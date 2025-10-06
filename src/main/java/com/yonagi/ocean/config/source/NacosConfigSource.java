@@ -23,8 +23,8 @@ public class NacosConfigSource implements ConfigSource {
 
         CacheConfig.Builder b = CacheConfig.builder();
         if (props == null) {
-            // 返回一个禁用配置，交给 Fallback 处理
-            return b.enabled(false).type(CacheConfig.Type.NONE).build();
+            // 返回 null 触发 Fallback 使用本地配置
+            return null;
         }
 
         boolean enabled = Boolean.parseBoolean(props.getProperty("server.cache.enabled", "false"));

@@ -3,7 +3,6 @@ package com.yonagi.ocean;
 import com.yonagi.ocean.cache.StaticFileCacheFactory;
 import com.yonagi.ocean.core.HttpServer;
 import com.yonagi.ocean.utils.LocalConfigLoader;
-import com.yonagi.ocean.utils.NacosConfigLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,7 +20,6 @@ public class Main {
 
     public static void main(String[] args) throws IOException {
         log.info("Ocean is starting...");
-        NacosConfigLoader.init();
         StaticFileCacheFactory.init();
         String property = LocalConfigLoader.getProperty("server.port");
         String webRoot = LocalConfigLoader.getProperty("server.webroot");

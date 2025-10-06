@@ -45,8 +45,9 @@ public class StaticFileCacheFactory {
     }
 
     private static void refresh() {
-        final CacheConfig cfg = configSource.load() != null
-                ? configSource.load()
+        final CacheConfig loaded = configSource.load();
+        final CacheConfig cfg = loaded != null
+                ? loaded
                 : CacheConfig.builder().enabled(false).type(CacheConfig.Type.NONE).build();
         StaticFileCache created;
         if (!cfg.isEnabled()) {
