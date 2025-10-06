@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.StringReader;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.Properties;
@@ -29,9 +30,9 @@ public class NacosConfigLoader {
     private static int retryInterval;
 
     public static void init() {
-        nacosEnabled = Boolean.parseBoolean(ConfigLoader.getProperty("nacos.enabled"));
-        maxRetries = Integer.parseInt(ConfigLoader.getProperty("nacos.max_retries"));
-        retryInterval = Integer.parseInt(ConfigLoader.getProperty("nacos.retry_interval_ms"));
+        nacosEnabled = Boolean.parseBoolean(LocalConfigLoader.getProperty("nacos.enabled"));
+        maxRetries = Integer.parseInt(LocalConfigLoader.getProperty("nacos.max_retries"));
+        retryInterval = Integer.parseInt(LocalConfigLoader.getProperty("nacos.retry_interval_ms"));
 
         if (!nacosEnabled) {
             log.warn("Nacos disabled in configuration, using local configuration only.");
@@ -41,7 +42,7 @@ public class NacosConfigLoader {
             if (configService != null) {
                 return;
             }
-            String serverAddr = ConfigLoader.getProperty("nacos.server_addr");
+            String serverAddr = LocalConfigLoader.getProperty("nacos.server_addr");
             if (!checkNacosConnectivity(serverAddr)) {
                 log.error("Nacos server is unreachable at {}. Falling back to local config.", serverAddr);
                 return;
@@ -89,20 +90,27 @@ public class NacosConfigLoader {
         return false;
     }
 
-    public static String getConfig(String dataId, String group, long timeoutMs) {
+    public static Properties getConfig(String dataId, String group, long timeoutMs) {
         if (configService == null) {
             log.warn("Nacos ConfigService is not initialized");
             return null;
         }
         try {
             int attempt = 0;
-            int maxRetries = Integer.parseInt(ConfigLoader.getProperty("nacos.max_retries"));
-            int retryInterval = Integer.parseInt(ConfigLoader.getProperty("nacos.retry_interval_ms"));
+            int maxRetries = Integer.parseInt(LocalConfigLoader.getProperty("nacos.max_retries"));
+            int retryInterval = Integer.parseInt(LocalConfigLoader.getProperty("nacos.retry_interval_ms"));
             while (attempt < maxRetries) {
                 try {
-                    String config = configService.getConfig(dataId, group, timeoutMs);
-                    if (config != null) {
-                        return config;
+                    String configContent = configService.getConfig(dataId, group, timeoutMs);
+                    if (configContent != null) {
+                        Properties props = new Properties();
+                        try (StringReader reader = new StringReader(configContent)) {
+                            props.load(reader);
+                        } catch (IOException e) {
+                            log.error("Nacos ConfigService failed to load properties from {}", configContent);
+                            return null;
+                        }
+                        return props;
                     }
                 } catch (NacosException e) {
                     log.warn("Fail to fetch configuration from Nacos, attempt {}/{}", attempt + 1, maxRetries, e);
