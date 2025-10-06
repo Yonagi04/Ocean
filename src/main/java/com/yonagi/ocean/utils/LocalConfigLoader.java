@@ -11,11 +11,11 @@ import java.util.Properties;
  * @description 通用配置加载类
  * @date 2025/10/05 10:39
  */
-public class ConfigLoader {
+public class LocalConfigLoader {
     private static final Properties properties = new Properties();
 
     static {
-        try (InputStream inputStream = ConfigLoader.class.getResourceAsStream("/server.properties")) {
+        try (InputStream inputStream = LocalConfigLoader.class.getResourceAsStream("/server.properties")) {
             if (inputStream != null) {
                 properties.load(inputStream);
             } else {
@@ -26,7 +26,7 @@ public class ConfigLoader {
         }
     }
 
-    private ConfigLoader() {}
+    private LocalConfigLoader() {}
 
     public static String getProperty(String key) {
         return properties.getProperty(key);

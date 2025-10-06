@@ -1,7 +1,7 @@
 package com.yonagi.ocean.core;
 
 import com.yonagi.ocean.cache.StaticFileCacheFactory;
-import com.yonagi.ocean.utils.ConfigLoader;
+import com.yonagi.ocean.utils.LocalConfigLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,7 +31,7 @@ public class HttpServer {
 
     public HttpServer(Integer port, String webRoot) {
         int corePoolSize = Math.min(Runtime.getRuntime().availableProcessors(),
-                ConfigLoader.getProperty("server.threads") == null ? 2 : Integer.parseInt(ConfigLoader.getProperty("server.threads")));
+                LocalConfigLoader.getProperty("server.threads") == null ? 2 : Integer.parseInt(LocalConfigLoader.getProperty("server.threads")));
         int maximumPoolSize = Runtime.getRuntime().availableProcessors() + 1;
         this.port = port;
         this.threadPool = new ThreadPoolExecutor(

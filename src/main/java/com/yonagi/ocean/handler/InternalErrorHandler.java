@@ -4,14 +4,12 @@ import com.yonagi.ocean.cache.CachedFile;
 import com.yonagi.ocean.cache.StaticFileCache;
 import com.yonagi.ocean.cache.StaticFileCacheFactory;
 import com.yonagi.ocean.core.HttpResponse;
-import com.yonagi.ocean.utils.ConfigLoader;
+import com.yonagi.ocean.utils.LocalConfigLoader;
 import com.yonagi.ocean.utils.MimeTypeUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.InputStream;
 import java.io.OutputStream;
 
 /**
@@ -49,7 +47,7 @@ public class InternalErrorHandler {
     private final StaticFileCache fileCache = StaticFileCacheFactory.getInstance();
 
     public InternalErrorHandler() {
-        this.errorPagePath = ConfigLoader.getProperty("server.internal_error_page");
+        this.errorPagePath = LocalConfigLoader.getProperty("server.internal_error_page");
     }
 
     public void handleInternalError(OutputStream outputStream) {

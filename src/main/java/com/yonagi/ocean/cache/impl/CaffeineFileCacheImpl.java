@@ -4,7 +4,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.yonagi.ocean.cache.CachedFile;
 import com.yonagi.ocean.cache.StaticFileCache;
-import com.yonagi.ocean.utils.ConfigLoader;
+import com.yonagi.ocean.utils.LocalConfigLoader;
 import com.yonagi.ocean.utils.MimeTypeUtil;
 
 import java.io.File;
@@ -25,21 +25,21 @@ public class CaffeineFileCacheImpl implements StaticFileCache {
 
     public CaffeineFileCacheImpl() {
         Caffeine<Object, Object> builder = Caffeine.newBuilder();
-        if ("ACCESS".equalsIgnoreCase(ConfigLoader.getProperty("server.cache.caffeine.expire_type"))) {
-            builder.expireAfterAccess(Math.max(Long.parseLong(ConfigLoader.getProperty("server.cache.caffeine.ttl_ms")), 60000L), TimeUnit.MILLISECONDS);
+        if ("ACCESS".equalsIgnoreCase(LocalConfigLoader.getProperty("server.cache.caffeine.expire_type"))) {
+            builder.expireAfterAccess(Math.max(Long.parseLong(LocalConfigLoader.getProperty("server.cache.caffeine.ttl_ms")), 60000L), TimeUnit.MILLISECONDS);
         } else {
-            builder.expireAfterWrite(Math.max(Long.parseLong(ConfigLoader.getProperty("server.cache.caffeine.ttl_ms")), 60000L), TimeUnit.MILLISECONDS);
+            builder.expireAfterWrite(Math.max(Long.parseLong(LocalConfigLoader.getProperty("server.cache.caffeine.ttl_ms")), 60000L), TimeUnit.MILLISECONDS);
         }
 
-        if ("MEMORY".equalsIgnoreCase(ConfigLoader.getProperty("server.cache.caffeine.policy"))) {
+        if ("MEMORY".equalsIgnoreCase(LocalConfigLoader.getProperty("server.cache.caffeine.policy"))) {
             // weight in KB
-            builder.maximumWeight(Math.max(Long.parseLong(ConfigLoader.getProperty("server.cache.caffeine.max_memory_mb")), 100))
+            builder.maximumWeight(Math.max(Long.parseLong(LocalConfigLoader.getProperty("server.cache.caffeine.max_memory_mb")), 100))
                     .weigher((String key, CachedFile value) -> value.getContent().length / 1024);
         } else {
-            builder.maximumSize(Math.max(Long.parseLong(ConfigLoader.getProperty("server.cache.caffeine.max_entries")), 100));
+            builder.maximumSize(Math.max(Long.parseLong(LocalConfigLoader.getProperty("server.cache.caffeine.max_entries")), 100));
         }
 
-        if (Boolean.parseBoolean(ConfigLoader.getProperty("server.cache.caffeine.is_soft_values"))) {
+        if (Boolean.parseBoolean(LocalConfigLoader.getProperty("server.cache.caffeine.is_soft_values"))) {
             builder.softValues();
         }
         builder.recordStats();

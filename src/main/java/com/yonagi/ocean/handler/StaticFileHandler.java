@@ -2,7 +2,7 @@ package com.yonagi.ocean.handler;
 
 import com.yonagi.ocean.cache.*;
 import com.yonagi.ocean.core.HttpResponse;
-import com.yonagi.ocean.utils.ConfigLoader;
+import com.yonagi.ocean.utils.LocalConfigLoader;
 import com.yonagi.ocean.utils.MimeTypeUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,7 +46,7 @@ public class StaticFileHandler {
 
     public StaticFileHandler(String webRoot) {
         this.webRoot = webRoot;
-        this.errorPagePath = ConfigLoader.getProperty("server.404_page");
+        this.errorPagePath = LocalConfigLoader.getProperty("server.404_page");
     }
 
     public void handle(String uri, OutputStream outputStream) throws IOException {
