@@ -2,7 +2,7 @@ package com.yonagi.ocean.cache.impl;
 
 import com.yonagi.ocean.cache.CachedFile;
 import com.yonagi.ocean.cache.StaticFileCache;
-import com.yonagi.ocean.utils.LocalConfigLoader;
+import com.yonagi.ocean.config.CacheConfig;
 import com.yonagi.ocean.utils.MimeTypeUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,16 +41,20 @@ public class LRUFileCacheImpl implements StaticFileCache {
     private static final Logger log = LoggerFactory.getLogger(LRUFileCacheImpl.class);
 
     public LRUFileCacheImpl() {
-        this.maxEntries = Math.max(Integer.parseInt(LocalConfigLoader.getProperty("server.cache.lru.max_entries")), 1);
-        this.ttlMs = Math.max(Long.parseLong(LocalConfigLoader.getProperty("server.cache.lru.ttl_ms")), 60 * 1000);
+        this(CacheConfig.builder().type(CacheConfig.Type.LRU).build());
+    }
+
+    public LRUFileCacheImpl(CacheConfig config) {
+        this.maxEntries = Math.max(config.getLruMaxEntries(), 1);
+        this.ttlMs = Math.max(config.getLruTtlMs(), 60 * 1000);
         this.cache = new LinkedHashMap<String, CachedFile>(16, 0.75f, true) {
             @Override
             protected boolean removeEldestEntry(Map.Entry<String, CachedFile> eldest) {
                 return size() > maxEntries;
             }
         };
-        this.policy = LocalConfigLoader.getProperty("server.cache.lru.policy");
-        this.maxMemoryBytes = Math.max(Long.parseLong(LocalConfigLoader.getProperty("server.cache.lru.max_memory_mb")), 64);
+        this.policy = config.getLruPolicy();
+        this.maxMemoryBytes = Math.max(config.getLruMaxMemoryMb(), 64);
         this.currentMemoryBytes = 0;
     }
 

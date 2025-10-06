@@ -1,19 +1,20 @@
 package com.yonagi.ocean.cache;
 
-import com.alibaba.nacos.api.config.listener.Listener;
-import com.yonagi.ocean.cache.impl.CaffeineFileCacheImpl;
-import com.yonagi.ocean.cache.impl.LRUFileCacheImpl;
-import com.yonagi.ocean.cache.impl.NoCacheImpl;
-import com.yonagi.ocean.utils.LocalConfigLoader;
-import com.yonagi.ocean.utils.NacosConfigLoader;
+import com.yonagi.ocean.cache.provider.CacheProvider;
+import com.yonagi.ocean.cache.provider.CaffeineCacheProvider;
+import com.yonagi.ocean.cache.provider.LRUCacheProvider;
+import com.yonagi.ocean.cache.provider.NoCacheProvider;
+import com.yonagi.ocean.config.CacheConfig;
+import com.yonagi.ocean.config.source.ConfigSource;
+import com.yonagi.ocean.config.source.FallbackConfigSource;
+import com.yonagi.ocean.config.source.LocalConfigSource;
+import com.yonagi.ocean.config.source.NacosConfigSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.io.StringReader;
-import java.util.Objects;
-import java.util.Properties;
-import java.util.concurrent.Executor;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * @author Yonagi
@@ -26,95 +27,47 @@ public class StaticFileCacheFactory {
 
     private static final Logger log = LoggerFactory.getLogger(StaticFileCacheFactory.class);
 
-    private static StaticFileCache INSTANCE;
+    private static final AtomicReference<StaticFileCache> REF = new AtomicReference<>();
+    private static List<CacheProvider> providers;
+    private static ConfigSource configSource;
 
     private StaticFileCacheFactory() {}
 
     public static void init() {
-        if (INSTANCE != null) {
-            return;
-        }
+        if (REF.get() != null) return;
         synchronized (StaticFileCacheFactory.class) {
-            if (INSTANCE != null) {
-                return;
-            }
-            buildCache();
-            addNacosListener();
+            if (REF.get() != null) return;
+            providers = Arrays.asList(new LRUCacheProvider(), new CaffeineCacheProvider(), new NoCacheProvider());
+            configSource = new FallbackConfigSource(new NacosConfigSource(), new LocalConfigSource());
+            refresh();
+            configSource.onChange(StaticFileCacheFactory::refresh);
         }
     }
 
-    private static void buildCache() {
-        String dataId = LocalConfigLoader.getProperty("nacos.data_id");
-        String group = LocalConfigLoader.getProperty("nacos.group");
-        String cacheType = Objects.requireNonNull(NacosConfigLoader.getConfig(dataId,
-                        group,
-                        3000))
-                .getProperty("server.cache.type");
-        if (cacheType == null) {
-            log.warn("server.cache.type from Nacos is null, use local config");
-            cacheType = LocalConfigLoader.getProperty("server.cache.type");
-        }
-        String cacheEnabledString = Objects.requireNonNull(NacosConfigLoader.getConfig(dataId,
-                        "DEFAULT_GROUP",
-                        3000))
-                .getProperty("server.cache.enabled");
-        if (cacheEnabledString == null) {
-            log.warn("server.cache.enabled from Nacos is null, use local config");
-            cacheEnabledString = LocalConfigLoader.getProperty("server.cache.enabled");
-        }
-        boolean cacheEnabled = Boolean.parseBoolean(cacheEnabledString);
-        if (!cacheEnabled) {
-            log.info("Server cache disabled");
-            INSTANCE = new NoCacheImpl();
-            return;
-        }
-        if ("LRU".equalsIgnoreCase(cacheType)) {
-            log.info("LRU cache enabled");
-            INSTANCE = new LRUFileCacheImpl();
-            INSTANCE.startCleaner(Math.max(Long.parseLong(LocalConfigLoader.getProperty("server.cache.lru.cleanup_interval_ms")), 60000));
-            boolean enableDynamicAdjustment = Boolean.parseBoolean(LocalConfigLoader.getProperty("server.cache.lru.dynamic_adjustment"));
-            if (enableDynamicAdjustment) {
-                INSTANCE.startAdjuster(Math.max(Long.parseLong(LocalConfigLoader.getProperty("server.cache.lru.dynamic_adjustment_interval_ms")), 60000));
-            }
-        } else if ("Caffeine".equalsIgnoreCase(cacheType)) {
-            log.info("Caffeine cache enabled");
-            INSTANCE = new CaffeineFileCacheImpl();
+    private static void refresh() {
+        final CacheConfig cfg = configSource.load() != null
+                ? configSource.load()
+                : CacheConfig.builder().enabled(false).type(CacheConfig.Type.NONE).build();
+        StaticFileCache created;
+        if (!cfg.isEnabled()) {
+            created = new NoCacheProvider().create(cfg);
         } else {
-            log.info("No cache enabled");
-            INSTANCE = new NoCacheImpl();
+            created = providers.stream()
+                    .filter(p -> p.supports(cfg.getType()))
+                    .findFirst()
+                    .orElse(new NoCacheProvider())
+                    .create(cfg);
         }
+        REF.set(created);
+        log.info("StaticFileCache refreshed to type {} (enabled={})", cfg.getType(), cfg.isEnabled());
     }
 
     public static StaticFileCache getInstance() {
-        if (INSTANCE == null) {
+        if (REF.get() == null) {
             init();
         }
-        return INSTANCE;
+        return REF.get();
     }
 
-    private static void addNacosListener() {
-        String dataId = LocalConfigLoader.getProperty("nacos.data_id");
-        String group = LocalConfigLoader.getProperty("nacos.group");
-        NacosConfigLoader.addListener(dataId, group, new Listener() {
-            @Override
-            public Executor getExecutor() {
-                return null;
-            }
-
-            @Override
-            public void receiveConfigInfo(String configContent) {
-                Properties props = new Properties();
-                try (StringReader reader = new StringReader(configContent)) {
-                    props.load(reader);
-                } catch (IOException e) {
-                    log.error("Nacos Listener failed to load properties from {}", configContent);
-                    return;
-                }
-                boolean newCacheEnabled = Boolean.parseBoolean(props.getProperty("server.cache.enabled"));
-                String newCacheType = props.getProperty("server.cache.type");
-                log.info("Nacos Listener received new cache config: enabled={}, type={}", newCacheEnabled, newCacheType);
-                buildCache();
-            }
-        });
-    }
+    // 监听已由 ConfigSource 内部负责
 }
