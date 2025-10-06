@@ -1,7 +1,9 @@
 package com.yonagi.ocean;
 
+import com.yonagi.ocean.cache.StaticFileCacheFactory;
 import com.yonagi.ocean.core.HttpServer;
 import com.yonagi.ocean.utils.ConfigLoader;
+import com.yonagi.ocean.utils.NacosConfigLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,7 +21,8 @@ public class Main {
 
     public static void main(String[] args) throws IOException {
         log.info("Ocean is starting...");
-
+        NacosConfigLoader.init();
+        StaticFileCacheFactory.init();
         String property = ConfigLoader.getProperty("server.port");
         String webRoot = ConfigLoader.getProperty("server.webroot");
         new HttpServer(Integer.parseInt(property), webRoot).start();

@@ -7,7 +7,9 @@ import com.alibaba.nacos.api.exception.NacosException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.http.WebSocket;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.util.Properties;
 
 /**
@@ -20,20 +22,71 @@ import java.util.Properties;
 public class NacosConfigLoader {
 
     private static final Logger log = LoggerFactory.getLogger(NacosConfigLoader.class);
-    private static ConfigService configService;
+    private static volatile ConfigService configService;
 
-    static {
-        try {
-            boolean nacosEnabled = Boolean.parseBoolean(ConfigLoader.getProperty("nacos.enabled"));
-            if (nacosEnabled) {
-                Properties properties = new Properties();
-                properties.put("serverAddr", ConfigLoader.getProperty("nacos.server_addr"));
-                configService = NacosFactory.createConfigService(properties);
-                log.info("Configuration from Nacos enabled");
-            }
-        } catch (Exception e) {
-            log.error("Failed to initialize Nacos ConfigService", e);
+    private static boolean nacosEnabled;
+    private static int maxRetries;
+    private static int retryInterval;
+
+    public static void init() {
+        nacosEnabled = Boolean.parseBoolean(ConfigLoader.getProperty("nacos.enabled"));
+        maxRetries = Integer.parseInt(ConfigLoader.getProperty("nacos.max_retries"));
+        retryInterval = Integer.parseInt(ConfigLoader.getProperty("nacos.retry_interval_ms"));
+
+        if (!nacosEnabled) {
+            log.warn("Nacos disabled in configuration, using local configuration only.");
+            return;
         }
+        synchronized (NacosConfigLoader.class) {
+            if (configService != null) {
+                return;
+            }
+            String serverAddr = ConfigLoader.getProperty("nacos.server_addr");
+            if (!checkNacosConnectivity(serverAddr)) {
+                log.error("Nacos server is unreachable at {}. Falling back to local config.", serverAddr);
+                return;
+            }
+            Properties props = new Properties();
+            props.put("serverAddr", serverAddr);
+            for (int attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                    configService = NacosFactory.createConfigService(props);
+                    log.info("Nacos ConfigService created (attempt {}/{})", attempt, maxRetries);
+
+                    configService.getServerStatus();
+                    log.info("Successfully connected to Nacos Server");
+                    return;
+                } catch (Exception e) {
+                    log.warn("Attempt {}/{}: Failed to connect Nacos - {}", attempt, maxRetries, e.getMessage());
+                    try {
+                        Thread.sleep((long)retryInterval * attempt);
+                    } catch (InterruptedException ignored) {}
+                }
+            }
+            configService = null;
+            log.error("Failed to connect to Nacos after {} attemps. Falling back to local config.", maxRetries);
+        }
+    }
+
+    private static boolean checkNacosConnectivity(String serverAddr) {
+        String[] parts = serverAddr.split(":");
+        String host = parts[0];
+        int port = parts.length > 1 ? Integer.parseInt(parts[1]) : 8848;
+
+        for (int attempt = 0; attempt < maxRetries; attempt++) {
+            try (Socket socket = new Socket()) {
+                socket.connect(new InetSocketAddress(host, port));
+                return true;
+            } catch (IOException e) {
+                log.warn("Attempt {}/{}: Cannot connect to Nacos server at {}:{}", attempt + 1, maxRetries, host, port);
+                try {
+                    Thread.sleep((long) retryInterval * (attempt + 1));
+                } catch (InterruptedException ignored) {
+
+                }
+            }
+        }
+        return false;
     }
 
     public static String getConfig(String dataId, String group, long timeoutMs) {
@@ -43,7 +96,7 @@ public class NacosConfigLoader {
         }
         try {
             int attempt = 0;
-            int maxRetries = Integer.parseInt(ConfigLoader.getProperty("nacos.max_entries"));
+            int maxRetries = Integer.parseInt(ConfigLoader.getProperty("nacos.max_retries"));
             int retryInterval = Integer.parseInt(ConfigLoader.getProperty("nacos.retry_interval_ms"));
             while (attempt < maxRetries) {
                 try {
@@ -57,22 +110,23 @@ public class NacosConfigLoader {
                 attempt++;
                 Thread.sleep((long) retryInterval * attempt);
             }
-        } catch (InterruptedException ie) {
-            Thread.currentThread().interrupt();
-            log.error("Thread was interrupted while fetching config from Nacos", ie);
+        } catch (InterruptedException ignored) {
+
         }
         log.error("Could not fetch config from Nacos after \" + maxRetries + \" attempts. Using local config.");
         return null;
     }
 
     public static void addListener(String dataId, String group, Listener listener) {
-        if (!Boolean.parseBoolean(ConfigLoader.getProperty("nacos.enabled"))) {
+        if (!nacosEnabled || configService == null) {
+            log.warn("Nacos not available, listener not registered for [{}:{}]", group, dataId);
             return;
         }
         try {
             configService.addListener(dataId, group, listener);
+            log.info("Listener added for [{}:{}]", group, dataId);
         } catch (Exception e) {
-            log.error("Failed to add listener to Nacos Config", e);
+            log.error("Failed to add listener [{}:{}]", group, dataId, e);
         }
     }
 }
