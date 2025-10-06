@@ -34,9 +34,13 @@ public class StaticFileCacheFactory {
     private StaticFileCacheFactory() {}
 
     public static void init() {
-        if (REF.get() != null) return;
+        if (REF.get() != null) {
+            return;
+        }
         synchronized (StaticFileCacheFactory.class) {
-            if (REF.get() != null) return;
+            if (REF.get() != null) {
+                return;
+            }
             providers = Arrays.asList(new LRUCacheProvider(), new CaffeineCacheProvider(), new NoCacheProvider());
             configSource = new FallbackConfigSource(new NacosConfigSource(), new LocalConfigSource());
             refresh();
@@ -61,6 +65,15 @@ public class StaticFileCacheFactory {
         }
         REF.set(created);
         log.info("StaticFileCache refreshed to type {} (enabled={})", cfg.getType(), cfg.isEnabled());
+        if (CacheConfig.Type.LRU.equals(cfg.getType())) {
+            log.info("LRU Config: maxEntries={}, ttlMs={}, policy={}, maxMemoryMb={}, dynamicAdjustment={}, adjustIntervalMs={}",
+                    cfg.getLruMaxEntries(), cfg.getLruTtlMs(), cfg.getLruPolicy(), cfg.getLruMaxMemoryMb(),
+                    cfg.isLruDynamicAdjustment(), cfg.getLruAdjustIntervalMs());
+        } else if (CacheConfig.Type.CAFFEINE.equals(cfg.getType())) {
+            log.info("Caffeine Config: expireType={}, ttlMs={}, policy={}, maxEntries={}, maxMemoryMb={}, isSoftValues={}",
+                    cfg.getCaffeineExpireType(), cfg.getCaffeineTtlMs(), cfg.getCaffeinePolicy(),
+                    cfg.getCaffeineMaxEntries(), cfg.getCaffeineMaxMemoryMb(), cfg.isCaffeineSoftValues());
+        }
     }
 
     public static StaticFileCache getInstance() {

@@ -70,7 +70,9 @@ public class NacosConfigSource implements ConfigSource {
             public Executor getExecutor() { return null; }
             @Override
             public void receiveConfigInfo(String configContent) {
-                if (callback != null) callback.run();
+                if (callback != null) {
+                    callback.run();
+                }
             }
         });
     }
@@ -86,15 +88,21 @@ public class NacosConfigSource implements ConfigSource {
     }
     private void setIfPresentInt(Properties p, String key, IntSetter setter) {
         String v = p.getProperty(key);
-        if (v != null) setter.set(Integer.parseInt(v));
+        if (v != null) {
+            setter.set(Integer.parseInt(v));
+        }
     }
     private void setIfPresentLong(Properties p, String key, LongSetter setter) {
         String v = p.getProperty(key);
-        if (v != null) setter.set(Long.parseLong(v));
+        if (v != null) {
+            setter.set(Long.parseLong(v));
+        }
     }
     private void setIfPresentBool(Properties p, String key, BoolSetter setter) {
         String v = p.getProperty(key);
-        if (v != null) setter.set(Boolean.parseBoolean(v));
+        if (v != null) {
+            setter.set(Boolean.parseBoolean(v));
+        }
     }
 }
 
