@@ -27,7 +27,7 @@ public class NacosConfigLoader {
             boolean nacosEnabled = Boolean.parseBoolean(ConfigLoader.getProperty("nacos.enabled"));
             if (nacosEnabled) {
                 Properties properties = new Properties();
-                properties.put("serverAddr", ConfigLoader.getProperty("nacos.serverAddr"));
+                properties.put("serverAddr", ConfigLoader.getProperty("nacos.server_addr"));
                 configService = NacosFactory.createConfigService(properties);
                 log.info("Configuration from Nacos enabled");
             }
@@ -42,11 +42,27 @@ public class NacosConfigLoader {
             return null;
         }
         try {
-            return configService.getConfig(dataId, group, timeoutMs);
-        } catch (NacosException e) {
-            log.error("Failed to get config from Nacos", e);
-            return null;
+            int attempt = 0;
+            int maxRetries = Integer.parseInt(ConfigLoader.getProperty("nacos.max_entries"));
+            int retryInterval = Integer.parseInt(ConfigLoader.getProperty("nacos.retry_interval_ms"));
+            while (attempt < maxRetries) {
+                try {
+                    String config = configService.getConfig(dataId, group, timeoutMs);
+                    if (config != null) {
+                        return config;
+                    }
+                } catch (NacosException e) {
+                    log.warn("Fail to fetch configuration from Nacos, attempt {}/{}", attempt + 1, maxRetries, e);
+                }
+                attempt++;
+                Thread.sleep((long) retryInterval * attempt);
+            }
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            log.error("Thread was interrupted while fetching config from Nacos", ie);
         }
+        log.error("Could not fetch config from Nacos after \" + maxRetries + \" attempts. Using local config.");
+        return null;
     }
 
     public static void addListener(String dataId, String group, Listener listener) {
