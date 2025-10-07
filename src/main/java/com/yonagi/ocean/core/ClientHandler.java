@@ -46,9 +46,9 @@ public class ClientHandler implements Runnable {
             }
             Map<HttpMethod, RequestHandler> handlers = Map.of(
                     HttpMethod.GET, new StaticFileHandler(webRoot),
-                    HttpMethod.POST, new ApiHandler(),
-                    HttpMethod.HEAD, new HeadHandler(),
-                    HttpMethod.OPTIONS, new OptionsHandler()
+                    HttpMethod.POST, new ApiHandler(webRoot),
+                    HttpMethod.HEAD, new HeadHandler(webRoot),
+                    HttpMethod.OPTIONS, new OptionsHandler(webRoot)
             );
 
             HttpMethod method = request.getMethod();

@@ -15,6 +15,12 @@ import java.io.OutputStream;
  */
 public class OptionsHandler implements RequestHandler {
 
+    private static String webRoot;
+
+    public OptionsHandler(String webRoot) {
+        this.webRoot = webRoot;
+    }
+
     @Override
     public void handle(HttpRequest request, OutputStream output) throws IOException {
 

@@ -52,7 +52,7 @@ public class StaticFileHandler implements RequestHandler {
     }
 
     @Override
-    public void handle(HttpRequest request, OutputStream outputStream) throws IOException{
+    public void handle(HttpRequest request, OutputStream outputStream) throws IOException {
         String uri = request.getUri();
         if ("/".equals(uri)) {
             uri = "/index.html";
@@ -96,28 +96,24 @@ public class StaticFileHandler implements RequestHandler {
         }
     }
 
-    private void writeNotFound(OutputStream outputStream) {
+    private void writeNotFound(OutputStream outputStream) throws IOException {
         File errorPage = new File(errorPagePath);
-        try {
-            if (errorPage.exists()) {
-                HttpRequest request = new HttpRequest.Builder()
-                        .method(HttpMethod.GET)
-                        .uri(errorPagePath)
-                        .httpVersion(HttpVersion.HTTP_1_1)
-                        .build();
-                handle(request, outputStream);
-            }
-            HttpResponse httpResponse = new HttpResponse.Builder()
+        if (errorPage.exists()) {
+            HttpRequest request = new HttpRequest.Builder()
+                    .method(HttpMethod.GET)
+                    .uri(errorPagePath)
                     .httpVersion(HttpVersion.HTTP_1_1)
-                    .statusCode(404)
-                    .statusText("Not Found")
-                    .contentType("text/html")
-                    .body(DEFAULT_404_HTML.getBytes())
                     .build();
-            outputStream.write(httpResponse.toString().getBytes());
-            outputStream.flush();
-        } catch (IOException e) {
-            e.printStackTrace();
+            handle(request, outputStream);
         }
+        HttpResponse httpResponse = new HttpResponse.Builder()
+                .httpVersion(HttpVersion.HTTP_1_1)
+                .statusCode(404)
+                .statusText("Not Found")
+                .contentType("text/html")
+                .body(DEFAULT_404_HTML.getBytes())
+                .build();
+        outputStream.write(httpResponse.toString().getBytes());
+        outputStream.flush();
     }
 }
