@@ -33,6 +33,12 @@ public class ApiHandler implements RequestHandler {
 
     private static final Logger log = LoggerFactory.getLogger(ApiHandler.class);
 
+    private final String webRoot;
+
+    public ApiHandler(String webRoot) {
+        this.webRoot = webRoot;
+    }
+
     /**
      * Form-data字段表示类
      */
@@ -58,17 +64,31 @@ public class ApiHandler implements RequestHandler {
         }
 
         // Getters
-        public String getName() { return name; }
-        public String getValue() { return value; }
-        public String getFilename() { return filename; }
-        public String getContentType() { return contentType; }
-        public boolean isFile() { return isFile; }
+        public String getName() {
+            return name;
+        }
+
+        public String getValue() {
+            return value;
+        }
+
+        public String getFilename() {
+            return filename;
+        }
+
+        public String getContentType() {
+            return contentType;
+        }
+
+        public boolean isFile() {
+            return isFile;
+        }
 
         @Override
         public String toString() {
             if (isFile) {
-                return String.format("FormField{name='%s', filename='%s', contentType='%s', isFile=true}", 
-                    name, filename, contentType);
+                return String.format("FormField{name='%s', filename='%s', contentType='%s', isFile=true}",
+                        name, filename, contentType);
             } else {
                 return String.format("FormField{name='%s', value='%s', isFile=false}", name, value);
             }
@@ -84,66 +104,10 @@ public class ApiHandler implements RequestHandler {
         if (contentType.contains("charset=")) {
             charset = contentType.split("charset=")[1].trim();
         }
-        if ("application/x-www-form-urlencoded".equals(mimeType)) {
-            Map<String, String> formParams = parseFormData(request.getBody(), charset);
-            responseData.put("status", "ok");
-            responseData.put("data", formParams);
-        } else if ("application/json".equals(mimeType)) {
-            Map<String, Object> jsonData = objectMapper.readValue(request.getBody(), Map.class);
-            responseData.put("status", "ok");
-            responseData.put("data", jsonData);
-        } else if ("application/xml".equals(mimeType)) {
-            try {
-                Map<String, Object> xmlData = parseXmlData(request.getBody(), charset);
-                responseData.put("status", "ok");
-                responseData.put("data", xmlData);
-            } catch (Exception e) {
-                log.error("Error parsing XML data: {}", e.getMessage(), e);
-                HttpResponse errorResponse = new HttpResponse.Builder()
-                        .httpVersion(request.getHttpVersion())
-                        .statusCode(400)
-                        .statusText("Bad Request")
-                        .contentType("text/plain")
-                        .body(("XML parsing error: " + e.getMessage()).getBytes())
-                        .build();
-                output.write(errorResponse.toString().getBytes());
-                output.flush();
-                return;
-            }
-        } else if ("multipart/form-data".equals(mimeType)) {
-            try {
-                List<FormField> formFields = parseMultipartFormData(request.getBody(), contentType, charset);
-                Map<String, Object> formData = new HashMap<>();
-                for (FormField field : formFields) {
-                    if (field.isFile()) {
-                        // 对于文件字段，存储文件信息
-                        Map<String, Object> fileInfo = new HashMap<>();
-                        fileInfo.put("filename", field.getFilename());
-                        fileInfo.put("contentType", field.getContentType());
-                        fileInfo.put("size", field.getValue().length());
-                        formData.put(field.getName(), fileInfo);
-                    } else {
-                        // 对于普通字段，直接存储值
-                        formData.put(field.getName(), field.getValue());
-                    }
-                }
-                responseData.put("status", "ok");
-                responseData.put("data", formData);
-                responseData.put("fields", formFields.size());
-            } catch (Exception e) {
-                log.error("Error parsing multipart form data: {}", e.getMessage(), e);
-                HttpResponse errorResponse = new HttpResponse.Builder()
-                        .httpVersion(request.getHttpVersion())
-                        .statusCode(400)
-                        .statusText("Bad Request")
-                        .contentType("text/plain")
-                        .body(("Multipart form data parsing error: " + e.getMessage()).getBytes())
-                        .build();
-                output.write(errorResponse.toString().getBytes());
-                output.flush();
-                return;
-            }
-        } else {
+
+        // 使用策略映射替代 if-else
+        ContentProcessor processor = processors.get(mimeType);
+        if (processor == null) {
             HttpResponse response = new HttpResponse.Builder()
                     .httpVersion(request.getHttpVersion())
                     .statusCode(415)
@@ -156,6 +120,24 @@ public class ApiHandler implements RequestHandler {
             log.warn("Client sent unsupported Content-Type: {}", contentType);
             return;
         }
+
+        try {
+            processor.process(request, contentType, charset, responseData);
+        } catch (Exception e) {
+            String msgPrefix = "application/xml".equals(mimeType) ? "XML parsing error: " : "Multipart form data parsing error: ";
+            log.error("{}{}", msgPrefix, e.getMessage(), e);
+            HttpResponse errorResponse = new HttpResponse.Builder()
+                    .httpVersion(request.getHttpVersion())
+                    .statusCode(400)
+                    .statusText("Bad Request")
+                    .contentType("text/plain")
+                    .body((msgPrefix + e.getMessage()).getBytes())
+                    .build();
+            output.write(errorResponse.toString().getBytes());
+            output.flush();
+            return;
+        }
+
         String responseBody = objectMapper.writeValueAsString(responseData);
         HttpResponse response = new HttpResponse.Builder()
                 .httpVersion(request.getHttpVersion())
@@ -166,6 +148,57 @@ public class ApiHandler implements RequestHandler {
                 .build();
         output.write(response.toString().getBytes());
         output.flush();
+    }
+
+    @FunctionalInterface
+    private interface ContentProcessor {
+        void process(HttpRequest request, String contentType, String charset, Map<String, Object> responseData) throws Exception;
+    }
+
+    private final Map<String, ContentProcessor> processors = initProcessors();
+
+    private Map<String, ContentProcessor> initProcessors() {
+        Map<String, ContentProcessor> map = new HashMap<>();
+
+        map.put("application/x-www-form-urlencoded", (request, contentType, charset, responseData) -> {
+            Map<String, String> formParams = parseFormData(request.getBody(), charset);
+            responseData.put("status", "ok");
+            responseData.put("data", formParams);
+        });
+
+        map.put("application/json", (request, contentType, charset, responseData) -> {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> jsonData = objectMapper.readValue(request.getBody(), Map.class);
+            responseData.put("status", "ok");
+            responseData.put("data", jsonData);
+        });
+
+        map.put("application/xml", (request, contentType, charset, responseData) -> {
+            Map<String, Object> xmlData = parseXmlData(request.getBody(), charset);
+            responseData.put("status", "ok");
+            responseData.put("data", xmlData);
+        });
+
+        map.put("multipart/form-data", (request, contentType, charset, responseData) -> {
+            List<FormField> formFields = parseMultipartFormData(request.getBody(), contentType, charset);
+            Map<String, Object> formData = new HashMap<>();
+            for (FormField field : formFields) {
+                if (field.isFile()) {
+                    Map<String, Object> fileInfo = new HashMap<>();
+                    fileInfo.put("filename", field.getFilename());
+                    fileInfo.put("contentType", field.getContentType());
+                    fileInfo.put("size", field.getValue().length());
+                    formData.put(field.getName(), fileInfo);
+                } else {
+                    formData.put(field.getName(), field.getValue());
+                }
+            }
+            responseData.put("status", "ok");
+            responseData.put("data", formData);
+            responseData.put("fields", formFields.size());
+        });
+
+        return map;
     }
 
     private Map<String, String> parseFormData(byte[] body, String charset) {
@@ -202,26 +235,26 @@ public class ApiHandler implements RequestHandler {
 
     private List<FormField> parseMultipartFormData(byte[] body, String contentType, String charset) throws IOException {
         List<FormField> fields = new ArrayList<>();
-        
+
         // 从Content-Type中提取boundary
         String boundary = extractBoundary(contentType);
         if (boundary == null) {
             throw new IOException("Missing boundary in multipart/form-data");
         }
-        
+
         String boundaryDelimiter = "--" + boundary;
         String bodyString = new String(body, charset);
         log.debug("Parsing multipart form data with boundary: {}", boundary);
         log.debug("Body length: {}", body.length);
-        
+
         // 按边界分割数据
         String[] parts = bodyString.split(Pattern.quote(boundaryDelimiter));
-        
+
         for (String part : parts) {
             if (part.trim().isEmpty() || part.equals("--")) {
                 continue; // 跳过空部分和结束边界
             }
-            
+
             try {
                 FormField field = parseFormField(part, charset);
                 if (field != null) {
@@ -231,7 +264,7 @@ public class ApiHandler implements RequestHandler {
                 log.warn("Failed to parse form field: {}", e.getMessage());
             }
         }
-        
+
         return fields;
     }
 
@@ -256,22 +289,22 @@ public class ApiHandler implements RequestHandler {
         } else {
             headerEndIndex += 4;
         }
-        
+
         String headers = part.substring(0, headerEndIndex);
         String data = part.substring(headerEndIndex);
-        
+
         // 移除末尾的换行符
         data = data.replaceAll("\r?\n$", "");
-        
+
         // 解析Content-Disposition头部
         String name = extractFromHeader(headers, "name");
         String filename = extractFromHeader(headers, "filename");
         String contentType = extractFromHeader(headers, "Content-Type");
-        
+
         if (name == null) {
             return null;
         }
-        
+
         if (filename != null) {
             // 文件字段
             return new FormField(name, data, filename, contentType);
@@ -287,14 +320,14 @@ public class ApiHandler implements RequestHandler {
         if (matcher.find()) {
             return matcher.group(1);
         }
-        
+
         // 尝试不带引号的格式
         pattern = Pattern.compile(attributeName + "=([^;\\s]+)", Pattern.CASE_INSENSITIVE);
         matcher = pattern.matcher(headers);
         if (matcher.find()) {
             return matcher.group(1);
         }
-        
+
         return null;
     }
 }
