@@ -1,21 +1,41 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Welcome to Ocean!</title>
-    <style>
-        body {
-            width: 35em;
-            margin: 0 auto;
-            font-family: Tahoma, Verdana, Arial, sans-serif;
-        }
-    </style>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<h1>Welcome to Ocean!</h1>
-<p>This is the default welcome page for Ocean.</p>
+    <div class="container">
+        <h1>欢迎使用Ocean服务器！ <span class="status-indicator" title="服务器状态"></span></h1>
+        
+        <p>本页面是Ocean服务器的默认欢迎页面</p>
+        
+        <div class="features">
+            <h3>🌊 Ocean服务器特性</h3>
+            <ul>
+                <li>高性能HTTP服务器</li>
+                <li>支持静态文件服务</li>
+                <li>内置缓存机制</li>
+                <li>多配置源支持</li>
+                <li>现代化架构设计</li>
+            </ul>
+        </div>
+        
+        <p>如果需要自定义此页面，请替换位于项目 <code>/www/</code> 目录中的 <code>index.html</code> 文件。</p>
 
-<p>To customize this page, replace the <code>index.html</code> file located in the <code>/www/</code> directory of your project.</p>
+        <p><em>非常感谢您使用Ocean</em></p>
 
-<p><em>Thank you for using Ocean.</em></p>
+        <div class="info-box">
+            <strong>💡 提示:</strong> 您可以通过页面上的按钮来测试服务器功能。
+        </div>
+
+        <div class="footer">
+            <p>🌊 Ocean Web Server - 让Web服务更简单</p>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
 </body>
 </html>
