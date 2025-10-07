@@ -21,8 +21,6 @@ public class Main {
     public static void main(String[] args) throws IOException {
         log.info("Ocean is starting...");
         StaticFileCacheFactory.init();
-        String property = LocalConfigLoader.getProperty("server.port");
-        String webRoot = LocalConfigLoader.getProperty("server.webroot");
-        new HttpServer(Integer.parseInt(property), webRoot).start();
+        new HttpServer().start();
     }
 }

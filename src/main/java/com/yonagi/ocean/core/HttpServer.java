@@ -29,7 +29,9 @@ public class HttpServer {
 
     private static final Logger log = LoggerFactory.getLogger(HttpServer.class);
 
-    public HttpServer(Integer port, String webRoot) {
+    public HttpServer() {
+        int port = Integer.parseInt(LocalConfigLoader.getProperty("server.port"));
+        String webRoot = LocalConfigLoader.getProperty("server.webroot");
         int corePoolSize = Math.min(Runtime.getRuntime().availableProcessors(),
                 LocalConfigLoader.getProperty("server.threads") == null ? 2 : Integer.parseInt(LocalConfigLoader.getProperty("server.threads")));
         int maximumPoolSize = Runtime.getRuntime().availableProcessors() + 1;
