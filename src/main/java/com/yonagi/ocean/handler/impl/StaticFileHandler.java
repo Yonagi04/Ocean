@@ -12,6 +12,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * @author Yonagi
@@ -80,11 +82,38 @@ public class StaticFileHandler implements RequestHandler {
             boolean isInCache = fileCache.contain(file.getCanonicalPath());
             CachedFile cf = fileCache.get(file);
 
+            String etag = generateETag(cf);
+
+            Map<String, String> headers = new HashMap<>();
+            if (Boolean.parseBoolean(LocalConfigLoader.getProperty("server.http_cache.enabled"))) {
+                String maxAgeSecond = LocalConfigLoader.getProperty("server.http_cache.max_age_seconds");
+                String cacheScope = LocalConfigLoader.getProperty("server.http_cache.cache_scope");
+                String cacheControl = "max-age=" + maxAgeSecond + ", " + cacheScope;
+                headers.put("Cache-Control", cacheControl);
+                headers.put("ETag", etag);
+            }
+
+            String ifNoneMatch = request.getHeaders() != null ? request.getHeaders().get("if-none-match") : null;
+            if (ifNoneMatch != null && matchesEtag(ifNoneMatch, etag)) {
+                HttpResponse notModified = new HttpResponse.Builder()
+                        .httpVersion(request.getHttpVersion())
+                        .statusCode(304)
+                        .statusText("Not Modified")
+                        .contentType(contentType)
+                        .headers(headers)
+                        .build();
+                notModified.write(outputStream);
+                outputStream.flush();
+                log.info("Respond 304 Not Modified for {}", uri);
+                return;
+            }
+
             HttpResponse httpResponse = new HttpResponse.Builder()
                     .httpVersion(request.getHttpVersion())
                     .statusCode(200)
                     .statusText("OK")
                     .contentType(contentType)
+                    .headers(headers)
                     .body(cf.getContent())
                     .build();
             httpResponse.write(outputStream);
@@ -128,5 +157,25 @@ public class StaticFileHandler implements RequestHandler {
                 .build();
         httpResponse.write(outputStream);
         outputStream.flush();
+    }
+
+    private String generateETag(CachedFile cf) {
+        long lastModified = cf.getLastModified();
+        int length = cf.getContent() != null ? cf.getContent().length : 0;
+        return "\"" + lastModified + "-" + length + "\"";
+    }
+
+    private boolean matchesEtag(String ifNoneMatch, String etag) {
+        String candidate = ifNoneMatch.trim();
+        if ("*".equals(candidate)) {
+            return true;
+        }
+        String[] parts = candidate.split(",");
+        for (String part : parts) {
+            if (etag.equals(part.trim())) {
+                return true;
+            }
+        }
+        return false;
     }
 }
