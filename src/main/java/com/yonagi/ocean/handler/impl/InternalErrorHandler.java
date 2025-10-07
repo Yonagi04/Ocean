@@ -1,9 +1,12 @@
-package com.yonagi.ocean.handler;
+package com.yonagi.ocean.handler.impl;
 
 import com.yonagi.ocean.cache.CachedFile;
 import com.yonagi.ocean.cache.StaticFileCache;
 import com.yonagi.ocean.cache.StaticFileCacheFactory;
-import com.yonagi.ocean.core.HttpResponse;
+import com.yonagi.ocean.core.protocol.HttpRequest;
+import com.yonagi.ocean.core.protocol.HttpResponse;
+import com.yonagi.ocean.core.protocol.HttpVersion;
+import com.yonagi.ocean.handler.RequestHandler;
 import com.yonagi.ocean.utils.LocalConfigLoader;
 import com.yonagi.ocean.utils.MimeTypeUtil;
 import org.slf4j.Logger;
@@ -19,7 +22,7 @@ import java.io.OutputStream;
  * @description
  * @date 2025/10/05 16:01
  */
-public class InternalErrorHandler {
+public class InternalErrorHandler implements RequestHandler {
 
     private final String errorPagePath;
 
@@ -50,50 +53,41 @@ public class InternalErrorHandler {
         this.errorPagePath = LocalConfigLoader.getProperty("server.internal_error_page");
     }
 
-    public void handleInternalError(OutputStream outputStream) {
+    @Override
+    public void handle(HttpRequest request, OutputStream outputStream) {
         File errorPage = new File(errorPagePath);
         if (errorPage.exists()) {
             try {
-                handle(outputStream);
+                String contentType = MimeTypeUtil.getMimeType(errorPage.getName());
+                if (contentType == null) {
+                    contentType = "text/html";
+                }
+                CachedFile cf = fileCache.get(errorPage);
+                HttpResponse httpResponse = new HttpResponse.Builder()
+                        .httpVersion(request.getHttpVersion())
+                        .statusCode(500)
+                        .statusText("Internal Server Error")
+                        .contentType(contentType)
+                        .body(cf.getContent())
+                        .build();
+                outputStream.write(httpResponse.toString().getBytes());
+                outputStream.flush();
             } catch (Exception ex) {
-                log.error("Error in handle method: {}", ex.getMessage(), ex);
-                ex.printStackTrace();
+                log.error("Error serving internal error page: {}", ex.getMessage(), ex);
+                writeDefaultErrorResponse(outputStream);
             }
         } else {
             log.info("Error page not found, using default error response");
-            writeDefaultErrorResponse(outputStream, 500, "Internal Server Error");
+            writeDefaultErrorResponse(outputStream);
         }
     }
 
-    private void handle(OutputStream outputStream) {
-        File errorPage = new File(errorPagePath);
-        String contentType = MimeTypeUtil.getMimeType(errorPage.getName());
-        if (contentType == null) {
-            contentType = "text/html";
-        }
+    private void writeDefaultErrorResponse(OutputStream outputStream) {
         try {
-            CachedFile cf = fileCache.get(errorPage);
             HttpResponse httpResponse = new HttpResponse.Builder()
-                    .httpVersion("HTTP/1.1")
+                    .httpVersion(HttpVersion.HTTP_1_1)
                     .statusCode(500)
                     .statusText("Internal Server Error")
-                    .contentType(contentType)
-                    .body(cf.getContent())
-                    .build();
-            outputStream.write(httpResponse.toString().getBytes());
-            outputStream.flush();
-        } catch (Exception e) {
-            log.error("Error serving internal error page: {}", e.getMessage(), e);
-            writeDefaultErrorResponse(outputStream, 500, "Internal Server Error");
-        }
-    }
-
-    private void writeDefaultErrorResponse(OutputStream outputStream, int code, String message) {
-        try {
-            HttpResponse httpResponse = new HttpResponse.Builder()
-                    .httpVersion("HTTP/1.1")
-                    .statusCode(code)
-                    .statusText(message)
                     .contentType("text/html")
                     .body(DEFAULT_500_HTML.getBytes())
                     .build();

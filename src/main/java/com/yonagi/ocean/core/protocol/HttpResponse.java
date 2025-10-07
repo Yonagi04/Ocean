@@ -1,4 +1,4 @@
-package com.yonagi.ocean.core;
+package com.yonagi.ocean.core.protocol;
 
 /**
  * @author Yonagi
@@ -8,17 +8,17 @@ package com.yonagi.ocean.core;
  * @date 2025/10/05 16:24
  */
 public class HttpResponse {
-    String httpVersion;
-    Integer statusCode;
-    String statusText;
-    String contentType;
-    byte[] body;
+    private HttpVersion httpVersion;
+    private Integer statusCode;
+    private String statusText;
+    private String contentType;
+    private byte[] body;
 
     private HttpResponse() {
 
     }
 
-    public String getHttpVersion() {
+    public HttpVersion getHttpVersion() {
         return httpVersion;
     }
 
@@ -40,7 +40,7 @@ public class HttpResponse {
 
     @Override
     public String toString() {
-        return httpVersion + " " + statusCode + " " + statusText + "\r\n" +
+        return httpVersion.getVersion() + " " + statusCode + " " + statusText + "\r\n" +
                "Content-Type: " + contentType + "\r\n" +
                "Content-Length: " + (body != null ? body.length : 0) + "\r\n" +
                "\r\n" +
@@ -48,13 +48,13 @@ public class HttpResponse {
     }
 
     public static class Builder {
-        String httpVersion;
-        Integer statusCode;
-        String statusText;
-        String contentType;
-        byte[] body;
+        private HttpVersion httpVersion;
+        private Integer statusCode;
+        private String statusText;
+        private String contentType;
+        private byte[] body;
 
-        public Builder httpVersion(String httpVersion) {
+        public Builder httpVersion(HttpVersion httpVersion) {
             this.httpVersion = httpVersion;
             return this;
         }

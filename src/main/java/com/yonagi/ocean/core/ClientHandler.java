@@ -1,11 +1,19 @@
 package com.yonagi.ocean.core;
 
-import com.yonagi.ocean.handler.StaticFileHandler;
+import com.alibaba.nacos.api.naming.pojo.healthcheck.impl.Http;
+import com.yonagi.ocean.core.protocol.HttpMethod;
+import com.yonagi.ocean.core.protocol.HttpRequest;
+import com.yonagi.ocean.core.protocol.HttpRequestParser;
+import com.yonagi.ocean.core.protocol.HttpResponse;
+import com.yonagi.ocean.handler.RequestHandler;
+import com.yonagi.ocean.handler.impl.*;
+import org.checkerframework.checker.units.qual.A;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.net.Socket;
+import java.util.Map;
 
 /**
  * @author Yonagi
@@ -31,29 +39,32 @@ public class ClientHandler implements Runnable {
         try (
                 InputStream input = client.getInputStream();
                 OutputStream output = client.getOutputStream();
-                BufferedReader reader = new BufferedReader(new InputStreamReader(input));
         ) {
-            String requestLine = reader.readLine();
-            if (requestLine == null || requestLine.isEmpty()) {
+            HttpRequest request = HttpRequestParser.parse(input);
+            if (request == null) {
                 return;
             }
-            log.info("Request: {}", requestLine);
-            String[] parts = requestLine.split(" ");
-            if (parts.length < 2) {
-                return;
-            }
+            Map<HttpMethod, RequestHandler> handlers = Map.of(
+                    HttpMethod.GET, new StaticFileHandler(webRoot),
+                    HttpMethod.POST, new ApiHandler(),
+                    HttpMethod.HEAD, new HeadHandler(),
+                    HttpMethod.OPTIONS, new OptionsHandler()
+            );
 
-            String method = parts[0];
-            String uri = parts[1];
-            if (!"GET".equals(method)) {
-                writeMethodNotAllow(output);
+            HttpMethod method = request.getMethod();
+            if (method == null) {
+                new MethodNotAllowHandler().handle(request, output);
                 return;
             }
-            StaticFileHandler staticFileHandler = new StaticFileHandler(webRoot);
-            staticFileHandler.handle(uri, output);
+            
+            RequestHandler requestHandler = handlers.get(method);
+            if (requestHandler != null) {
+                requestHandler.handle(request, output);
+            } else {
+                new MethodNotAllowHandler().handle(request, output);
+            }
         } catch (IOException e) {
             log.error("Error handling client: {}", e.getMessage(), e);
-
         } finally {
             try {
                 client.close();
@@ -61,17 +72,5 @@ public class ClientHandler implements Runnable {
                 e.printStackTrace();
             }
         }
-    }
-
-    private void writeMethodNotAllow(OutputStream outputStream) throws IOException {
-        String body = "<h1>405 Method Not Allowed</h1>";
-        HttpResponse response = new HttpResponse.Builder()
-                .statusCode(405)
-                .statusText("Method Not Allowed")
-                .contentType("text/html")
-                .body(body.getBytes())
-                .build();
-        outputStream.write(response.toString().getBytes());
-        outputStream.flush();
     }
 }

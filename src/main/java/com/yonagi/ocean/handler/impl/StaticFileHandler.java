@@ -1,7 +1,11 @@
-package com.yonagi.ocean.handler;
+package com.yonagi.ocean.handler.impl;
 
 import com.yonagi.ocean.cache.*;
-import com.yonagi.ocean.core.HttpResponse;
+import com.yonagi.ocean.core.protocol.HttpMethod;
+import com.yonagi.ocean.core.protocol.HttpRequest;
+import com.yonagi.ocean.core.protocol.HttpResponse;
+import com.yonagi.ocean.core.protocol.HttpVersion;
+import com.yonagi.ocean.handler.RequestHandler;
 import com.yonagi.ocean.utils.LocalConfigLoader;
 import com.yonagi.ocean.utils.MimeTypeUtil;
 import org.slf4j.Logger;
@@ -16,9 +20,7 @@ import java.io.*;
  * @description
  * @date 2025/10/05 11:49
  */
-public class StaticFileHandler {
-
-    // private static final Logger log = Logger.getLogger(StaticFileHandler.class);
+public class StaticFileHandler implements RequestHandler {
 
     private static final Logger log = LoggerFactory.getLogger(StaticFileHandler.class);
 
@@ -49,7 +51,9 @@ public class StaticFileHandler {
         this.errorPagePath = LocalConfigLoader.getProperty("server.404_page");
     }
 
-    public void handle(String uri, OutputStream outputStream) throws IOException {
+    @Override
+    public void handle(HttpRequest request, OutputStream outputStream) throws IOException{
+        String uri = request.getUri();
         if ("/".equals(uri)) {
             uri = "/index.html";
         }
@@ -77,7 +81,7 @@ public class StaticFileHandler {
             CachedFile cf = fileCache.get(file);
 
             HttpResponse httpResponse = new HttpResponse.Builder()
-                    .httpVersion("HTTP/1.1")
+                    .httpVersion(request.getHttpVersion())
                     .statusCode(200)
                     .statusText("OK")
                     .contentType(contentType)
@@ -88,19 +92,23 @@ public class StaticFileHandler {
             log.info("Served from {}{}", isInCache ? "cache: " : "disk: ", uri);
         } catch (Exception e) {
             log.error("Error serving file: {}", uri, e);
-            new InternalErrorHandler().handleInternalError(outputStream);
+            new InternalErrorHandler().handle(request, outputStream);
         }
     }
 
-
-    public void writeNotFound(OutputStream outputStream) {
+    private void writeNotFound(OutputStream outputStream) {
         File errorPage = new File(errorPagePath);
         try {
             if (errorPage.exists()) {
-                handle(errorPagePath, outputStream);
+                HttpRequest request = new HttpRequest.Builder()
+                        .method(HttpMethod.GET)
+                        .uri(errorPagePath)
+                        .httpVersion(HttpVersion.HTTP_1_1)
+                        .build();
+                handle(request, outputStream);
             }
             HttpResponse httpResponse = new HttpResponse.Builder()
-                    .httpVersion("HTTP/1.1")
+                    .httpVersion(HttpVersion.HTTP_1_1)
                     .statusCode(404)
                     .statusText("Not Found")
                     .contentType("text/html")
