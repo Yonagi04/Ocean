@@ -1,5 +1,7 @@
 package com.yonagi.ocean.core.protocol;
 
+import java.util.Map;
+
 /**
  * @author Yonagi
  * @version 1.0
@@ -13,6 +15,9 @@ public class HttpResponse {
     private String statusText;
     private String contentType;
     private byte[] body;
+
+    // Additional headers, e.g., for CORS, caching, etc.
+    private Map<String, String> headers;
 
     private HttpResponse() {
 
@@ -38,10 +43,23 @@ public class HttpResponse {
         return body;
     }
 
+    public Map<String, String> getHeaders() {
+        return headers;
+    }
+
     @Override
     public String toString() {
         return httpVersion.getVersion() + " " + statusCode + " " + statusText + "\r\n" +
                "Content-Type: " + contentType + "\r\n" +
+                (headers != null ? headers.entrySet().stream()
+                        .filter(entry -> {
+                            String key = entry.getKey();
+                            return key != null &&
+                                   !key.equalsIgnoreCase("Content-Type") &&
+                                   !key.equalsIgnoreCase("Content-Length");
+                        })
+                        .map(entry -> entry.getKey() + ": " + entry.getValue() + "\r\n")
+                        .reduce("", String::concat) : "") +
                "Content-Length: " + (body != null ? body.length : 0) + "\r\n" +
                "\r\n" +
                (body != null ? new String(body) : "");
@@ -53,6 +71,7 @@ public class HttpResponse {
         private String statusText;
         private String contentType;
         private byte[] body;
+        private Map<String, String> headers;
 
         public Builder httpVersion(HttpVersion httpVersion) {
             this.httpVersion = httpVersion;
@@ -79,6 +98,11 @@ public class HttpResponse {
             return this;
         }
 
+        public Builder headers(Map<String, String> headers) {
+            this.headers = headers;
+            return this;
+        }
+
         public HttpResponse build() {
             if (statusCode == null || statusText == null || contentType == null) {
                 throw new IllegalStateException("Status code, status text, and content type must be set");
@@ -89,6 +113,7 @@ public class HttpResponse {
             httpResponse.statusText = this.statusText;
             httpResponse.contentType = this.contentType;
             httpResponse.body = this.body;
+            httpResponse.headers = this.headers;
             return httpResponse;
         }
     }
