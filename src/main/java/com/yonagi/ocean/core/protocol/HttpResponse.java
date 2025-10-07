@@ -1,5 +1,7 @@
 package com.yonagi.ocean.core.protocol;
 
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.Map;
 
 /**
@@ -45,6 +47,40 @@ public class HttpResponse {
 
     public Map<String, String> getHeaders() {
         return headers;
+    }
+
+    /**
+     * 将响应以正确的 HTTP 报文格式写入输出流，避免将二进制 body 进行字符串编码导致内容损坏。
+     */
+    public void write(OutputStream outputStream) throws IOException {
+        StringBuilder headerBuilder = new StringBuilder();
+        headerBuilder.append(httpVersion.getVersion()).append(" ")
+                .append(statusCode).append(" ").append(statusText).append("\r\n");
+        headerBuilder.append("Content-Type: ").append(contentType).append("\r\n");
+
+        if (headers != null) {
+            for (Map.Entry<String, String> entry : headers.entrySet()) {
+                String key = entry.getKey();
+                if (key == null) {
+                    continue;
+                }
+                if (key.equalsIgnoreCase("Content-Type") || key.equalsIgnoreCase("Content-Length")) {
+                    continue;
+                }
+                headerBuilder.append(entry.getKey()).append(": ")
+                        .append(entry.getValue()).append("\r\n");
+            }
+        }
+
+        int contentLength = body != null ? body.length : 0;
+        headerBuilder.append("Content-Length: ").append(contentLength).append("\r\n\r\n");
+
+        // 写入头
+        outputStream.write(headerBuilder.toString().getBytes());
+        // 写入体（若有）
+        if (body != null && body.length > 0) {
+            outputStream.write(body);
+        }
     }
 
     @Override

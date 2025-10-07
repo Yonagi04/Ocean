@@ -27,7 +27,7 @@ public class MethodNotAllowHandler implements RequestHandler {
                 .contentType("text/html")
                 .body(body.getBytes())
                 .build();
-        output.write(response.toString().getBytes());
+        response.write(output);
         output.flush();
     }
 }

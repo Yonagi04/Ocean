@@ -58,7 +58,7 @@ public class HeadHandler implements RequestHandler {
                 .statusText("OK")
                 .contentType(contentType)
                 .build();
-        output.write(response.toString().getBytes());
+        response.write(output);
         output.flush();
     }
 
@@ -69,7 +69,7 @@ public class HeadHandler implements RequestHandler {
                 .statusText("Not Found")
                 .contentType("text/html")
                 .build();
-        output.write(response.toString().getBytes());
+        response.write(output);
         output.flush();
     }
 }

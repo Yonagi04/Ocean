@@ -70,7 +70,7 @@ public class InternalErrorHandler implements RequestHandler {
                         .contentType(contentType)
                         .body(cf.getContent())
                         .build();
-                outputStream.write(httpResponse.toString().getBytes());
+                httpResponse.write(outputStream);
                 outputStream.flush();
             } catch (Exception ex) {
                 log.error("Error serving internal error page: {}", ex.getMessage(), ex);
@@ -91,7 +91,7 @@ public class InternalErrorHandler implements RequestHandler {
                     .contentType("text/html")
                     .body(DEFAULT_500_HTML.getBytes())
                     .build();
-            outputStream.write(httpResponse.toString().getBytes());
+            httpResponse.write(outputStream);
             outputStream.flush();
         } catch (Exception ex) {
             ex.printStackTrace();

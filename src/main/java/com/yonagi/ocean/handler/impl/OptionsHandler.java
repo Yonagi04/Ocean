@@ -53,7 +53,7 @@ public class OptionsHandler implements RequestHandler {
                 .contentType("application/json")
                 .headers(headers)
                 .build();
-        output.write(response.toString().getBytes());
+        response.write(output);
         output.flush();
     }
 }
