@@ -1,19 +1,67 @@
-<html>
+<!DOCTYPE html>
+<html lang="zh-CN">
 <head>
-    <title>Error</title>
+    <meta charset="UTF-8">
+    <title>服务器错误</title>
     <style>
         body {
-            width: 35em;
-            margin: 0 auto;
-            font-family: Tahoma, Verdana, Arial, sans-serif;
+            background: linear-gradient(135deg, #f8ffae 0%, #43c6ac 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .error-container {
+            background: #fff;
+            padding: 2.5em 3em;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(44, 62, 80, 0.15);
+            text-align: center;
+        }
+        .error-code {
+            font-size: 4em;
+            color: #e67e22;
+            font-weight: bold;
+            margin-bottom: 0.2em;
+        }
+        .error-message {
+            font-size: 1.3em;
+            color: #333;
+            margin-bottom: 1em;
+        }
+        .tips {
+            color: #888;
+            font-size: 1em;
+        }
+        .admin-tips {
+            margin-top: 1em;
+            font-size: 0.95em;
+            color: #b71c1c;
+        }
+        .home-link {
+            display: inline-block;
+            margin-top: 1.5em;
+            padding: 0.6em 1.2em;
+            background: #e67e22;
+            color: #fff;
+            border-radius: 8px;
+            text-decoration: none;
+            transition: background 0.2s;
+        }
+        .home-link:hover {
+            background: #b75d1c;
         }
     </style>
 </head>
 <body>
-<h1>An error occurred.</h1>
-<p>Sorry, the page you are looking for is currently unavailable.<br/>
-    Please try again later.</p>
-<p>If you are the system administrator of this resource then you should check
-    the error log for details.</p>
+    <div class="error-container">
+        <div class="error-code">内部错误</div>
+        <div class="error-message">服务器遇到错误，暂时无法处理您的请求。</div>
+        <div class="tips">请稍后再试，或返回首页。</div>
+        <div class="admin-tips">如您是管理员，请检查服务器日志以获取详细信息。</div>
+        <a class="home-link" href="index.html">返回首页</a>
+    </div>
 </body>
 </html>
