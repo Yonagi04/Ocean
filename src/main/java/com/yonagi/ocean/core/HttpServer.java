@@ -1,10 +1,15 @@
 package com.yonagi.ocean.core;
 
+import com.alibaba.nacos.api.naming.pojo.healthcheck.impl.Http;
 import com.yonagi.ocean.cache.StaticFileCacheFactory;
-import com.yonagi.ocean.config.KeepAliveConfig;
-import com.yonagi.ocean.config.RouteConfig;
+import com.yonagi.ocean.core.configuration.KeepAliveConfig;
+import com.yonagi.ocean.core.configuration.RouteConfig;
+import com.yonagi.ocean.core.configuration.RouteConfigManager;
+import com.yonagi.ocean.core.configuration.source.route.ConfigSource;
+import com.yonagi.ocean.core.configuration.source.route.FallbackConfigSource;
+import com.yonagi.ocean.core.configuration.source.route.LocalConfigSource;
+import com.yonagi.ocean.core.configuration.source.route.NacosConfigSource;
 import com.yonagi.ocean.utils.LocalConfigLoader;
-import com.yonagi.ocean.utils.RouteConfigLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -12,6 +17,7 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -34,6 +40,8 @@ public class HttpServer {
     private ConnectionManager connectionManager;
     private RouteConfig routeConfig;
     private Router router;
+    private RouteConfigManager routeConfigManager;
+    private ConfigSource configSource;
 
     private static final Logger log = LoggerFactory.getLogger(HttpServer.class);
 
@@ -79,9 +87,18 @@ public class HttpServer {
         
         // Initialize connection manager
         this.connectionManager = new ConnectionManager(keepAliveConfig);
-        
+
         // Initialize router
         this.router = new Router(webRoot);
+
+        // Initialize route configuration manager
+        this.routeConfigManager = new RouteConfigManager(router);
+
+        // Load initial route configuration
+        this.configSource = new FallbackConfigSource(new NacosConfigSource(), new LocalConfigSource());
+        this.configSource.onChange(this::reloadRouter);
+
+        // Initialize routes if enabled
         if (Boolean.parseBoolean(LocalConfigLoader.getProperty("server.router.enabled", "true"))) {
             initializeRouter();
         }
@@ -138,8 +155,9 @@ public class HttpServer {
      */
     private void initializeRouter() {
         try {
-            List<RouteConfig> routeConfigs = RouteConfigLoader.loadRouteConfigs();
+            List<RouteConfig> routeConfigs = configSource.load();
             router.registerRoutes(routeConfigs);
+            routeConfigManager.initializeRoutes(routeConfigs);
             
             // 打印路由统计信息
             var stats = router.getRouteStats();
@@ -148,6 +166,20 @@ public class HttpServer {
             
         } catch (Exception e) {
             log.error("Failed to initialize router: {}", e.getMessage(), e);
+        }
+    }
+
+    private void reloadRouter() {
+        try {
+            List<RouteConfig> newRouteConfigs = configSource.load();
+            routeConfigManager.refreshRoutes(newRouteConfigs);
+
+            // 打印路由统计信息
+            Map<String, Object> routeStats = router.getRouteStats();
+            log.info("Router reloaded - Total routes: {}, Handler cache size: {}",
+                    routeStats.get("totalRoutes"), routeStats.get("handlerCacheSize"));
+        } catch (Exception e) {
+            log.error("Failed to reload router: {}", e.getMessage(), e);
         }
     }
 }

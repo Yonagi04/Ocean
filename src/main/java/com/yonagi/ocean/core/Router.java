@@ -1,6 +1,6 @@
 package com.yonagi.ocean.core;
 
-import com.yonagi.ocean.config.RouteConfig;
+import com.yonagi.ocean.core.configuration.RouteConfig;
 import com.yonagi.ocean.core.protocol.HttpMethod;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.handler.RequestHandler;
@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit;
  * @date 2025/10/08 11:12
  */
 public class Router {
-    
+
     /**
      * 缓存条目，包含值和过期时间
      */
@@ -190,7 +190,27 @@ public class Router {
         log.info("Router initialized with LRU cache: size={}, ttl={}s, cleanup_interval={}s", 
                 cacheSize, cacheTtlSeconds, cleanupIntervalSeconds);
     }
-    
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(this.routes, this.handlerCache, this.defaultHandlers, this.webRoot);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
+        Router that = (Router) obj;
+        return Objects.equals(this.webRoot, that.webRoot) &&
+               Objects.equals(this.routes, that.routes) &&
+               Objects.equals(this.handlerCache, that.handlerCache) &&
+               Objects.equals(this.defaultHandlers, that.defaultHandlers);
+    }
+
     /**
      * 初始化默认处理器
      */
@@ -216,7 +236,7 @@ public class Router {
     /**
      * 注册单个路由
      */
-    private void registerRoute(RouteConfig config) {
+    public void registerRoute(RouteConfig config) {
         HttpMethod method = config.getMethod();
         String path = config.getPath();
         
@@ -224,6 +244,28 @@ public class Router {
               .put(path, config);
         
         log.debug("Registered route: {} {}", method, path);
+    }
+
+    /**
+     * 注销路由配置
+     */
+    public void unregisterRoute(RouteConfig config) {
+        HttpMethod method = config.getMethod();
+        String path = config.getPath();
+        Map<String, RouteConfig> methodRoutes = routes.get(method);
+        if (methodRoutes != null) {
+            methodRoutes.remove(path);
+            log.debug("Unregistered route: {} {}", method, path);
+        }
+    }
+
+    /**
+     * 更新路由配置
+     */
+    public void updateRoute(RouteConfig oldConfig, RouteConfig newConfig) {
+        unregisterRoute(oldConfig);
+        registerRoute(newConfig);
+        log.debug("Updated route: {} {}", newConfig.getMethod(), newConfig.getPath());
     }
     
     /**

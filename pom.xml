@@ -16,6 +16,7 @@
         <nacos.version>2.1.2</nacos.version>
         <slf4j.version>1.7.36</slf4j.version>
         <slf4j.log4j12.version>1.7.36</slf4j.log4j12.version>
+        <jackson.version>2.15.2</jackson.version>
     </properties>
 
     <dependencies>
@@ -42,18 +43,25 @@
             <version>${nacos.version}</version>
         </dependency>
 
-        <!-- Jackson for JSON processing -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+            <version>${jackson.version}</version>
+        </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-            <version>2.15.2</version>
+            <version>${jackson.version}</version>
         </dependency>
-        
-        <!-- Jackson XML for XML processing -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+            <version>${jackson.version}</version>
+        </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.dataformat</groupId>
             <artifactId>jackson-dataformat-xml</artifactId>
-            <version>2.15.2</version>
+            <version>${jackson.version}</version>
         </dependency>
     </dependencies>
 </project>

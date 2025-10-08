@@ -4,6 +4,15 @@ import com.alibaba.nacos.api.NacosFactory;
 import com.alibaba.nacos.api.config.ConfigService;
 import com.alibaba.nacos.api.config.listener.Listener;
 import com.alibaba.nacos.api.exception.NacosException;
+import com.alibaba.nacos.shaded.com.google.gson.JsonArray;
+import com.alibaba.nacos.shaded.com.google.gson.JsonObject;
+import com.alibaba.nacos.shaded.io.grpc.internal.JsonParser;
+import com.alibaba.nacos.shaded.io.grpc.internal.JsonUtil;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,8 +37,14 @@ public class NacosConfigLoader {
     private static boolean nacosEnabled;
     private static int maxRetries;
     private static int retryInterval;
+    private static volatile boolean initialized = false;
+
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     public static void init() {
+        if (initialized) {
+            return;
+        }
         nacosEnabled = Boolean.parseBoolean(LocalConfigLoader.getProperty("nacos.enabled"));
         maxRetries = Integer.parseInt(LocalConfigLoader.getProperty("nacos.max_retries"));
         retryInterval = Integer.parseInt(LocalConfigLoader.getProperty("nacos.retry_interval_ms"));
@@ -44,7 +59,7 @@ public class NacosConfigLoader {
             }
             String serverAddr = LocalConfigLoader.getProperty("nacos.server_addr");
             if (!checkNacosConnectivity(serverAddr)) {
-                log.error("Nacos server is unreachable at {}. Falling back to local config.", serverAddr);
+                log.error("Nacos server is unreachable at {}. Falling back to local configuration.", serverAddr);
                 return;
             }
             Properties props = new Properties();
@@ -56,6 +71,7 @@ public class NacosConfigLoader {
 
                     configService.getServerStatus();
                     log.info("Successfully connected to Nacos Server");
+                    initialized = true;
                     return;
                 } catch (Exception e) {
                     log.warn("Attempt {}/{}: Failed to connect Nacos - {}", attempt, maxRetries, e.getMessage());
@@ -65,7 +81,8 @@ public class NacosConfigLoader {
                 }
             }
             configService = null;
-            log.error("Failed to connect to Nacos after {} attemps. Falling back to local config.", maxRetries);
+            log.error("Failed to connect to Nacos after {} attemps. Falling back to local configuration.", maxRetries);
+            initialized = true;
         }
     }
 
@@ -90,7 +107,7 @@ public class NacosConfigLoader {
         return false;
     }
 
-    public static Properties getConfig(String dataId, String group, long timeoutMs) {
+    public static Properties getPropertiesConfig(String dataId, String group, long timeoutMs) {
         if (configService == null) {
             log.warn("Nacos ConfigService is not initialized");
             return null;
@@ -121,7 +138,46 @@ public class NacosConfigLoader {
         } catch (InterruptedException ignored) {
 
         }
-        log.error("Could not fetch config from Nacos after \" + maxRetries + \" attempts. Using local config.");
+        log.error("Could not fetch configuration from Nacos after \" + maxRetries + \" attempts. Using local configuration.");
+        return null;
+    }
+
+    public static ArrayNode getJsonArrayConfig(String dataId, String group, long timeoutMs) {
+        if (configService == null) {
+            log.warn("Nacos ConfigService is not initialized");
+            return null;
+        }
+        try {
+            int attempt = 0;
+            int maxRetries = Integer.parseInt(LocalConfigLoader.getProperty("nacos.max_retries"));
+            int retryInterval = Integer.parseInt(LocalConfigLoader.getProperty("nacos.retry_interval_ms"));
+            while (attempt < maxRetries) {
+                try {
+                    String configContent = configService.getConfig(dataId, group, timeoutMs);
+                    if (configContent != null) {
+                        JsonNode rootNode = objectMapper.readTree(configContent);
+                        if (rootNode.isArray()) {
+                            return (ArrayNode) rootNode;
+                        } else {
+                            return null;
+                        }
+                    }
+                } catch (NacosException e) {
+                    log.warn("Fail to fetch configuration from Nacos, attempt {}/{}", attempt + 1, maxRetries, e);
+                } catch (JsonMappingException e) {
+                    log.error("Nacos ConfigService returned invalid JSON array: {}", e.getMessage());
+                    return null;
+                } catch (JsonProcessingException e) {
+                    log.error("Nacos ConfigService failed to parse JSON: {}", e.getMessage());
+                    return null;
+                }
+                attempt++;
+                Thread.sleep((long) retryInterval * attempt);
+            }
+        } catch (InterruptedException ignored) {
+
+        }
+        log.error("Could not fetch configuration from Nacos after {} attempts. Using local configuration.", maxRetries);
         return null;
     }
 

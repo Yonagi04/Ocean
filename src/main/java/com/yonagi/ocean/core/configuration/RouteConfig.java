@@ -1,5 +1,8 @@
-package com.yonagi.ocean.config;
+package com.yonagi.ocean.core.configuration;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 import com.yonagi.ocean.core.protocol.HttpMethod;
 
 /**
@@ -9,6 +12,7 @@ import com.yonagi.ocean.core.protocol.HttpMethod;
  * @description
  * @date 2025/10/08 11:29
  */
+@JsonDeserialize(builder = RouteConfig.Builder.class)
 public final class RouteConfig {
 
     private final boolean enabled;
@@ -49,6 +53,11 @@ public final class RouteConfig {
         return contentType;
     }
 
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    @JsonPOJOBuilder(buildMethodName = "build", withPrefix = "with")
     public static class Builder {
         private boolean enabled;
         private HttpMethod method;
@@ -56,27 +65,32 @@ public final class RouteConfig {
         private String handlerClassName;
         private String contentType;
 
-        public Builder enabled(boolean enabled) {
+        public Builder() {
+
+        }
+
+        public Builder withEnabled(boolean enabled) {
             this.enabled = enabled;
             return this;
         }
 
-        public Builder method(HttpMethod method) {
+        public Builder withMethod(HttpMethod method) {
             this.method = method;
             return this;
         }
 
-        public Builder path(String path) {
+        public Builder withPath(String path) {
             this.path = path;
             return this;
         }
 
-        public Builder handlerClassName(String handlerClassName) {
+        @JsonProperty("handler")
+        public Builder withHandlerClassName(String handlerClassName) {
             this.handlerClassName = handlerClassName;
             return this;
         }
 
-        public Builder contentType(String contentType) {
+        public Builder withContentType(String contentType) {
             this.contentType = contentType;
             return this;
         }
