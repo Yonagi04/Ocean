@@ -162,7 +162,7 @@ public class HttpResponse {
                 throw new IllegalStateException("Status code, status text, and content type must be set");
             }
             HttpResponse httpResponse = new HttpResponse();
-            httpResponse.httpVersion = this.httpVersion;
+            httpResponse.httpVersion = this.httpVersion != null ? this.httpVersion : HttpVersion.HTTP_1_1;
             httpResponse.statusCode = this.statusCode;
             httpResponse.statusText = this.statusText;
             httpResponse.contentType = this.contentType;
