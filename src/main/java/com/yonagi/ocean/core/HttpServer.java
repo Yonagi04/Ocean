@@ -1,10 +1,9 @@
 package com.yonagi.ocean.core;
 
-import com.alibaba.nacos.api.naming.pojo.healthcheck.impl.Http;
 import com.yonagi.ocean.cache.StaticFileCacheFactory;
 import com.yonagi.ocean.core.configuration.KeepAliveConfig;
-import com.yonagi.ocean.core.configuration.RouteConfig;
 import com.yonagi.ocean.core.configuration.RouteConfigManager;
+import com.yonagi.ocean.core.configuration.ServerStartupConfig;
 import com.yonagi.ocean.core.configuration.source.route.ConfigSource;
 import com.yonagi.ocean.core.configuration.source.route.FallbackConfigSource;
 import com.yonagi.ocean.core.configuration.source.route.LocalConfigSource;
@@ -16,11 +15,7 @@ import org.slf4j.LoggerFactory;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 
 /**
  * @author Yonagi
@@ -38,7 +33,6 @@ public class HttpServer {
     private ThreadPoolExecutor threadPool;
     private KeepAliveConfig keepAliveConfig;
     private ConnectionManager connectionManager;
-    private RouteConfig routeConfig;
     private Router router;
     private RouteConfigManager routeConfigManager;
     private ConfigSource configSource;
@@ -56,54 +50,25 @@ public class HttpServer {
                 "| (___) || (____/\\| (____/\\| )   ( || )  \\  |\n" +
                 "(_______)(_______/(_______/|/     \\||/    )_)\n" +
                 "                                             ");
-        int port = Integer.parseInt(LocalConfigLoader.getProperty("server.port"));
-        String webRoot = LocalConfigLoader.getProperty("server.webroot");
-        int corePoolSize = Math.max(Runtime.getRuntime().availableProcessors(),
-                LocalConfigLoader.getProperty("server.thread_pool.core_size") == null ? 2 : Integer.parseInt(LocalConfigLoader.getProperty("server.thread_pool.core_size")));
-        int maximumPoolSize = Math.max(Runtime.getRuntime().availableProcessors() + 1,
-                LocalConfigLoader.getProperty("server.thread_pool.max_size") == null ? 4 : Integer.parseInt(LocalConfigLoader.getProperty("server.thread_pool.max_size")));
-        long keepAliveTime = Math.max(60L,
-                LocalConfigLoader.getProperty("server.thread_pool.keep_alive_seconds") == null ? 60L : Long.parseLong(LocalConfigLoader.getProperty("server.thread_pool.keep_alive_seconds")));
-        int queueCapacity = Math.max(1000,
-                LocalConfigLoader.getProperty("server.thread_pool.queue_capacity") == null ? 1000 : Integer.parseInt(LocalConfigLoader.getProperty("server.thread_pool.queue_capacity")));
-        this.port = port;
-        this.threadPool = new ThreadPoolExecutor(
-                corePoolSize,
-                maximumPoolSize,
-                keepAliveTime,
-                TimeUnit.SECONDS,
-                new ArrayBlockingQueue<>(queueCapacity),
-                new ThreadPoolExecutor.AbortPolicy()
-        );
-        this.webRoot = webRoot;
-        
-        // Initialize Keep-Alive configuration
-        this.keepAliveConfig = new KeepAliveConfig.Builder()
-                .enabled(Boolean.parseBoolean(LocalConfigLoader.getProperty("server.keep_alive.enabled", "true")))
-                .timeoutSeconds(Integer.parseInt(LocalConfigLoader.getProperty("server.keep_alive.timeout_seconds", "60")))
-                .maxRequests(Integer.parseInt(LocalConfigLoader.getProperty("server.keep_alive.max_requests", "100")))
-                .timeoutCheckIntervalSeconds(Integer.parseInt(LocalConfigLoader.getProperty("server.keep_alive.timeout_check_interval_seconds", "30")))
-                .build();
-        
-        // Initialize connection manager
-        this.connectionManager = new ConnectionManager(keepAliveConfig);
+        ServerStartupConfig startupConfig = new ServerStartupConfig();
+        this.port = startupConfig.getPort();
+        this.webRoot = startupConfig.getWebRoot();
+        this.threadPool = startupConfig.getThreadPool();
+        this.keepAliveConfig = startupConfig.getKeepAliveConfig();
 
-        // Initialize router
-        this.router = new Router(webRoot);
+        // Initialize static file cache
+        StaticFileCacheFactory.init();
 
-        // Initialize route configuration manager
-        this.routeConfigManager = new RouteConfigManager(router);
+        // Initialize core components
+        initializeComponents(startupConfig);
 
-        // Load initial route configuration
-        this.configSource = new FallbackConfigSource(new NacosConfigSource(), new LocalConfigSource());
-        this.configSource.onChange(this::reloadRouter);
+        // Register configuration change listener
+        this.configSource.onChange(() -> routeConfigManager.refreshRoutes(configSource));
 
         // Initialize routes if enabled
         if (Boolean.parseBoolean(LocalConfigLoader.getProperty("server.router.enabled", "true"))) {
-            initializeRouter();
+            this.routeConfigManager.initializeRoutes(configSource);
         }
-        
-        StaticFileCacheFactory.init();
         
         log.info("HTTP Keep-Alive enabled: {}, timeout: {}s, max requests: {}", 
                 keepAliveConfig.isEnabled(), 
@@ -149,37 +114,14 @@ public class HttpServer {
         }
         log.info("Ocean has stopped.");
     }
-    
-    /**
-     * 初始化路由器
-     */
-    private void initializeRouter() {
-        try {
-            List<RouteConfig> routeConfigs = configSource.load();
-            router.registerRoutes(routeConfigs);
-            routeConfigManager.initializeRoutes(routeConfigs);
-            
-            // 打印路由统计信息
-            var stats = router.getRouteStats();
-            log.info("Router initialized - Total routes: {}, Handler cache size: {}", 
-                    stats.get("totalRoutes"), stats.get("handlerCacheSize"));
-            
-        } catch (Exception e) {
-            log.error("Failed to initialize router: {}", e.getMessage(), e);
-        }
-    }
 
-    private void reloadRouter() {
-        try {
-            List<RouteConfig> newRouteConfigs = configSource.load();
-            routeConfigManager.refreshRoutes(newRouteConfigs);
+    private void initializeComponents(ServerStartupConfig startupConfig) {
+        // Initialize connection manager
+        this.connectionManager = new ConnectionManager(startupConfig.getKeepAliveConfig());
 
-            // 打印路由统计信息
-            Map<String, Object> routeStats = router.getRouteStats();
-            log.info("Router reloaded - Total routes: {}, Handler cache size: {}",
-                    routeStats.get("totalRoutes"), routeStats.get("handlerCacheSize"));
-        } catch (Exception e) {
-            log.error("Failed to reload router: {}", e.getMessage(), e);
-        }
+        // Initialize router, route configuration manager and initial route configuration
+        this.router = new Router(webRoot);
+        this.routeConfigManager = new RouteConfigManager(router);
+        this.configSource = new FallbackConfigSource(new NacosConfigSource(), new LocalConfigSource());
     }
 }

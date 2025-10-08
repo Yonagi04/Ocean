@@ -1,13 +1,13 @@
 package com.yonagi.ocean.core.configuration;
 
 import com.yonagi.ocean.core.Router;
+import com.yonagi.ocean.core.configuration.source.route.ConfigSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -33,38 +33,58 @@ public class RouteConfigManager {
         return routeConfig.getMethod().name() + ":" + routeConfig.getPath();
     }
 
-    public void refreshRoutes(List<RouteConfig> newRoutes) {
-        if (newRoutes == null) {
-            return;
+    public void refreshRoutes(ConfigSource configSource) {
+        try {
+            List<RouteConfig> routeConfigs = configSource.load();
+            if (routeConfigs == null) {
+                return;
+            }
+
+            Map<String, RouteConfig> newRouteMap = routeConfigs.stream()
+                    .collect(Collectors.toMap(RouteConfigManager::generateKey, Function.identity()));
+            Map<String, RouteConfig> oldRouteMap = this.routeMap;
+            oldRouteMap.forEach((key, oldConfig) -> {
+                if (!newRouteMap.containsKey(key)) {
+                    router.unregisterRoute(oldConfig);
+                    log.info("Unregistered route: {}", key);
+                }
+            });
+            newRouteMap.forEach((key, newConfig) -> {
+                RouteConfig oldConfig = oldRouteMap.get(key);
+                if (oldConfig == null) {
+                    router.registerRoute(newConfig);
+                    log.info("Registered route: {}", key);
+                } else if (!newConfig.equals(oldConfig)) {
+                    router.updateRoute(oldConfig, newConfig);
+                    log.info("Updated route: {}", key);
+                }
+            });
+            this.routeMap = newRouteMap;
+            log.info("Router refresh with {} custom routes", routeMap.size());
+
+            Map<String, Object> routeStats = router.getRouteStats();
+            log.info("Router refreshed - Total routes: {}, Handler cache size: {}",
+                    routeStats.get("totalRoutes"), routeStats.get("handlerCacheSize"));
+        } catch (Exception e) {
+            log.error("Failed to refresh router: {}", e.getMessage(), e);
         }
-        Map<String, RouteConfig> newRouteMap = newRoutes.stream()
-                .collect(Collectors.toMap(RouteConfigManager::generateKey, Function.identity()));
-        Map<String, RouteConfig> oldRouteMap = this.routeMap;
-        oldRouteMap.forEach((key, oldConfig) -> {
-            if (!newRouteMap.containsKey(key)) {
-                router.unregisterRoute(oldConfig);
-                log.info("Unregistered route: {}", key);
-            }
-        });
-        newRouteMap.forEach((key, newConfig) -> {
-            RouteConfig oldConfig = oldRouteMap.get(key);
-            if (oldConfig == null) {
-                router.registerRoute(newConfig);
-                log.info("Registered route: {}", key);
-            } else if (!newConfig.equals(oldConfig)) {
-                router.updateRoute(oldConfig, newConfig);
-                log.info("Updated route: {}", key);
-            }
-        });
-        this.routeMap = newRouteMap;
-        log.info("Router refresh with {} custom routes", routeMap.size());
     }
 
-    public void initializeRoutes(List<RouteConfig> currentRoutes) {
-        if (currentRoutes == null) {
-            return;
+    public void initializeRoutes(ConfigSource configSource) {
+        try {
+            List<RouteConfig> routeConfigs = configSource.load();
+            this.router.registerRoutes(routeConfigs);
+            if (routeConfigs == null || routeConfigs.isEmpty()) {
+                return;
+            }
+            this.routeMap = routeConfigs.stream()
+                    .collect(Collectors.toMap(RouteConfigManager::generateKey, Function.identity()));
+
+            Map<String, Object> stats = this.router.getRouteStats();
+            log.info("Router initialized - Total routes: {}, Handler cache size: {}",
+                    stats.get("totalRoutes"), stats.get("handlerCacheSize"));
+        } catch (Exception e) {
+            log.error("Failed to initialize router: {}", e.getMessage(), e);
         }
-        this.routeMap = currentRoutes.stream()
-                .collect(Collectors.toMap(RouteConfigManager::generateKey, Function.identity()));
     }
 }

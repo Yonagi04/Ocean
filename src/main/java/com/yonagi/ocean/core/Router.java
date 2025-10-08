@@ -237,6 +237,9 @@ public class Router {
      * 注册单个路由
      */
     public void registerRoute(RouteConfig config) {
+        if (config == null) {
+            return;
+        }
         HttpMethod method = config.getMethod();
         String path = config.getPath();
         
