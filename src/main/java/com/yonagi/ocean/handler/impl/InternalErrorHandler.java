@@ -55,6 +55,11 @@ public class InternalErrorHandler implements RequestHandler {
 
     @Override
     public void handle(HttpRequest request, OutputStream outputStream) {
+        handle(request, outputStream, true); // Default to keep-alive
+    }
+    
+    @Override
+    public void handle(HttpRequest request, OutputStream outputStream, boolean keepAlive) {
         File errorPage = new File(errorPagePath);
         if (errorPage.exists()) {
             try {
@@ -70,19 +75,23 @@ public class InternalErrorHandler implements RequestHandler {
                         .contentType(contentType)
                         .body(cf.getContent())
                         .build();
-                httpResponse.write(outputStream);
+                httpResponse.write(outputStream, keepAlive);
                 outputStream.flush();
             } catch (Exception ex) {
                 log.error("Error serving internal error page: {}", ex.getMessage(), ex);
-                writeDefaultErrorResponse(outputStream);
+                writeDefaultErrorResponse(outputStream, keepAlive);
             }
         } else {
             log.info("Error page not found, using default error response");
-            writeDefaultErrorResponse(outputStream);
+            writeDefaultErrorResponse(outputStream, keepAlive);
         }
     }
 
     private void writeDefaultErrorResponse(OutputStream outputStream) {
+        writeDefaultErrorResponse(outputStream, true); // Default to keep-alive
+    }
+    
+    private void writeDefaultErrorResponse(OutputStream outputStream, boolean keepAlive) {
         try {
             HttpResponse httpResponse = new HttpResponse.Builder()
                     .httpVersion(HttpVersion.HTTP_1_1)
@@ -91,7 +100,7 @@ public class InternalErrorHandler implements RequestHandler {
                     .contentType("text/html")
                     .body(DEFAULT_500_HTML.getBytes())
                     .build();
-            httpResponse.write(outputStream);
+            httpResponse.write(outputStream, keepAlive);
             outputStream.flush();
         } catch (Exception ex) {
             ex.printStackTrace();

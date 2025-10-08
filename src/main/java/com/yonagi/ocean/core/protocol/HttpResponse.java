@@ -53,6 +53,13 @@ public class HttpResponse {
      * 将响应以正确的 HTTP 报文格式写入输出流，避免将二进制 body 进行字符串编码导致内容损坏。
      */
     public void write(OutputStream outputStream) throws IOException {
+        write(outputStream, true); // Default to keep-alive
+    }
+    
+    /**
+     * 将响应以正确的 HTTP 报文格式写入输出流，支持Keep-Alive
+     */
+    public void write(OutputStream outputStream, boolean keepAlive) throws IOException {
         StringBuilder headerBuilder = new StringBuilder();
         headerBuilder.append(httpVersion.getVersion()).append(" ")
                 .append(statusCode).append(" ").append(statusText).append("\r\n");
@@ -64,7 +71,9 @@ public class HttpResponse {
                 if (key == null) {
                     continue;
                 }
-                if (key.equalsIgnoreCase("Content-Type") || key.equalsIgnoreCase("Content-Length")) {
+                if (key.equalsIgnoreCase("Content-Type") || 
+                    key.equalsIgnoreCase("Content-Length") || 
+                    key.equalsIgnoreCase("Connection")) {
                     continue;
                 }
                 headerBuilder.append(entry.getKey()).append(": ")
@@ -73,7 +82,16 @@ public class HttpResponse {
         }
 
         int contentLength = body != null ? body.length : 0;
-        headerBuilder.append("Content-Length: ").append(contentLength).append("\r\n\r\n");
+        headerBuilder.append("Content-Length: ").append(contentLength).append("\r\n");
+        
+        // Add Connection header based on keepAlive parameter
+        if (keepAlive) {
+            headerBuilder.append("Connection: keep-alive\r\n");
+        } else {
+            headerBuilder.append("Connection: close\r\n");
+        }
+        
+        headerBuilder.append("\r\n");
 
         // 写入头
         outputStream.write(headerBuilder.toString().getBytes());

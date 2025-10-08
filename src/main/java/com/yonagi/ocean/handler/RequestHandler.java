@@ -16,4 +16,8 @@ import java.io.OutputStream;
 public interface RequestHandler {
 
     void handle(HttpRequest request, OutputStream output) throws IOException;
+
+    default void handle(HttpRequest request, OutputStream output, boolean keepAlive) throws IOException {
+        handle(request, output);
+    }
 }

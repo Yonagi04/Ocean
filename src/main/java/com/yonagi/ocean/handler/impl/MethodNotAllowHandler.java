@@ -19,6 +19,11 @@ public class MethodNotAllowHandler implements RequestHandler {
 
     @Override
     public void handle(HttpRequest request, OutputStream output) throws IOException {
+        handle(request, output, true); // Default to keep-alive
+    }
+    
+    @Override
+    public void handle(HttpRequest request, OutputStream output, boolean keepAlive) throws IOException {
         String body = "<h1>405 Method Not Allowed</h1>";
         HttpResponse response = new HttpResponse.Builder()
                 .httpVersion(HttpVersion.HTTP_1_1)
@@ -27,7 +32,7 @@ public class MethodNotAllowHandler implements RequestHandler {
                 .contentType("text/html")
                 .body(body.getBytes())
                 .build();
-        response.write(output);
+        response.write(output, keepAlive);
         output.flush();
     }
 }

@@ -97,6 +97,11 @@ public class ApiHandler implements RequestHandler {
 
     @Override
     public void handle(HttpRequest request, OutputStream output) throws IOException {
+        handle(request, output, true); // Default to keep-alive
+    }
+    
+    @Override
+    public void handle(HttpRequest request, OutputStream output, boolean keepAlive) throws IOException {
         String contentType = request.getHeaders().getOrDefault("content-type", "");
         Map<String, Object> responseData = new HashMap<>();
         String charset = "UTF-8";
@@ -115,7 +120,7 @@ public class ApiHandler implements RequestHandler {
                     .contentType("text/plain")
                     .body("Unsupported Media Type".getBytes())
                     .build();
-            response.write(output);
+            response.write(output, keepAlive);
             output.flush();
             log.warn("Client sent unsupported Content-Type: {}", contentType);
             return;
@@ -133,7 +138,7 @@ public class ApiHandler implements RequestHandler {
                     .contentType("text/plain")
                     .body((msgPrefix + e.getMessage()).getBytes())
                     .build();
-            errorResponse.write(output);
+            errorResponse.write(output, keepAlive);
             output.flush();
             return;
         }
@@ -146,7 +151,7 @@ public class ApiHandler implements RequestHandler {
                 .contentType("application/json")
                 .body(responseBody.getBytes())
                 .build();
-        response.write(output);
+        response.write(output, keepAlive);
         output.flush();
     }
 

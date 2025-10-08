@@ -25,49 +25,98 @@ public class ClientHandler implements Runnable {
 
     private final Socket client;
     private final String webRoot;
+    private final ConnectionManager connectionManager;
 
-    public ClientHandler(Socket client, String webRoot) {
+    public ClientHandler(Socket client, String webRoot, ConnectionManager connectionManager) {
         this.client = client;
         this.webRoot = webRoot;
+        this.connectionManager = connectionManager;
     }
 
     @Override
     public void run() {
-        try (
-                InputStream input = client.getInputStream();
-                OutputStream output = client.getOutputStream();
-        ) {
-            HttpRequest request = HttpRequestParser.parse(input);
-            if (request == null) {
-                return;
-            }
-            Map<HttpMethod, RequestHandler> handlers = Map.of(
-                    HttpMethod.GET, new StaticFileHandler(webRoot),
-                    HttpMethod.POST, new ApiHandler(webRoot),
-                    HttpMethod.HEAD, new HeadHandler(webRoot),
-                    HttpMethod.OPTIONS, new OptionsHandler(webRoot)
-            );
-
-            HttpMethod method = request.getMethod();
-            if (method == null) {
-                new MethodNotAllowHandler().handle(request, output);
-                return;
-            }
+        // Register this connection for Keep-Alive management
+        connectionManager.registerConnection(client);
+        
+        try (InputStream input = client.getInputStream();
+             OutputStream output = client.getOutputStream()) {
             
-            RequestHandler requestHandler = handlers.get(method);
-            if (requestHandler != null) {
-                requestHandler.handle(request, output);
-            } else {
-                new MethodNotAllowHandler().handle(request, output);
+            // Handle multiple requests on the same connection
+            while (!client.isClosed() && !client.isInputShutdown()) {
+                HttpRequest request = HttpRequestParser.parse(input);
+                if (request == null) {
+                    break;
+                }
+
+                boolean shouldKeepAlive = shouldKeepAlive(request);
+                if (!shouldKeepAlive) {
+                    handleRequest(request, output, false);
+                    break;
+                }
+
+                handleRequest(request, output, true);
+                connectionManager.recordRequest(client);
+                if (!connectionManager.shouldKeepAlive(client)) {
+                    break;
+                }
             }
         } catch (IOException e) {
             log.error("Error handling client: {}", e.getMessage(), e);
         } finally {
             try {
+                connectionManager.removeConnection(client);
                 client.close();
             } catch (IOException e) {
-                e.printStackTrace();
+                log.warn("Error closing client connection: {}", e.getMessage());
             }
         }
+    }
+    
+    private void handleRequest(HttpRequest request, OutputStream output, boolean keepAlive) throws IOException {
+        Map<HttpMethod, RequestHandler> handlers = Map.of(
+                HttpMethod.GET, new StaticFileHandler(webRoot),
+                HttpMethod.POST, new ApiHandler(webRoot),
+                HttpMethod.HEAD, new HeadHandler(webRoot),
+                HttpMethod.OPTIONS, new OptionsHandler(webRoot)
+        );
+
+        HttpMethod method = request.getMethod();
+        if (method == null) {
+            new MethodNotAllowHandler().handle(request, output, keepAlive);
+            return;
+        }
+        
+        RequestHandler requestHandler = handlers.get(method);
+        if (requestHandler != null) {
+            requestHandler.handle(request, output, keepAlive);
+        } else {
+            new MethodNotAllowHandler().handle(request, output, keepAlive);
+        }
+    }
+    
+    /**
+     * Determine if the connection should be kept alive based on request headers
+     */
+    private boolean shouldKeepAlive(HttpRequest request) {
+        // Check if Keep-Alive is enabled in connection manager
+        if (!connectionManager.shouldKeepAlive(client)) {
+            return false;
+        }
+
+        if (request.getHttpVersion() == null || 
+            !request.getHttpVersion().getVersion().equals("HTTP/1.1")) {
+            return false;
+        }
+        
+        // Check Connection header
+        Map<String, String> headers = request.getHeaders();
+        if (headers == null) {
+            return true;
+        }
+        String connectionHeader = headers.get("Connection");
+        if (connectionHeader == null) {
+            return true;
+        }
+        return !connectionHeader.equalsIgnoreCase("close");
     }
 }

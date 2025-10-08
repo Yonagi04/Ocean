@@ -1,6 +1,7 @@
 package com.yonagi.ocean.core;
 
 import com.yonagi.ocean.cache.StaticFileCacheFactory;
+import com.yonagi.ocean.config.KeepAliveConfig;
 import com.yonagi.ocean.utils.LocalConfigLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,10 +27,22 @@ public class HttpServer {
     private Boolean isRunning;
     private ServerSocket serverSocket;
     private ThreadPoolExecutor threadPool;
+    private KeepAliveConfig keepAliveConfig;
+    private ConnectionManager connectionManager;
 
     private static final Logger log = LoggerFactory.getLogger(HttpServer.class);
 
     public HttpServer() {
+        log.info("\n" +
+                " _______  _______  _______  _______  _       \n" +
+                "(  ___  )(  ____ \\(  ____ \\(  ___  )( (    /|\n" +
+                "| (   ) || (    \\/| (    \\/| (   ) ||  \\  ( |\n" +
+                "| |   | || |      | (__    | (___) ||   \\ | |\n" +
+                "| |   | || |      |  __)   |  ___  || (\\ \\) |\n" +
+                "| |   | || |      | (      | (   ) || | \\   |\n" +
+                "| (___) || (____/\\| (____/\\| )   ( || )  \\  |\n" +
+                "(_______)(_______/(_______/|/     \\||/    )_)\n" +
+                "                                             ");
         int port = Integer.parseInt(LocalConfigLoader.getProperty("server.port"));
         String webRoot = LocalConfigLoader.getProperty("server.webroot");
         int corePoolSize = Math.max(Runtime.getRuntime().availableProcessors(),
@@ -50,7 +63,24 @@ public class HttpServer {
                 new ThreadPoolExecutor.AbortPolicy()
         );
         this.webRoot = webRoot;
+        
+        // Initialize Keep-Alive configuration
+        this.keepAliveConfig = new KeepAliveConfig.Builder()
+                .enabled(Boolean.parseBoolean(LocalConfigLoader.getProperty("server.keep_alive.enabled", "true")))
+                .timeoutSeconds(Integer.parseInt(LocalConfigLoader.getProperty("server.keep_alive.timeout_seconds", "60")))
+                .maxRequests(Integer.parseInt(LocalConfigLoader.getProperty("server.keep_alive.max_requests", "100")))
+                .timeoutCheckIntervalSeconds(Integer.parseInt(LocalConfigLoader.getProperty("server.keep_alive.timeout_check_interval_seconds", "30")))
+                .build();
+        
+        // Initialize connection manager
+        this.connectionManager = new ConnectionManager(keepAliveConfig);
+        
         StaticFileCacheFactory.init();
+        
+        log.info("HTTP Keep-Alive enabled: {}, timeout: {}s, max requests: {}", 
+                keepAliveConfig.isEnabled(), 
+                keepAliveConfig.getTimeoutSeconds(), 
+                keepAliveConfig.getMaxRequests());
     }
 
     public void start() {
@@ -61,7 +91,7 @@ public class HttpServer {
             log.info("Web root: {}", webRoot);
             while (isRunning) {
                 Socket client = serverSocket.accept();
-                threadPool.execute(new ClientHandler(client, webRoot));
+                threadPool.execute(new ClientHandler(client, webRoot, connectionManager));
             }
         } catch (Exception e) {
             log.error("Error starting Ocean: {}", e.getMessage(), e);
@@ -81,6 +111,13 @@ public class HttpServer {
         }
         if (threadPool != null && !threadPool.isShutdown()) {
             threadPool.shutdown();
+        }
+        if (connectionManager != null) {
+            try {
+                connectionManager.close();
+            } catch (Exception e) {
+                log.error("Error closing connection manager: {}", e.getMessage(), e);
+            }
         }
         log.info("Ocean has stopped.");
     }

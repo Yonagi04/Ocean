@@ -55,6 +55,11 @@ public class StaticFileHandler implements RequestHandler {
 
     @Override
     public void handle(HttpRequest request, OutputStream outputStream) throws IOException {
+        handle(request, outputStream, true); // Default to keep-alive
+    }
+    
+    @Override
+    public void handle(HttpRequest request, OutputStream outputStream, boolean keepAlive) throws IOException {
         String uri = request.getUri();
         if ("/".equals(uri)) {
             uri = "/index.html";
@@ -64,11 +69,11 @@ public class StaticFileHandler implements RequestHandler {
         }
         File file = new File(webRoot, uri);
         if (!file.exists() || file.isDirectory()) {
-            writeNotFound(outputStream);
+            writeNotFound(outputStream, keepAlive);
             return;
         }
         if (!file.getCanonicalPath().startsWith(new File(webRoot).getCanonicalPath())) {
-            writeNotFound(outputStream);
+            writeNotFound(outputStream, keepAlive);
             log.warn("Attempted directory traversal attack: {}", uri);
             return;
         }
@@ -102,7 +107,7 @@ public class StaticFileHandler implements RequestHandler {
                         .contentType(contentType)
                         .headers(headers)
                         .build();
-                notModified.write(outputStream);
+                notModified.write(outputStream, keepAlive);
                 outputStream.flush();
                 log.info("Respond 304 Not Modified for {}", uri);
                 return;
@@ -116,16 +121,20 @@ public class StaticFileHandler implements RequestHandler {
                     .headers(headers)
                     .body(cf.getContent())
                     .build();
-            httpResponse.write(outputStream);
+            httpResponse.write(outputStream, keepAlive);
             outputStream.flush();
             log.info("Served from {}{}", isInCache ? "cache: " : "disk: ", uri);
         } catch (Exception e) {
             log.error("Error serving file: {}", uri, e);
-            new InternalErrorHandler().handle(request, outputStream);
+            new InternalErrorHandler().handle(request, outputStream, keepAlive);
         }
     }
 
     private void writeNotFound(OutputStream outputStream) throws IOException {
+        writeNotFound(outputStream, true); // Default to keep-alive
+    }
+    
+    private void writeNotFound(OutputStream outputStream, boolean keepAlive) throws IOException {
         File errorPage = new File(errorPagePath);
         if (errorPage.exists()) {
             try {
@@ -141,7 +150,7 @@ public class StaticFileHandler implements RequestHandler {
                         .contentType(contentType)
                         .body(cf.getContent())
                         .build();
-                httpResponse.write(outputStream);
+                httpResponse.write(outputStream, keepAlive);
                 outputStream.flush();
                 return;
             } catch (Exception ignore) {
@@ -155,7 +164,7 @@ public class StaticFileHandler implements RequestHandler {
                 .contentType("text/html")
                 .body(DEFAULT_404_HTML.getBytes())
                 .build();
-        httpResponse.write(outputStream);
+        httpResponse.write(outputStream, keepAlive);
         outputStream.flush();
     }
 

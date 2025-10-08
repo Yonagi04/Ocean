@@ -31,6 +31,11 @@ public class HeadHandler implements RequestHandler {
 
     @Override
     public void handle(HttpRequest request, OutputStream output) throws IOException {
+        handle(request, output, true); // Default to keep-alive
+    }
+    
+    @Override
+    public void handle(HttpRequest request, OutputStream output, boolean keepAlive) throws IOException {
         String uri = request.getUri();
         if ("/".equals(uri)) {
             uri = "index.html";
@@ -40,11 +45,11 @@ public class HeadHandler implements RequestHandler {
         }
         File file = new File(webRoot, uri);
         if (!file.exists() || file.isDirectory()) {
-            writeNotFound(output);
+            writeNotFound(output, keepAlive);
             return;
         }
         if (!file.getCanonicalPath().startsWith(new File(webRoot).getCanonicalPath())) {
-            writeNotFound(output);
+            writeNotFound(output, keepAlive);
             log.warn("Attempted directory traversal attack: {}", uri);
             return;
         }
@@ -58,18 +63,22 @@ public class HeadHandler implements RequestHandler {
                 .statusText("OK")
                 .contentType(contentType)
                 .build();
-        response.write(output);
+        response.write(output, keepAlive);
         output.flush();
     }
 
     private void writeNotFound(OutputStream output) throws IOException {
+        writeNotFound(output, true); // Default to keep-alive
+    }
+    
+    private void writeNotFound(OutputStream output, boolean keepAlive) throws IOException {
         HttpResponse response = new HttpResponse.Builder()
                 .httpVersion(HttpVersion.HTTP_1_1)
                 .statusCode(404)
                 .statusText("Not Found")
                 .contentType("text/html")
                 .build();
-        response.write(output);
+        response.write(output, keepAlive);
         output.flush();
     }
 }

@@ -30,6 +30,11 @@ public class OptionsHandler implements RequestHandler {
 
     @Override
     public void handle(HttpRequest request, OutputStream output) throws IOException {
+        handle(request, output, true); // Default to keep-alive
+    }
+    
+    @Override
+    public void handle(HttpRequest request, OutputStream output, boolean keepAlive) throws IOException {
         List<String> allowedMethods = new ArrayList<>();
         for (HttpMethod method : HttpMethod.values()) {
             allowedMethods.add(method.name());
@@ -53,7 +58,7 @@ public class OptionsHandler implements RequestHandler {
                 .contentType("application/json")
                 .headers(headers)
                 .build();
-        response.write(output);
+        response.write(output, keepAlive);
         output.flush();
     }
 }
