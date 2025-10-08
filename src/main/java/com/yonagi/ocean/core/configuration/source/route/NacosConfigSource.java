@@ -1,7 +1,6 @@
 package com.yonagi.ocean.core.configuration.source.route;
 
 import com.alibaba.nacos.api.config.listener.Listener;
-import com.alibaba.nacos.shaded.com.google.gson.JsonObject;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
