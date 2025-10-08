@@ -1,6 +1,6 @@
 package com.yonagi.ocean.core;
 
-import com.yonagi.ocean.config.KeepAliveConfig;
+import com.yonagi.ocean.core.configuration.KeepAliveConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,7 +14,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Manages HTTP Keep-Alive connections
- * 
+ *
  * @author Yonagi
  * @version 1.0
  * @program Ocean
@@ -22,13 +22,13 @@ import java.util.concurrent.TimeUnit;
  * @date 2025/01/15
  */
 public class ConnectionManager implements Closeable {
-    
+
     private static final Logger log = LoggerFactory.getLogger(ConnectionManager.class);
-    
+
     private final KeepAliveConfig config;
     private final ConcurrentHashMap<Socket, ConnectionInfo> connections;
     private final ScheduledExecutorService cleanupScheduler;
-    
+
     public ConnectionManager(KeepAliveConfig config) {
         this.config = config;
         this.connections = new ConcurrentHashMap<>();
@@ -37,12 +37,12 @@ public class ConnectionManager implements Closeable {
             t.setDaemon(true);
             return t;
         });
-        
+
         if (config.isEnabled()) {
             startCleanupTask();
         }
     }
-    
+
     /**
      * Register a new connection for Keep-Alive management
      */
@@ -50,12 +50,12 @@ public class ConnectionManager implements Closeable {
         if (!config.isEnabled()) {
             return;
         }
-        
+
         ConnectionInfo info = new ConnectionInfo(socket, config.getTimeoutMillis(), config.getMaxRequests());
         connections.put(socket, info);
         log.debug("Registered Keep-Alive connection: {}", socket.getRemoteSocketAddress());
     }
-    
+
     /**
      * Check if a connection should be kept alive
      */
@@ -63,15 +63,15 @@ public class ConnectionManager implements Closeable {
         if (!config.isEnabled()) {
             return false;
         }
-        
+
         ConnectionInfo info = connections.get(socket);
         if (info == null) {
             return false;
         }
-        
+
         return info.canHandleMoreRequests() && !info.isExpired();
     }
-    
+
     /**
      * Record a request processed on this connection
      */
@@ -81,7 +81,7 @@ public class ConnectionManager implements Closeable {
             info.incrementRequestCount();
         }
     }
-    
+
     /**
      * Remove a connection from management
      */
@@ -91,48 +91,45 @@ public class ConnectionManager implements Closeable {
             log.debug("Removed Keep-Alive connection: {}", socket.getRemoteSocketAddress());
         }
     }
-    
+
     /**
      * Get the number of active Keep-Alive connections
      */
     public int getActiveConnectionCount() {
         return connections.size();
     }
-    
+
     private void startCleanupTask() {
         cleanupScheduler.scheduleWithFixedDelay(
-            this::cleanupExpiredConnections,
-            config.getTimeoutCheckIntervalSeconds(),
-            config.getTimeoutCheckIntervalSeconds(),
-            TimeUnit.SECONDS
+                this::cleanupExpiredConnections,
+                config.getTimeoutCheckIntervalSeconds(),
+                config.getTimeoutCheckIntervalSeconds(),
+                TimeUnit.SECONDS
         );
     }
-    
+
     private void cleanupExpiredConnections() {
         long now = System.currentTimeMillis();
         int cleaned = 0;
-        
+
         for (var entry : connections.entrySet()) {
             Socket socket = entry.getKey();
             ConnectionInfo info = entry.getValue();
-            
+
             if (info.isExpired() || !info.canHandleMoreRequests()) {
-                try {
-                    socket.close();
-                    connections.remove(socket);
-                    cleaned++;
-                    log.debug("Cleaned up expired Keep-Alive connection: {}", socket.getRemoteSocketAddress());
-                } catch (IOException e) {
-                    log.warn("Error closing expired connection: {}", e.getMessage());
-                }
+                // socket.close();
+                info.setExpired(true);
+                connections.remove(socket);
+                cleaned++;
+                log.debug("Cleaned up expired Keep-Alive connection: {}", socket.getRemoteSocketAddress());
             }
         }
-        
+
         if (cleaned > 0) {
             log.info("Cleaned up {} expired Keep-Alive connections", cleaned);
         }
     }
-    
+
     @Override
     public void close() throws IOException {
         cleanupScheduler.shutdown();
@@ -144,7 +141,7 @@ public class ConnectionManager implements Closeable {
             cleanupScheduler.shutdownNow();
             Thread.currentThread().interrupt();
         }
-        
+
         // Close all active connections
         for (Socket socket : connections.keySet()) {
             try {
@@ -155,7 +152,7 @@ public class ConnectionManager implements Closeable {
         }
         connections.clear();
     }
-    
+
     /**
      * Information about a Keep-Alive connection
      */
@@ -166,7 +163,8 @@ public class ConnectionManager implements Closeable {
         private final long createdAt;
         private long lastActivityAt;
         private int requestCount;
-        
+        private volatile boolean expired;
+
         public ConnectionInfo(Socket socket, long timeoutMillis, int maxRequests) {
             this.socket = socket;
             this.timeoutMillis = timeoutMillis;
@@ -175,28 +173,32 @@ public class ConnectionManager implements Closeable {
             this.lastActivityAt = createdAt;
             this.requestCount = 0;
         }
-        
+
         public boolean isExpired() {
-            return System.currentTimeMillis() - lastActivityAt > timeoutMillis;
+            return expired || System.currentTimeMillis() - lastActivityAt > timeoutMillis;
         }
-        
+
+        public void setExpired(boolean expired) {
+            this.expired = expired;
+        }
+
         public boolean canHandleMoreRequests() {
             return requestCount < maxRequests;
         }
-        
+
         public void incrementRequestCount() {
             this.requestCount++;
             this.lastActivityAt = System.currentTimeMillis();
         }
-        
+
         public Socket getSocket() {
             return socket;
         }
-        
+
         public long getLastActivityAt() {
             return lastActivityAt;
         }
-        
+
         public int getRequestCount() {
             return requestCount;
         }

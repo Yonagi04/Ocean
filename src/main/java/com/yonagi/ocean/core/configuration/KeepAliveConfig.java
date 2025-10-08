@@ -1,4 +1,4 @@
-package com.yonagi.ocean.config;
+package com.yonagi.ocean.core.configuration;
 
 /**
  * HTTP Keep-Alive configuration class
@@ -7,9 +7,9 @@ package com.yonagi.ocean.config;
  * @version 1.0
  * @program Ocean
  * @description Configuration for HTTP Keep-Alive mechanism
- * @date 2025/01/15
+ * @date 2025/10/8 10:30
  */
-public class KeepAliveConfig {
+public final class KeepAliveConfig {
     
     private final boolean enabled;
     private final int timeoutSeconds;

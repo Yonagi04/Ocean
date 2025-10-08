@@ -45,6 +45,9 @@ public class ClientHandler implements Runnable {
             
             // Handle multiple requests on the same connection
             while (!client.isClosed() && !client.isInputShutdown()) {
+                if (!connectionManager.shouldKeepAlive(client)) {
+                    break;
+                }
                 HttpRequest request = HttpRequestParser.parse(input);
                 if (request == null) {
                     break;
