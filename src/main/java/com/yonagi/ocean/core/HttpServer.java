@@ -2,13 +2,16 @@ package com.yonagi.ocean.core;
 
 import com.yonagi.ocean.cache.StaticFileCacheFactory;
 import com.yonagi.ocean.config.KeepAliveConfig;
+import com.yonagi.ocean.config.RouteConfig;
 import com.yonagi.ocean.utils.LocalConfigLoader;
+import com.yonagi.ocean.utils.RouteConfigLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -29,6 +32,8 @@ public class HttpServer {
     private ThreadPoolExecutor threadPool;
     private KeepAliveConfig keepAliveConfig;
     private ConnectionManager connectionManager;
+    private RouteConfig routeConfig;
+    private Router router;
 
     private static final Logger log = LoggerFactory.getLogger(HttpServer.class);
 
@@ -75,6 +80,12 @@ public class HttpServer {
         // Initialize connection manager
         this.connectionManager = new ConnectionManager(keepAliveConfig);
         
+        // Initialize router
+        this.router = new Router(webRoot);
+        if (Boolean.parseBoolean(LocalConfigLoader.getProperty("server.router.enabled", "true"))) {
+            initializeRouter();
+        }
+        
         StaticFileCacheFactory.init();
         
         log.info("HTTP Keep-Alive enabled: {}, timeout: {}s, max requests: {}", 
@@ -91,7 +102,7 @@ public class HttpServer {
             log.info("Web root: {}", webRoot);
             while (isRunning) {
                 Socket client = serverSocket.accept();
-                threadPool.execute(new ClientHandler(client, webRoot, connectionManager));
+                threadPool.execute(new ClientHandler(client, webRoot, connectionManager, router));
             }
         } catch (Exception e) {
             log.error("Error starting Ocean: {}", e.getMessage(), e);
@@ -120,5 +131,23 @@ public class HttpServer {
             }
         }
         log.info("Ocean has stopped.");
+    }
+    
+    /**
+     * 初始化路由器
+     */
+    private void initializeRouter() {
+        try {
+            List<RouteConfig> routeConfigs = RouteConfigLoader.loadRouteConfigs();
+            router.registerRoutes(routeConfigs);
+            
+            // 打印路由统计信息
+            var stats = router.getRouteStats();
+            log.info("Router initialized - Total routes: {}, Handler cache size: {}", 
+                    stats.get("totalRoutes"), stats.get("handlerCacheSize"));
+            
+        } catch (Exception e) {
+            log.error("Failed to initialize router: {}", e.getMessage(), e);
+        }
     }
 }

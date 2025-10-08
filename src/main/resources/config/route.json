@@ -1,0 +1,37 @@
+[
+  {
+    "method": "GET",
+    "path": "/api/detail",
+    "handler": "com.yonagi.ocean.handler.impl.GenericApiHandler",
+    "contentType": "application/json",
+    "enabled": true
+  },
+  {
+    "method": "GET",
+    "path": "/api/test",
+    "handler": "com.yonagi.ocean.handler.impl.GenericApiHandler",
+    "contentType": "application/json",
+    "enabled": true
+  },
+  {
+    "method": "POST",
+    "path": "/api/submit",
+    "handler": "com.yonagi.ocean.handler.impl.GenericApiHandler",
+    "contentType": "application/json",
+    "enabled": true
+  },
+  {
+    "method": "PUT",
+    "path": "/api/update",
+    "handler": "com.yonagi.ocean.handler.impl.GenericApiHandler",
+    "contentType": "application/json",
+    "enabled": true
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/delete",
+    "handler": "com.yonagi.ocean.handler.impl.GenericApiHandler",
+    "contentType": "application/json",
+    "enabled": true
+  }
+]

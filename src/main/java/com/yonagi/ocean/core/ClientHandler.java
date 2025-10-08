@@ -26,11 +26,13 @@ public class ClientHandler implements Runnable {
     private final Socket client;
     private final String webRoot;
     private final ConnectionManager connectionManager;
+    private final Router router;
 
-    public ClientHandler(Socket client, String webRoot, ConnectionManager connectionManager) {
+    public ClientHandler(Socket client, String webRoot, ConnectionManager connectionManager, Router router) {
         this.client = client;
         this.webRoot = webRoot;
         this.connectionManager = connectionManager;
+        this.router = router;
     }
 
     @Override
@@ -73,25 +75,16 @@ public class ClientHandler implements Runnable {
     }
     
     private void handleRequest(HttpRequest request, OutputStream output, boolean keepAlive) throws IOException {
-        Map<HttpMethod, RequestHandler> handlers = Map.of(
-                HttpMethod.GET, new StaticFileHandler(webRoot),
-                HttpMethod.POST, new ApiHandler(webRoot),
-                HttpMethod.HEAD, new HeadHandler(webRoot),
-                HttpMethod.OPTIONS, new OptionsHandler(webRoot)
-        );
-
         HttpMethod method = request.getMethod();
+        String path = request.getUri();
+        
         if (method == null) {
             new MethodNotAllowHandler().handle(request, output, keepAlive);
             return;
         }
         
-        RequestHandler requestHandler = handlers.get(method);
-        if (requestHandler != null) {
-            requestHandler.handle(request, output, keepAlive);
-        } else {
-            new MethodNotAllowHandler().handle(request, output, keepAlive);
-        }
+        // 使用Router进行路由转发
+        router.route(method, path, request, output, keepAlive);
     }
     
     /**
