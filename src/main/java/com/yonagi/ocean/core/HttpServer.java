@@ -32,16 +32,21 @@ public class HttpServer {
     public HttpServer() {
         int port = Integer.parseInt(LocalConfigLoader.getProperty("server.port"));
         String webRoot = LocalConfigLoader.getProperty("server.webroot");
-        int corePoolSize = Math.min(Runtime.getRuntime().availableProcessors(),
-                LocalConfigLoader.getProperty("server.threads") == null ? 2 : Integer.parseInt(LocalConfigLoader.getProperty("server.threads")));
-        int maximumPoolSize = Runtime.getRuntime().availableProcessors() + 1;
+        int corePoolSize = Math.max(Runtime.getRuntime().availableProcessors(),
+                LocalConfigLoader.getProperty("server.thread_pool.core_size") == null ? 2 : Integer.parseInt(LocalConfigLoader.getProperty("server.thread_pool.core_size")));
+        int maximumPoolSize = Math.max(Runtime.getRuntime().availableProcessors() + 1,
+                LocalConfigLoader.getProperty("server.thread_pool.max_size") == null ? 4 : Integer.parseInt(LocalConfigLoader.getProperty("server.thread_pool.max_size")));
+        long keepAliveTime = Math.max(60L,
+                LocalConfigLoader.getProperty("server.thread_pool.keep_alive_seconds") == null ? 60L : Long.parseLong(LocalConfigLoader.getProperty("server.thread_pool.keep_alive_seconds")));
+        int queueCapacity = Math.max(1000,
+                LocalConfigLoader.getProperty("server.thread_pool.queue_capacity") == null ? 1000 : Integer.parseInt(LocalConfigLoader.getProperty("server.thread_pool.queue_capacity")));
         this.port = port;
         this.threadPool = new ThreadPoolExecutor(
                 corePoolSize,
                 maximumPoolSize,
-                60L,
+                keepAliveTime,
                 TimeUnit.SECONDS,
-                new ArrayBlockingQueue<>(1000),
+                new ArrayBlockingQueue<>(queueCapacity),
                 new ThreadPoolExecutor.AbortPolicy()
         );
         this.webRoot = webRoot;
