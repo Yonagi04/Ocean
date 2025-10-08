@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yonagi.ocean.core.configuration.RouteConfig;
 import com.yonagi.ocean.core.protocol.HttpMethod;
+import com.yonagi.ocean.utils.LocalConfigLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,7 +29,7 @@ public class LocalConfigSource implements ConfigSource {
     public List<RouteConfig> load() {
         List<RouteConfig> routeConfigs = new ArrayList<>();
         try {
-            routeConfigs = loadFromClasspath("/config/route.json");
+            routeConfigs = loadFromClasspath(LocalConfigLoader.getProperty("server.router.config_file_path", "/config/route.json"));
             log.info("Loaded {} route configurations from local configuration", routeConfigs.size());
             for (RouteConfig config : routeConfigs) {
                 log.info("Route: {} {} -> {} (enabled: {})",
