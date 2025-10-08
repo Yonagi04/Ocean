@@ -2,7 +2,7 @@ package com.yonagi.ocean.cache.provider;
 
 import com.yonagi.ocean.cache.StaticFileCache;
 import com.yonagi.ocean.cache.impl.LRUFileCacheImpl;
-import com.yonagi.ocean.config.CacheConfig;
+import com.yonagi.ocean.cache.configuration.CacheConfig;
 
 public class LRUCacheProvider implements CacheProvider {
     @Override

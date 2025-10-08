@@ -1,6 +1,6 @@
-package com.yonagi.ocean.config.source;
+package com.yonagi.ocean.cache.configuration.source;
 
-import com.yonagi.ocean.config.CacheConfig;
+import com.yonagi.ocean.cache.configuration.CacheConfig;
 import com.yonagi.ocean.utils.LocalConfigLoader;
 
 public class LocalConfigSource implements ConfigSource {

@@ -1,7 +1,7 @@
 package com.yonagi.ocean.cache.provider;
 
 import com.yonagi.ocean.cache.StaticFileCache;
-import com.yonagi.ocean.config.CacheConfig;
+import com.yonagi.ocean.cache.configuration.CacheConfig;
 
 public interface CacheProvider {
     boolean supports(CacheConfig.Type type);

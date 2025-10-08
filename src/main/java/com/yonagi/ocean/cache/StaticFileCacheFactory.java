@@ -4,11 +4,11 @@ import com.yonagi.ocean.cache.provider.CacheProvider;
 import com.yonagi.ocean.cache.provider.CaffeineCacheProvider;
 import com.yonagi.ocean.cache.provider.LRUCacheProvider;
 import com.yonagi.ocean.cache.provider.NoCacheProvider;
-import com.yonagi.ocean.config.CacheConfig;
-import com.yonagi.ocean.config.source.ConfigSource;
-import com.yonagi.ocean.config.source.FallbackConfigSource;
-import com.yonagi.ocean.config.source.LocalConfigSource;
-import com.yonagi.ocean.config.source.NacosConfigSource;
+import com.yonagi.ocean.cache.configuration.CacheConfig;
+import com.yonagi.ocean.cache.configuration.source.ConfigSource;
+import com.yonagi.ocean.cache.configuration.source.FallbackConfigSource;
+import com.yonagi.ocean.cache.configuration.source.LocalConfigSource;
+import com.yonagi.ocean.cache.configuration.source.NacosConfigSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

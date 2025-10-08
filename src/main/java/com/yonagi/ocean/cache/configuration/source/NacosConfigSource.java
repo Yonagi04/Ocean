@@ -1,7 +1,7 @@
-package com.yonagi.ocean.config.source;
+package com.yonagi.ocean.cache.configuration.source;
 
 import com.alibaba.nacos.api.config.listener.Listener;
-import com.yonagi.ocean.config.CacheConfig;
+import com.yonagi.ocean.cache.configuration.CacheConfig;
 import com.yonagi.ocean.utils.LocalConfigLoader;
 import com.yonagi.ocean.utils.NacosConfigLoader;
 
@@ -17,9 +17,10 @@ public class NacosConfigSource implements ConfigSource {
 
     @Override
     public CacheConfig load() {
-        String dataId = LocalConfigLoader.getProperty("nacos.data_id");
-        String group = LocalConfigLoader.getProperty("nacos.group");
-        Properties props = NacosConfigLoader.getConfig(dataId, group, 3000);
+        String dataId = LocalConfigLoader.getProperty("server.cache.nacos.data_id");
+        String group = LocalConfigLoader.getProperty("server.cache.nacos.group");
+        int timeoutMs = Integer.parseInt(LocalConfigLoader.getProperty("nacos.timeout_ms", "3000"));
+        Properties props = NacosConfigLoader.getPropertiesConfig(dataId, group, timeoutMs);
 
         CacheConfig.Builder b = CacheConfig.builder();
         if (props == null) {
@@ -63,8 +64,8 @@ public class NacosConfigSource implements ConfigSource {
     @Override
     public void onChange(Runnable callback) {
         this.callback = callback;
-        String dataId = LocalConfigLoader.getProperty("nacos.data_id");
-        String group = LocalConfigLoader.getProperty("nacos.group");
+        String dataId = LocalConfigLoader.getProperty("server.cache.nacos.data_id");
+        String group = LocalConfigLoader.getProperty("server.cache.nacos.group");
         NacosConfigLoader.addListener(dataId, group, new Listener() {
             @Override
             public Executor getExecutor() { return null; }

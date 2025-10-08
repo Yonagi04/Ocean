@@ -1,4 +1,4 @@
-package com.yonagi.ocean.config;
+package com.yonagi.ocean.cache.configuration;
 
 /**
  * 缓存配置的不可变值对象

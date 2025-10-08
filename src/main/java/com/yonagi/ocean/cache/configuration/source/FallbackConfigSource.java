@@ -1,6 +1,6 @@
-package com.yonagi.ocean.config.source;
+package com.yonagi.ocean.cache.configuration.source;
 
-import com.yonagi.ocean.config.CacheConfig;
+import com.yonagi.ocean.cache.configuration.CacheConfig;
 
 public class FallbackConfigSource implements ConfigSource {
     private final ConfigSource primary;
