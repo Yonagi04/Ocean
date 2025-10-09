@@ -3,7 +3,11 @@ package com.yonagi.ocean.core.configuration.source.route;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yonagi.ocean.core.configuration.RouteConfig;
+import com.yonagi.ocean.core.configuration.RouteConfigManager;
+import com.yonagi.ocean.core.configuration.RouteType;
 import com.yonagi.ocean.core.protocol.HttpMethod;
+import com.yonagi.ocean.handler.impl.RedirectHandler;
+import com.yonagi.ocean.handler.impl.StaticFileHandler;
 import com.yonagi.ocean.utils.LocalConfigLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,6 +28,8 @@ public class LocalConfigSource implements ConfigSource {
 
     private static final Logger log = LoggerFactory.getLogger(LocalConfigSource.class);
     private static final ObjectMapper objectMapper = new ObjectMapper();
+    private static final String STATIC_HANDLER_CLASS = StaticFileHandler.class.getName();
+    private static final String REDIRECT_HANDLER_CLASS = RedirectHandler.class.getName();
 
     @Override
     public List<RouteConfig> load() {
@@ -65,13 +71,26 @@ public class LocalConfigSource implements ConfigSource {
         for (RouteConfigDto dto : dtos) {
             try {
                 HttpMethod method = HttpMethod.valueOf(dto.method.toUpperCase());
-                RouteConfig config = new RouteConfig.Builder()
+                RouteConfig.Builder builder = new RouteConfig.Builder()
                         .withEnabled(dto.enabled)
                         .withMethod(method)
                         .withPath(dto.path)
-                        .withHandlerClassName(dto.handler)
                         .withContentType(dto.contentType)
-                        .build();
+                        .withRouteType(dto.type);
+                if (dto.targetUrl != null && !dto.targetUrl.isEmpty()) {
+                    builder.withTargetUrl(dto.targetUrl);
+                }
+                if (dto.statusCode != null) {
+                    builder.withStatusCode(dto.statusCode);
+                }
+                if (dto.type == RouteType.HANDLER && dto.handler != null && !dto.handler.isEmpty()) {
+                    builder.withHandlerClassName(dto.handler);
+                } else if (dto.type == RouteType.STATIC) {
+                    builder.withHandlerClassName(STATIC_HANDLER_CLASS);
+                } else if (dto.type == RouteType.REDIRECT) {
+                    builder.withHandlerClassName(REDIRECT_HANDLER_CLASS);
+                }
+                RouteConfig config = builder.build();
                 configs.add(config);
             } catch (Exception e) {
                 log.error("Failed to parse route configuration: {} - {}", dto, e.getMessage());
@@ -90,11 +109,15 @@ public class LocalConfigSource implements ConfigSource {
         public String handler;
         public String contentType;
         public boolean enabled;
+        public RouteType type;
+        public String targetUrl;
+        public Integer statusCode;
 
         @Override
         public String toString() {
-            return String.format("RouteConfigDto{method='%s', path='%s', handler='%s', contentType='%s', enabled=%s}",
-                    method, path, handler, contentType, enabled);
+            return String.format("RouteConfigDto{method='%s', path='%s', handler='%s', contentType='%s', enabled=%s," +
+                            "routeType='%s', targetUrl='%s', statusCode=%s}",
+                    method, path, handler, contentType, enabled, type.toString(), targetUrl, statusCode);
         }
     }
 

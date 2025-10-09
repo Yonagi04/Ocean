@@ -2,6 +2,7 @@
   {
     "method": "GET",
     "path": "/api/detail",
+    "type": "HANDLER",
     "handler": "com.yonagi.ocean.handler.impl.GenericApiHandler",
     "contentType": "application/json",
     "enabled": true
@@ -9,6 +10,7 @@
   {
     "method": "GET",
     "path": "/api/test",
+    "type": "HANDLER",
     "handler": "com.yonagi.ocean.handler.impl.GenericApiHandler",
     "contentType": "application/json",
     "enabled": true
@@ -16,6 +18,7 @@
   {
     "method": "POST",
     "path": "/api/submit",
+    "type": "HANDLER",
     "handler": "com.yonagi.ocean.handler.impl.GenericApiHandler",
     "contentType": "application/json",
     "enabled": true
@@ -23,6 +26,7 @@
   {
     "method": "PUT",
     "path": "/api/update",
+    "type": "HANDLER",
     "handler": "com.yonagi.ocean.handler.impl.GenericApiHandler",
     "contentType": "application/json",
     "enabled": true
@@ -30,8 +34,27 @@
   {
     "method": "DELETE",
     "path": "/api/delete",
+    "type": "HANDLER",
     "handler": "com.yonagi.ocean.handler.impl.GenericApiHandler",
     "contentType": "application/json",
+    "enabled": true
+  },
+  {
+    "method": "GET",
+    "path": "/static/redirect",
+    "type": "REDIRECT",
+    "targetUrl": "/index.html",
+    "contentType": "text/html",
+    "statusCode": 301,
+    "enabled": true
+  },
+  {
+    "method": "GET",
+    "path": "/test",
+    "type": "REDIRECT",
+    "targetUrl": "https://baidu.com",
+    "contentType": "text/html",
+    "statusCode": 302,
     "enabled": true
   }
 ]

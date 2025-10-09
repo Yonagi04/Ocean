@@ -5,6 +5,9 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.yonagi.ocean.core.configuration.RouteConfig;
+import com.yonagi.ocean.core.configuration.RouteType;
+import com.yonagi.ocean.handler.impl.RedirectHandler;
+import com.yonagi.ocean.handler.impl.StaticFileHandler;
 import com.yonagi.ocean.utils.LocalConfigLoader;
 import com.yonagi.ocean.utils.NacosBackupScheduler;
 import com.yonagi.ocean.utils.NacosConfigLoader;
@@ -26,6 +29,8 @@ public class NacosConfigSource implements ConfigSource {
     private Runnable callback;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private static final Logger log = LoggerFactory.getLogger(NacosConfigSource.class);
+    private static final String STATIC_HANDLER_CLASS = StaticFileHandler.class.getName();
+    private static final String REDIRECT_HANDLER_CLASS = RedirectHandler.class.getName();
 
     public NacosConfigSource() {
         NacosConfigLoader.init();
@@ -47,6 +52,15 @@ public class NacosConfigSource implements ConfigSource {
             List<RouteConfig> routeConfigs = objectMapper.convertValue(jsonArrayConfig, typeRef);
             log.info("Loaded {} route configurations from Nacos configuration", routeConfigs.size());
             for (RouteConfig config : routeConfigs) {
+                if (config.getRouteType() == RouteType.STATIC) {
+                    RouteConfig.Builder builder = config.toBuilder();
+                    builder.withHandlerClassName(STATIC_HANDLER_CLASS);
+                    config = builder.build();
+                } else if (config.getRouteType() == RouteType.REDIRECT) {
+                    RouteConfig.Builder builder = config.toBuilder();
+                    builder.withHandlerClassName(REDIRECT_HANDLER_CLASS);
+                    config = builder.build();
+                }
                 log.info("Route: {} {} -> {} (enabled: {})",
                         config.getMethod(), config.getPath(), config.getHandlerClassName(), config.isEnabled());
             }

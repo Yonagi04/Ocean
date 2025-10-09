@@ -112,6 +112,10 @@ public class HttpServer {
                 log.error("Error closing connection manager: {}", e.getMessage(), e);
             }
         }
+        if (router != null) {
+            router.shutdown();
+        }
+
         log.info("Ocean has stopped.");
     }
 

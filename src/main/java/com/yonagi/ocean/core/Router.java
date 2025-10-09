@@ -1,6 +1,7 @@
 package com.yonagi.ocean.core;
 
 import com.yonagi.ocean.core.configuration.RouteConfig;
+import com.yonagi.ocean.core.configuration.RouteType;
 import com.yonagi.ocean.core.protocol.HttpMethod;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.handler.RequestHandler;
@@ -9,6 +10,8 @@ import com.yonagi.ocean.utils.LocalConfigLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -161,6 +164,10 @@ public class Router {
     
     // 缓存清理调度器
     private final ScheduledExecutorService cleanupScheduler;
+
+    private static final String STATIC_HANDLER_CLASS = StaticFileHandler.class.getName();
+
+    private static final String REDIRECT_HANDLER_CLASS = RedirectHandler.class.getName();
     
     public Router(String webRoot) {
         this.webRoot = webRoot;
@@ -275,7 +282,7 @@ public class Router {
      * 路由匹配和请求处理
      */
     public void route(HttpMethod method, String path, HttpRequest request,
-                     java.io.OutputStream output, boolean keepAlive) throws java.io.IOException {
+                     OutputStream output, boolean keepAlive) throws IOException {
         // 首先尝试精确匹配自定义路由
         RouteConfig routeConfig = findRoute(method, path);
         if (routeConfig != null) {
@@ -317,14 +324,30 @@ public class Router {
      * 处理自定义路由
      * @return true 如果处理成功，false 如果处理失败需要回退到默认处理器
      */
-    private boolean handleCustomRoute(RouteConfig routeConfig, com.yonagi.ocean.core.protocol.HttpRequest request, 
-                                    java.io.OutputStream output, boolean keepAlive) throws java.io.IOException {
-        
-        String handlerClassName = routeConfig.getHandlerClassName();
-        RequestHandler handler = getOrCreateHandler(handlerClassName);
+    private boolean handleCustomRoute(RouteConfig routeConfig, HttpRequest request,
+                                      OutputStream output, boolean keepAlive) throws IOException {
+        RouteType routeType = routeConfig.getRouteType();
+        RequestHandler handler = null;
+        String handlerClassName = "";
+        if (routeType == RouteType.HANDLER) {
+            handlerClassName = routeConfig.getHandlerClassName();
+            handler = getOrCreateHandler(handlerClassName);
+        } else if (routeType == RouteType.STATIC) {
+            handlerClassName = STATIC_HANDLER_CLASS;
+            handler = getOrCreateHandler(handlerClassName);
+        } else if (routeType == RouteType.REDIRECT) {
+            handlerClassName = REDIRECT_HANDLER_CLASS;
+            handler = new RedirectHandler(handlerClassName);
+        }
         
         if (handler != null) {
             log.debug("Handling request with custom route: {} -> {}", request.getUri(), handlerClassName);
+            if (routeType == RouteType.REDIRECT) {
+                // 对于重定向，传递目标URL和状态码
+                request.setAttribute("targetUrl", routeConfig.getTargetUrl());
+                request.setAttribute("statusCode", routeConfig.getStatusCode());
+                request.setAttribute("contentType", routeConfig.getContentType());
+            }
             handler.handle(request, output, keepAlive);
             return true;
         } else {

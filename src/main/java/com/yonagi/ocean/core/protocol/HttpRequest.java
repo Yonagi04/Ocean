@@ -1,5 +1,6 @@
 package com.yonagi.ocean.core.protocol;
 
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -16,6 +17,9 @@ public class HttpRequest {
     private Map<String, String> headers;
     private byte[] body;
     private Map<String, String> queryParams;
+
+    // Ocean内部使用的属性存储
+    private final Map<String, Object> attributes = new HashMap<>();
 
     private HttpRequest() {
 
@@ -77,6 +81,14 @@ public class HttpRequest {
                        .reduce("", (a, b) -> a + b + "\r\n") +
                "\r\n" +
                (body != null ? new String(body) : "");
+    }
+
+    public void setAttribute(String key, Object value) {
+        attributes.put(key, value);
+    }
+
+    public Object getAttribute(String key) {
+        return attributes.get(key);
     }
 
     public static class Builder {
