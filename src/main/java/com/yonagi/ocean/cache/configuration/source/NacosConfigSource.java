@@ -1,8 +1,10 @@
 package com.yonagi.ocean.cache.configuration.source;
 
 import com.alibaba.nacos.api.config.listener.Listener;
+import com.alibaba.nacos.shaded.com.google.common.base.Strings;
 import com.yonagi.ocean.cache.configuration.CacheConfig;
 import com.yonagi.ocean.utils.LocalConfigLoader;
+import com.yonagi.ocean.utils.NacosBackupScheduler;
 import com.yonagi.ocean.utils.NacosConfigLoader;
 
 import java.util.Properties;
@@ -13,6 +15,7 @@ public class NacosConfigSource implements ConfigSource {
 
     public NacosConfigSource() {
         NacosConfigLoader.init();
+        startPeriodicSync();
     }
 
     @Override
@@ -76,6 +79,19 @@ public class NacosConfigSource implements ConfigSource {
                 }
             }
         });
+    }
+
+    private void startPeriodicSync() {
+        boolean enabledSync = Boolean.parseBoolean(LocalConfigLoader.getProperty("server.cache.nacos.sync_to_local", "true"));
+        if (!enabledSync) {
+            return;
+        }
+        int syncIntervalSeconds = Integer.parseInt(LocalConfigLoader.getProperty("server.cache.nacos.sync_interval_seconds", "7200"));
+        String syncLocalPath = LocalConfigLoader.getProperty("server.cache.nacos.sync_local_path");
+        String dataId = LocalConfigLoader.getProperty("server.cache.nacos.data_id");
+        String group = LocalConfigLoader.getProperty("server.cache.nacos.group");
+        int timeoutMs = Integer.parseInt(LocalConfigLoader.getProperty("nacos.timeout_ms", "3000"));
+        NacosBackupScheduler.start(dataId, group, syncLocalPath, syncIntervalSeconds, timeoutMs);
     }
 
     private interface IntSetter { void set(int v); }

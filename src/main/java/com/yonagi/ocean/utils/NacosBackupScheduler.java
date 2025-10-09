@@ -27,7 +27,9 @@ public class NacosBackupScheduler {
 
     private static final Map<String, ScheduledFuture<?>> TASKS = new ConcurrentHashMap<>();
 
-    private static final ScheduledExecutorService backupService = Executors.newScheduledThreadPool(2, r -> {
+    private static final int POOL_SIZE = Integer.parseInt(LocalConfigLoader.getProperty("nacos.backup.thread_pool_size", "5"));
+
+    private static final ScheduledExecutorService backupService = Executors.newScheduledThreadPool(POOL_SIZE, r -> {
         Thread t = new Thread(r);
         t.setDaemon(true);
         t.setName("NacosBackupScheduler");
