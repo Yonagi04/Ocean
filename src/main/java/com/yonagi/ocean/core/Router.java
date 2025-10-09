@@ -345,7 +345,7 @@ public class Router {
             if (routeType == RouteType.REDIRECT) {
                 // 对于重定向，传递目标URL和状态码
                 request.setAttribute("targetUrl", routeConfig.getTargetUrl());
-                request.setAttribute("statusCode", routeConfig.getStatusCode());
+                request.setAttribute("statusCode", routeConfig.getStatusCode() == null ? 302 : routeConfig.getStatusCode());
                 request.setAttribute("contentType", routeConfig.getContentType());
             }
             handler.handle(request, output, keepAlive);
