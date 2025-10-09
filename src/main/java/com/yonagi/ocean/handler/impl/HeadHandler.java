@@ -2,6 +2,7 @@ package com.yonagi.ocean.handler.impl;
 
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
+import com.yonagi.ocean.core.protocol.HttpStatus;
 import com.yonagi.ocean.core.protocol.HttpVersion;
 import com.yonagi.ocean.handler.RequestHandler;
 import com.yonagi.ocean.utils.MimeTypeUtil;
@@ -59,23 +60,17 @@ public class HeadHandler implements RequestHandler {
         }
         HttpResponse response = new HttpResponse.Builder()
                 .httpVersion(request.getHttpVersion())
-                .statusCode(200)
-                .statusText("OK")
+                .httpStatus(HttpStatus.OK)
                 .contentType(contentType)
                 .build();
         response.write(output, keepAlive);
         output.flush();
     }
-
-    private void writeNotFound(OutputStream output) throws IOException {
-        writeNotFound(output, true); // Default to keep-alive
-    }
     
     private void writeNotFound(OutputStream output, boolean keepAlive) throws IOException {
         HttpResponse response = new HttpResponse.Builder()
                 .httpVersion(HttpVersion.HTTP_1_1)
-                .statusCode(404)
-                .statusText("Not Found")
+                .httpStatus(HttpStatus.NOT_FOUND)
                 .contentType("text/html")
                 .build();
         response.write(output, keepAlive);

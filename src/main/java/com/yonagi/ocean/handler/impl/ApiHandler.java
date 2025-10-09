@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
+import com.yonagi.ocean.core.protocol.HttpStatus;
 import com.yonagi.ocean.handler.RequestHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -115,8 +116,7 @@ public class ApiHandler implements RequestHandler {
         if (processor == null) {
             HttpResponse response = new HttpResponse.Builder()
                     .httpVersion(request.getHttpVersion())
-                    .statusCode(415)
-                    .statusText("Unsupported Media Type")
+                    .httpStatus(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
                     .contentType("text/plain")
                     .body("Unsupported Media Type".getBytes())
                     .build();
@@ -133,8 +133,7 @@ public class ApiHandler implements RequestHandler {
             log.error("{}{}", msgPrefix, e.getMessage(), e);
             HttpResponse errorResponse = new HttpResponse.Builder()
                     .httpVersion(request.getHttpVersion())
-                    .statusCode(400)
-                    .statusText("Bad Request")
+                    .httpStatus(HttpStatus.BAD_REQUEST)
                     .contentType("text/plain")
                     .body((msgPrefix + e.getMessage()).getBytes())
                     .build();
@@ -146,8 +145,7 @@ public class ApiHandler implements RequestHandler {
         String responseBody = objectMapper.writeValueAsString(responseData);
         HttpResponse response = new HttpResponse.Builder()
                 .httpVersion(request.getHttpVersion())
-                .statusCode(201)
-                .statusText("Created")
+                .httpStatus(HttpStatus.CREATED)
                 .contentType("application/json")
                 .body(responseBody.getBytes())
                 .build();

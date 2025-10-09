@@ -13,8 +13,7 @@ import java.util.Map;
  */
 public class HttpResponse {
     private HttpVersion httpVersion;
-    private Integer statusCode;
-    private String statusText;
+    private HttpStatus httpStatus;
     private String contentType;
     private byte[] body;
 
@@ -29,12 +28,8 @@ public class HttpResponse {
         return httpVersion;
     }
 
-    public Integer getStatusCode() {
-        return statusCode;
-    }
-
-    public String getStatusText() {
-        return statusText;
+    public HttpStatus getHttpStatus() {
+        return httpStatus;
     }
 
     public String getContentType() {
@@ -62,7 +57,7 @@ public class HttpResponse {
     public void write(OutputStream outputStream, boolean keepAlive) throws IOException {
         StringBuilder headerBuilder = new StringBuilder();
         headerBuilder.append(httpVersion.getVersion()).append(" ")
-                .append(statusCode).append(" ").append(statusText).append("\r\n");
+                .append(httpStatus.toString()).append("\r\n");
         headerBuilder.append("Content-Type: ").append(contentType).append("\r\n");
 
         if (headers != null) {
@@ -103,7 +98,7 @@ public class HttpResponse {
 
     @Override
     public String toString() {
-        return httpVersion.getVersion() + " " + statusCode + " " + statusText + "\r\n" +
+        return httpVersion.getVersion() + " " + httpStatus.toString() + "\r\n" +
                "Content-Type: " + contentType + "\r\n" +
                 (headers != null ? headers.entrySet().stream()
                         .filter(entry -> {
@@ -121,8 +116,7 @@ public class HttpResponse {
 
     public static class Builder {
         private HttpVersion httpVersion;
-        private Integer statusCode;
-        private String statusText;
+        private HttpStatus httpStatus;
         private String contentType;
         private byte[] body;
         private Map<String, String> headers;
@@ -132,13 +126,8 @@ public class HttpResponse {
             return this;
         }
 
-        public Builder statusCode(Integer statusCode) {
-            this.statusCode = statusCode;
-            return this;
-        }
-
-        public Builder statusText(String statusText) {
-            this.statusText = statusText;
+        public Builder httpStatus(HttpStatus httpStatus) {
+            this.httpStatus = httpStatus;
             return this;
         }
 
@@ -158,13 +147,12 @@ public class HttpResponse {
         }
 
         public HttpResponse build() {
-            if (statusCode == null || statusText == null || contentType == null) {
+            if (httpStatus == null || contentType == null) {
                 throw new IllegalStateException("Status code, status text, and content type must be set");
             }
             HttpResponse httpResponse = new HttpResponse();
             httpResponse.httpVersion = this.httpVersion != null ? this.httpVersion : HttpVersion.HTTP_1_1;
-            httpResponse.statusCode = this.statusCode;
-            httpResponse.statusText = this.statusText;
+            httpResponse.httpStatus = this.httpStatus;
             httpResponse.contentType = this.contentType;
             httpResponse.body = this.body;
             httpResponse.headers = this.headers;

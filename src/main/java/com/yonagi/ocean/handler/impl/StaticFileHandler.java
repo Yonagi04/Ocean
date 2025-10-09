@@ -1,10 +1,7 @@
 package com.yonagi.ocean.handler.impl;
 
 import com.yonagi.ocean.cache.*;
-import com.yonagi.ocean.core.protocol.HttpMethod;
-import com.yonagi.ocean.core.protocol.HttpRequest;
-import com.yonagi.ocean.core.protocol.HttpResponse;
-import com.yonagi.ocean.core.protocol.HttpVersion;
+import com.yonagi.ocean.core.protocol.*;
 import com.yonagi.ocean.handler.RequestHandler;
 import com.yonagi.ocean.utils.LocalConfigLoader;
 import com.yonagi.ocean.utils.MimeTypeUtil;
@@ -102,8 +99,7 @@ public class StaticFileHandler implements RequestHandler {
             if (ifNoneMatch != null && matchesEtag(ifNoneMatch, etag)) {
                 HttpResponse notModified = new HttpResponse.Builder()
                         .httpVersion(request.getHttpVersion())
-                        .statusCode(304)
-                        .statusText("Not Modified")
+                        .httpStatus(HttpStatus.NOT_MODIFIED)
                         .contentType(contentType)
                         .headers(headers)
                         .build();
@@ -115,8 +111,7 @@ public class StaticFileHandler implements RequestHandler {
 
             HttpResponse httpResponse = new HttpResponse.Builder()
                     .httpVersion(request.getHttpVersion())
-                    .statusCode(200)
-                    .statusText("OK")
+                    .httpStatus(HttpStatus.OK)
                     .contentType(contentType)
                     .headers(headers)
                     .body(cf.getContent())
@@ -145,8 +140,7 @@ public class StaticFileHandler implements RequestHandler {
                 CachedFile cf = fileCache.get(errorPage);
                 HttpResponse httpResponse = new HttpResponse.Builder()
                         .httpVersion(HttpVersion.HTTP_1_1)
-                        .statusCode(404)
-                        .statusText("Not Found")
+                        .httpStatus(HttpStatus.NOT_FOUND)
                         .contentType(contentType)
                         .body(cf.getContent())
                         .build();
@@ -159,8 +153,7 @@ public class StaticFileHandler implements RequestHandler {
         }
         HttpResponse httpResponse = new HttpResponse.Builder()
                 .httpVersion(HttpVersion.HTTP_1_1)
-                .statusCode(404)
-                .statusText("Not Found")
+                .httpStatus(HttpStatus.NOT_FOUND)
                 .contentType("text/html")
                 .body(DEFAULT_404_HTML.getBytes())
                 .build();

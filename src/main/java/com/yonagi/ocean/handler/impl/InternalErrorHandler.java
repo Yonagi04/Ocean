@@ -5,6 +5,7 @@ import com.yonagi.ocean.cache.StaticFileCache;
 import com.yonagi.ocean.cache.StaticFileCacheFactory;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
+import com.yonagi.ocean.core.protocol.HttpStatus;
 import com.yonagi.ocean.core.protocol.HttpVersion;
 import com.yonagi.ocean.handler.RequestHandler;
 import com.yonagi.ocean.utils.LocalConfigLoader;
@@ -70,8 +71,7 @@ public class InternalErrorHandler implements RequestHandler {
                 CachedFile cf = fileCache.get(errorPage);
                 HttpResponse httpResponse = new HttpResponse.Builder()
                         .httpVersion(request.getHttpVersion())
-                        .statusCode(500)
-                        .statusText("Internal Server Error")
+                        .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
                         .contentType(contentType)
                         .body(cf.getContent())
                         .build();
@@ -86,17 +86,12 @@ public class InternalErrorHandler implements RequestHandler {
             writeDefaultErrorResponse(outputStream, keepAlive);
         }
     }
-
-    private void writeDefaultErrorResponse(OutputStream outputStream) {
-        writeDefaultErrorResponse(outputStream, true); // Default to keep-alive
-    }
     
     private void writeDefaultErrorResponse(OutputStream outputStream, boolean keepAlive) {
         try {
             HttpResponse httpResponse = new HttpResponse.Builder()
                     .httpVersion(HttpVersion.HTTP_1_1)
-                    .statusCode(500)
-                    .statusText("Internal Server Error")
+                    .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
                     .contentType("text/html")
                     .body(DEFAULT_500_HTML.getBytes())
                     .build();

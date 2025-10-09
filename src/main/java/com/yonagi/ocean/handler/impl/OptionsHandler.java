@@ -1,11 +1,12 @@
 package com.yonagi.ocean.handler.impl;
 
-import com.yonagi.ocean.core.protocol.HttpMethod;
-import com.yonagi.ocean.core.protocol.HttpRequest;
-import com.yonagi.ocean.core.protocol.HttpResponse;
+import com.yonagi.ocean.core.protocol.*;
 import com.yonagi.ocean.handler.RequestHandler;
 import com.yonagi.ocean.utils.LocalConfigLoader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
@@ -22,6 +23,8 @@ import java.util.Map;
  */
 public class OptionsHandler implements RequestHandler {
 
+    private static final Logger log = LoggerFactory.getLogger(OptionsHandler.class);
+
     private static String webRoot;
 
     public OptionsHandler(String webRoot) {
@@ -35,6 +38,24 @@ public class OptionsHandler implements RequestHandler {
     
     @Override
     public void handle(HttpRequest request, OutputStream output, boolean keepAlive) throws IOException {
+        String uri = request.getUri();
+        if ("/".equals(uri)) {
+            uri = "index.html";
+        }
+        if (uri.startsWith(webRoot)) {
+            uri = uri.substring(webRoot.length());
+        }
+        File file = new File(webRoot, uri);
+        if (!file.exists() || file.isDirectory()) {
+            writeNotFound(output, keepAlive);
+            return;
+        }
+        if (!file.getCanonicalPath().startsWith(new File(webRoot).getCanonicalPath())) {
+            writeNotFound(output, keepAlive);
+            log.warn("Attempted directory traversal attack: {}", uri);
+            return;
+        }
+
         List<String> allowedMethods = new ArrayList<>();
         for (HttpMethod method : HttpMethod.values()) {
             allowedMethods.add(method.name());
@@ -53,12 +74,21 @@ public class OptionsHandler implements RequestHandler {
         }
         HttpResponse response = new HttpResponse.Builder()
                 .httpVersion(request.getHttpVersion())
-                .statusCode(204)
-                .statusText("No Content")
-                .contentType("application/json")
+                .httpStatus(HttpStatus.NO_CONTENT)
+                .contentType("text/html")
                 .headers(headers)
                 .build();
         response.write(output, keepAlive);
+        output.flush();
+    }
+
+    private void writeNotFound(OutputStream output, boolean keepAlive) throws IOException {
+        HttpResponse httpResponse = new HttpResponse.Builder()
+                .httpVersion(HttpVersion.HTTP_1_1)
+                .httpStatus(HttpStatus.NOT_FOUND)
+                .contentType("text/html")
+                .build();
+        httpResponse.write(output, keepAlive);
         output.flush();
     }
 }

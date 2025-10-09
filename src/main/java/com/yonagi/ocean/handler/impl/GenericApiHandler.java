@@ -3,6 +3,7 @@ package com.yonagi.ocean.handler.impl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
+import com.yonagi.ocean.core.protocol.HttpStatus;
 import com.yonagi.ocean.handler.RequestHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,8 +66,7 @@ public class GenericApiHandler implements RequestHandler {
         String responseBody = objectMapper.writeValueAsString(responseData);
         HttpResponse response = new HttpResponse.Builder()
                 .httpVersion(request.getHttpVersion())
-                .statusCode(200)
-                .statusText("OK")
+                .httpStatus(HttpStatus.OK)
                 .contentType("application/json")
                 .body(responseBody.getBytes())
                 .build();

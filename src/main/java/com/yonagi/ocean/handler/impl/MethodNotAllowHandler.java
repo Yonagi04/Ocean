@@ -2,6 +2,7 @@ package com.yonagi.ocean.handler.impl;
 
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
+import com.yonagi.ocean.core.protocol.HttpStatus;
 import com.yonagi.ocean.core.protocol.HttpVersion;
 import com.yonagi.ocean.handler.RequestHandler;
 
@@ -27,8 +28,7 @@ public class MethodNotAllowHandler implements RequestHandler {
         String body = "<h1>405 Method Not Allowed</h1>";
         HttpResponse response = new HttpResponse.Builder()
                 .httpVersion(HttpVersion.HTTP_1_1)
-                .statusCode(405)
-                .statusText("Method Not Allowed")
+                .httpStatus(HttpStatus.METHOD_NOT_ALLOWED)
                 .contentType("text/html")
                 .body(body.getBytes())
                 .build();

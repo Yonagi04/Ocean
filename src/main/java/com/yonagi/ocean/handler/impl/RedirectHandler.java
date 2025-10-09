@@ -2,6 +2,7 @@ package com.yonagi.ocean.handler.impl;
 
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
+import com.yonagi.ocean.core.protocol.HttpStatus;
 import com.yonagi.ocean.handler.RequestHandler;
 import com.yonagi.ocean.utils.LocalConfigLoader;
 import org.slf4j.Logger;
@@ -63,23 +64,14 @@ public class RedirectHandler implements RequestHandler {
             }
         }
 
-        if (statusCode != 301 && statusCode != 302 && statusCode != 307 && statusCode != 308) {
+        if (statusCode != 301 && statusCode != 302 && statusCode != 303 && statusCode != 307 && statusCode != 308) {
             log.warn("RedirectHandler: Invalid statusCode for redirect: {}, reset to 302", statusCode);
             statusCode = 302;
         }
         HttpResponse.Builder builder = new HttpResponse.Builder()
                 .httpVersion(request.getHttpVersion())
-                .statusCode(statusCode)
+                .httpStatus(HttpStatus.fromCode(statusCode))
                 .contentType(request.getAttribute("contentType") != null ? (String) request.getAttribute("contentType") : "text/html");
-        if (statusCode == 301) {
-            builder.statusText("Moved Permanently");
-        } else if (statusCode == 302) {
-            builder.statusText("Found");
-        } else if (statusCode == 307) {
-            builder.statusText("Temporary Redirect");
-        } else {
-            builder.statusText("Permanent Redirect");
-        }
         Map<String, String> responseHeaders = new HashMap<>();
         responseHeaders.put("Location", finalLocation);
         builder.headers(responseHeaders);
