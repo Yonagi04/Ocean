@@ -4,10 +4,6 @@ import com.alibaba.nacos.api.NacosFactory;
 import com.alibaba.nacos.api.config.ConfigService;
 import com.alibaba.nacos.api.config.listener.Listener;
 import com.alibaba.nacos.api.exception.NacosException;
-import com.alibaba.nacos.shaded.com.google.gson.JsonArray;
-import com.alibaba.nacos.shaded.com.google.gson.JsonObject;
-import com.alibaba.nacos.shaded.io.grpc.internal.JsonParser;
-import com.alibaba.nacos.shaded.io.grpc.internal.JsonUtil;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -51,15 +47,18 @@ public class NacosConfigLoader {
 
         if (!nacosEnabled) {
             log.warn("Nacos disabled in configuration, using local configuration only.");
+            initialized = true;
             return;
         }
         synchronized (NacosConfigLoader.class) {
             if (configService != null) {
+                initialized = true;
                 return;
             }
             String serverAddr = LocalConfigLoader.getProperty("nacos.server_addr");
             if (!checkNacosConnectivity(serverAddr)) {
                 log.error("Nacos server is unreachable at {}. Falling back to local configuration.", serverAddr);
+                initialized = true;
                 return;
             }
             Properties props = new Properties();
