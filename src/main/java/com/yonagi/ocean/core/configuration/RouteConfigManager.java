@@ -50,6 +50,11 @@ public class RouteConfigManager {
                 }
             });
             newRouteMap.forEach((key, newConfig) -> {
+                if (!newConfig.isEnabled()) {
+                    router.unregisterRoute(newConfig);
+                    log.info("Disabled route: {}", key);
+                    return;
+                }
                 RouteConfig oldConfig = oldRouteMap.get(key);
                 if (oldConfig == null) {
                     router.registerRoute(newConfig);
