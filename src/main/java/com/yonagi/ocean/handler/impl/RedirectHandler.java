@@ -1,5 +1,6 @@
 package com.yonagi.ocean.handler.impl;
 
+import com.yonagi.ocean.core.configuration.RedirectConfig;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
 import com.yonagi.ocean.core.protocol.HttpStatus;
@@ -10,8 +11,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.HashMap;
-import java.util.Map;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.*;
 
 /**
  * @author Yonagi
@@ -23,11 +25,19 @@ import java.util.Map;
 public class RedirectHandler implements RequestHandler {
 
     private final String webRoot;
+    private final RedirectConfig redirectConfig;
+    private final Set<String> whitelist;
+    private final String fallbackUrl;
 
     private static final Logger log = LoggerFactory.getLogger(RedirectHandler.class);
 
     public RedirectHandler(String webRoot) {
         this.webRoot = webRoot;
+        this.redirectConfig = new RedirectConfig();
+        this.whitelist = redirectConfig.getAllowedRedirectHosts();
+        this.fallbackUrl = redirectConfig.getFallbackUrl() == null ?
+                LocalConfigLoader.getProperty("server.url") + ":" + LocalConfigLoader.getProperty("server.port", "8080") :
+                redirectConfig.getFallbackUrl();
     }
 
     @Override
@@ -39,33 +49,62 @@ public class RedirectHandler implements RequestHandler {
     public void handle(HttpRequest request, OutputStream output, boolean keepAlive) throws IOException {
         String targetUrl = (String) request.getAttribute("targetUrl");
         Integer statusCode = (Integer) request.getAttribute("statusCode");
-        if (targetUrl == null || statusCode == null) {
-            log.error("RedirectHandler: Missing targetUrl or statusCode attribute");
+        if (targetUrl == null) {
+            log.error("Missing targetUrl attribute");
             return;
         }
-        Map<String, String> requestHeaders = request.getHeaders();
-        String host = requestHeaders.get("Host");
+        if (statusCode == null) {
+            log.warn("Missing statusCode attribute, using default 302");
+            statusCode = 302;
+        }
+        String host = request.getHeaders().get("Host");
         if (host == null) {
             host = LocalConfigLoader.getProperty("server.url") + ":" + LocalConfigLoader.getProperty("server.port", "8080");
         }
+
         // TODO support https
         String protocol = "http";
 
         String finalLocation;
         if (targetUrl.startsWith("http://") || targetUrl.startsWith("https://")) {
-            // TODO safety check
-            finalLocation = targetUrl;
-        } else {
+            try {
+                URL url = new URL(targetUrl);
+                String originalHostName = url.getHost();
+                String hostName = normalizeHost(originalHostName);
+                if (!whitelist.isEmpty() && whitelist.contains(hostName)) {
+                    finalLocation = targetUrl;
+                } else {
+                    log.warn("Host '{}' is not in the whitelist, redirect blocked", hostName);
+                    finalLocation = fallbackUrl;
+                }
+            } catch (MalformedURLException e) {
+                log.error("Malformed URL, redirect to fallback url", e);
+                finalLocation = fallbackUrl;
+            }
+        } else if (targetUrl.startsWith("/")) {
             String baseUrl = protocol + "://" + host;
-            if (!targetUrl.startsWith("/")) {
-                finalLocation = baseUrl + "/" + targetUrl;
-            } else {
-                finalLocation = baseUrl + targetUrl;
+            finalLocation = baseUrl + targetUrl;
+        } else {
+            log.warn("Target URL '{}' is missing protocol. Assuming external redirect with 'https://' for safety", targetUrl);
+            String assumedUrl = "https://" + targetUrl;
+            try {
+                URL url = new URL(assumedUrl);
+                String originalHostName = url.getHost();
+                String hostName = normalizeHost(originalHostName);
+                if (!whitelist.isEmpty() && whitelist.contains(hostName)) {
+                    finalLocation = assumedUrl;
+                } else {
+                    log.warn("Host '{}' is not in the whitelist, redirect blocked", hostName);
+                    finalLocation = fallbackUrl;
+                }
+            } catch (MalformedURLException e) {
+                log.error("Malformed URL, redirect to fallback url", e);
+                finalLocation = fallbackUrl;
             }
         }
 
         if (statusCode != 301 && statusCode != 302 && statusCode != 303 && statusCode != 307 && statusCode != 308) {
-            log.warn("RedirectHandler: Invalid statusCode for redirect: {}, reset to 302", statusCode);
+            log.warn("Invalid statusCode for redirect: {}, using default 302", statusCode);
             statusCode = 302;
         }
         HttpResponse.Builder builder = new HttpResponse.Builder()
@@ -80,5 +119,16 @@ public class RedirectHandler implements RequestHandler {
         response.write(output, keepAlive);
         output.flush();
         log.info("Request path: {}, redirect to: {}, status code: {}", request.getUri(), finalLocation, statusCode);
+    }
+
+    private String normalizeHost(String hostName) {
+        if (hostName == null) {
+            return null;
+        }
+        String lowerCaseHostName = hostName.toLowerCase();
+        if (lowerCaseHostName.startsWith("www.")) {
+            return lowerCaseHostName.substring(4);
+        }
+        return lowerCaseHostName;
     }
 }

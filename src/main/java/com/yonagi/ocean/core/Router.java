@@ -337,7 +337,7 @@ public class Router {
             handler = getOrCreateHandler(handlerClassName);
         } else if (routeType == RouteType.REDIRECT) {
             handlerClassName = REDIRECT_HANDLER_CLASS;
-            handler = new RedirectHandler(handlerClassName);
+            handler = getOrCreateHandler(handlerClassName);
         }
         
         if (handler != null) {
