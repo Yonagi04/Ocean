@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit;
  * @description
  * @date 2025/10/08 20:02
  */
-public class ServerStartupConfig {
+public final class ServerStartupConfig {
 
     private final Integer port;
     private final String webRoot;

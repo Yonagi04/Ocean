@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.yonagi.ocean.core.configuration.RouteConfig;
 import com.yonagi.ocean.utils.LocalConfigLoader;
+import com.yonagi.ocean.utils.NacosBackupScheduler;
 import com.yonagi.ocean.utils.NacosConfigLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +29,7 @@ public class NacosConfigSource implements ConfigSource {
 
     public NacosConfigSource() {
         NacosConfigLoader.init();
+        startPeriodicSync();
     }
 
     @Override
@@ -73,5 +75,18 @@ public class NacosConfigSource implements ConfigSource {
                 }
             }
         });
+    }
+
+    private void startPeriodicSync() {
+        boolean enabledSync = Boolean.parseBoolean(LocalConfigLoader.getProperty("server.router.nacos.sync_to_local", "true"));
+        if (!enabledSync) {
+            return;
+        }
+        int syncIntervalSeconds = Integer.parseInt(LocalConfigLoader.getProperty("server.router.nacos.sync_interval_seconds", "7200"));
+        String syncLocalPath = LocalConfigLoader.getProperty("server.router.nacos.sync_local_path");
+        String dataId = LocalConfigLoader.getProperty("server.router.nacos.data_id");
+        String group = LocalConfigLoader.getProperty("server.router.nacos.group");
+        int timeoutMs = Integer.parseInt(LocalConfigLoader.getProperty("nacos.timeout_ms", "5000"));
+        NacosBackupScheduler.start(dataId, group, syncLocalPath, syncIntervalSeconds, timeoutMs);
     }
 }
