@@ -4,10 +4,10 @@ import com.yonagi.ocean.cache.StaticFileCacheFactory;
 import com.yonagi.ocean.core.configuration.KeepAliveConfig;
 import com.yonagi.ocean.core.router.RouteConfigManager;
 import com.yonagi.ocean.core.configuration.ServerStartupConfig;
-import com.yonagi.ocean.core.configuration.source.route.ConfigSource;
-import com.yonagi.ocean.core.configuration.source.route.FallbackConfigSource;
-import com.yonagi.ocean.core.configuration.source.route.LocalConfigSource;
-import com.yonagi.ocean.core.configuration.source.route.NacosConfigSource;
+import com.yonagi.ocean.core.configuration.source.router.ConfigSource;
+import com.yonagi.ocean.core.configuration.source.router.FallbackConfigSource;
+import com.yonagi.ocean.core.configuration.source.router.LocalConfigSource;
+import com.yonagi.ocean.core.configuration.source.router.NacosConfigSource;
 import com.yonagi.ocean.core.router.Router;
 import com.yonagi.ocean.utils.LocalConfigLoader;
 import org.slf4j.Logger;
@@ -124,7 +124,7 @@ public class HttpServer {
         // Initialize connection manager
         this.connectionManager = new ConnectionManager(startupConfig.getKeepAliveConfig());
 
-        // Initialize router, route configuration manager and initial route configuration
+        // Initialize router, router configuration manager and initial router configuration
         this.router = new Router(webRoot);
         this.routeConfigManager = new RouteConfigManager(router);
         this.configSource = new FallbackConfigSource(new NacosConfigSource(), new LocalConfigSource());

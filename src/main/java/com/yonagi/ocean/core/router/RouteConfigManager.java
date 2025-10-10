@@ -1,7 +1,7 @@
 package com.yonagi.ocean.core.router;
 
 import com.yonagi.ocean.core.configuration.RouteConfig;
-import com.yonagi.ocean.core.configuration.source.route.ConfigSource;
+import com.yonagi.ocean.core.configuration.source.router.ConfigSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,22 +46,22 @@ public class RouteConfigManager {
             oldRouteMap.forEach((key, oldConfig) -> {
                 if (!newRouteMap.containsKey(key)) {
                     router.unregisterRoute(oldConfig);
-                    log.info("Unregistered route: {}", key);
+                    log.info("Unregistered router: {}", key);
                 }
             });
             newRouteMap.forEach((key, newConfig) -> {
                 if (!newConfig.isEnabled()) {
                     router.unregisterRoute(newConfig);
-                    log.info("Disabled route: {}", key);
+                    log.info("Disabled router: {}", key);
                     return;
                 }
                 RouteConfig oldConfig = oldRouteMap.get(key);
                 if (oldConfig == null) {
                     router.registerRoute(newConfig);
-                    log.info("Registered route: {}", key);
+                    log.info("Registered router: {}", key);
                 } else if (!newConfig.equals(oldConfig)) {
                     router.updateRoute(oldConfig, newConfig);
-                    log.info("Updated route: {}", key);
+                    log.info("Updated router: {}", key);
                 }
             });
             this.routeMap = newRouteMap;

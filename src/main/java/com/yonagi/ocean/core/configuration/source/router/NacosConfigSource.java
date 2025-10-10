@@ -1,4 +1,4 @@
-package com.yonagi.ocean.core.configuration.source.route;
+package com.yonagi.ocean.core.configuration.source.router;
 
 import com.alibaba.nacos.api.config.listener.Listener;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -50,7 +50,7 @@ public class NacosConfigSource implements ConfigSource {
             TypeReference<List<RouteConfig>> typeRef = new TypeReference<List<RouteConfig>>() {
             };
             List<RouteConfig> routeConfigs = objectMapper.convertValue(jsonArrayConfig, typeRef);
-            log.info("Loaded {} route configurations from Nacos configuration", routeConfigs.size());
+            log.info("Loaded {} router configurations from Nacos configuration", routeConfigs.size());
             for (RouteConfig config : routeConfigs) {
                 if (config.getRouteType() == RouteType.STATIC) {
                     RouteConfig.Builder builder = config.toBuilder();
@@ -66,7 +66,7 @@ public class NacosConfigSource implements ConfigSource {
             }
             return routeConfigs;
         } catch (Exception e) {
-            log.error("Failed to load route configuration from Nacos: {}", e.getMessage(), e);
+            log.error("Failed to load router configuration from Nacos: {}", e.getMessage(), e);
             return null;
         }
     }

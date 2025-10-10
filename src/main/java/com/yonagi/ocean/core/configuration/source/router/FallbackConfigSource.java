@@ -1,4 +1,4 @@
-package com.yonagi.ocean.core.configuration.source.route;
+package com.yonagi.ocean.core.configuration.source.router;
 
 import com.yonagi.ocean.core.configuration.RouteConfig;
 

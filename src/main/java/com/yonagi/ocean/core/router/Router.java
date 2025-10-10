@@ -129,7 +129,7 @@ public class Router {
         routes.computeIfAbsent(method, k -> new ConcurrentHashMap<>())
               .put(path, config);
         
-        log.debug("Registered route: {} {}", method, path);
+        log.debug("Registered router: {} {}", method, path);
     }
 
     /**
@@ -141,7 +141,7 @@ public class Router {
         Map<String, RouteConfig> methodRoutes = routes.get(method);
         if (methodRoutes != null) {
             methodRoutes.remove(path);
-            log.debug("Unregistered route: {} {}", method, path);
+            log.debug("Unregistered router: {} {}", method, path);
         }
     }
 
@@ -151,7 +151,7 @@ public class Router {
     public void updateRoute(RouteConfig oldConfig, RouteConfig newConfig) {
         unregisterRoute(oldConfig);
         registerRoute(newConfig);
-        log.debug("Updated route: {} {}", newConfig.getMethod(), newConfig.getPath());
+        log.debug("Updated router: {} {}", newConfig.getMethod(), newConfig.getPath());
     }
     
     /**
@@ -165,7 +165,7 @@ public class Router {
             if (handleCustomRoute(routeConfig, request, output, keepAlive)) {
                 return;
             }
-            log.warn("Custom route failed, falling back to default handler for {} {}", method, path);
+            log.warn("Custom router failed, falling back to default handler for {} {}", method, path);
         }
         RequestHandler defaultHandler = defaultHandlers.get(method);
         if (defaultHandler != null) {
@@ -217,7 +217,7 @@ public class Router {
         }
         
         if (handler != null) {
-            log.debug("Handling request with custom route: {} -> {}", request.getUri(), handlerClassName);
+            log.debug("Handling request with custom router: {} -> {}", request.getUri(), handlerClassName);
             if (routeType == RouteType.REDIRECT) {
                 // 对于重定向，传递目标URL和状态码
                 request.setAttribute("targetUrl", routeConfig.getTargetUrl());
@@ -227,7 +227,7 @@ public class Router {
             handler.handle(request, output, keepAlive);
             return true;
         } else {
-            log.warn("Failed to create handler for route: {} - handler class not found or invalid", routeConfig);
+            log.warn("Failed to create handler for router: {} - handler class not found or invalid", routeConfig);
             return false;
         }
     }

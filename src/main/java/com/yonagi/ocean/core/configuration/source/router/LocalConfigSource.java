@@ -1,4 +1,4 @@
-package com.yonagi.ocean.core.configuration.source.route;
+package com.yonagi.ocean.core.configuration.source.router;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -35,14 +35,14 @@ public class LocalConfigSource implements ConfigSource {
         List<RouteConfig> routeConfigs = new ArrayList<>();
         try {
             routeConfigs = loadFromClasspath(LocalConfigLoader.getProperty("server.router.config_file_path", "/config/route.json"));
-            log.info("Loaded {} route configurations from local configuration", routeConfigs.size());
+            log.info("Loaded {} router configurations from local configuration", routeConfigs.size());
             for (RouteConfig config : routeConfigs) {
                 log.info("Route: {} {} -> {} (enabled: {})",
                         config.getMethod(), config.getPath(), config.getHandlerClassName(), config.isEnabled());
             }
 
         } catch (Exception e) {
-            log.error("Failed to load route configuration: {}", e.getMessage(), e);
+            log.error("Failed to load router configuration: {}", e.getMessage(), e);
         }
         return routeConfigs;
     }
@@ -92,7 +92,7 @@ public class LocalConfigSource implements ConfigSource {
                 RouteConfig config = builder.build();
                 configs.add(config);
             } catch (Exception e) {
-                log.error("Failed to parse route configuration: {} - {}", dto, e.getMessage());
+                log.error("Failed to parse router configuration: {} - {}", dto, e.getMessage());
             }
         }
 
