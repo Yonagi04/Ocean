@@ -33,7 +33,6 @@ public class NacosConfigSource implements ConfigSource {
     private static final String REDIRECT_HANDLER_CLASS = RedirectHandler.class.getName();
 
     public NacosConfigSource() {
-        NacosConfigLoader.init();
         startPeriodicSync();
     }
 

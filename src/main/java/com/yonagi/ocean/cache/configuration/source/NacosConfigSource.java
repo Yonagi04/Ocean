@@ -14,7 +14,6 @@ public class NacosConfigSource implements ConfigSource {
     private Runnable callback;
 
     public NacosConfigSource() {
-        NacosConfigLoader.init();
         startPeriodicSync();
     }
 

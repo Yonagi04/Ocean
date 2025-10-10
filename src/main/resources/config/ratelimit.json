@@ -1,0 +1,26 @@
+[
+  {
+    "method": "GET",
+    "path": "/404.html",
+    "scopes": [
+      "IP_URI"
+    ],
+    "enabled": true
+  },
+  {
+    "method": "ALL",
+    "path": "/50x.html",
+    "scopes": [
+      "IP_GLOBAL"
+    ],
+    "enabled": true
+  },
+  {
+    "method": "ALL",
+    "path": "/index.html",
+    "scopes": [
+      "GLOBAL_URI"
+    ],
+    "enabled": true
+  }
+]

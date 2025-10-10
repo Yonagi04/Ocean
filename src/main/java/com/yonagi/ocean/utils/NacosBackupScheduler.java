@@ -8,10 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 import java.util.concurrent.*;
 
 /**
@@ -58,10 +55,11 @@ public class NacosBackupScheduler {
             log.info("Nacos backup task already running for {}:{}", dataId, group);
             return;
         }
-        List<ConfigBackupHandler> handlers = List.of(
+        List<ConfigBackupHandler> handlers = Arrays.asList(
                 new JsonConfigBackupHandler(),
                 new PropertiesConfigBackupHandler()
         );
+
         String fileName = backupPath.substring(backupPath.lastIndexOf('/') + 1);
         String contentType = fileName.contains(".") ? fileName.substring(fileName.lastIndexOf('.') + 1) : "";
         String resolvedBackupPath = backupPath.replace("${timestamp}", new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date()));

@@ -1,8 +1,9 @@
 package com.yonagi.ocean.core;
 
-import com.yonagi.ocean.core.protocol.HttpMethod;
+import com.yonagi.ocean.core.protocol.enums.HttpMethod;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpRequestParser;
+import com.yonagi.ocean.core.ratelimiter.RateLimiterChecker;
 import com.yonagi.ocean.core.router.Router;
 import com.yonagi.ocean.handler.impl.*;
 import org.slf4j.Logger;
@@ -27,12 +28,15 @@ public class ClientHandler implements Runnable {
     private final String webRoot;
     private final ConnectionManager connectionManager;
     private final Router router;
+    private final RateLimiterChecker rateLimiterChecker;
 
-    public ClientHandler(Socket client, String webRoot, ConnectionManager connectionManager, Router router) {
+    public ClientHandler(Socket client, String webRoot, ConnectionManager connectionManager,
+                         Router router, RateLimiterChecker rateLimiterChecker) {
         this.client = client;
         this.webRoot = webRoot;
         this.connectionManager = connectionManager;
         this.router = router;
+        this.rateLimiterChecker = rateLimiterChecker;
     }
 
     @Override
@@ -52,6 +56,7 @@ public class ClientHandler implements Runnable {
                 if (request == null) {
                     break;
                 }
+                request.setAttribute("clientIp", client.getInetAddress().getHostAddress());
 
                 boolean shouldKeepAlive = shouldKeepAlive(request);
                 if (!shouldKeepAlive) {
@@ -85,7 +90,13 @@ public class ClientHandler implements Runnable {
             new MethodNotAllowHandler().handle(request, output, keepAlive);
             return;
         }
-        
+
+        // 限流器做限流判断
+        if (!rateLimiterChecker.check(request)) {
+            new TooManyRequestsHandler().handle(request, output, keepAlive);
+            return;
+        }
+
         // 使用Router进行路由转发
         router.route(method, path, request, output, keepAlive);
     }

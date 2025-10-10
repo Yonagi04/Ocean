@@ -1,4 +1,4 @@
-package com.yonagi.ocean.core.protocol;/**
+package com.yonagi.ocean.core.protocol.enums;/**
 * @program Ocean
 * @author Yonagi
 * @version 1.0
@@ -6,6 +6,7 @@ package com.yonagi.ocean.core.protocol;/**
 * @date 2025/10/07 11:45
 */
 public enum HttpMethod {
+    // ALL means all methods, only used for route matching and rate limiting
     GET,
     POST,
     PUT,
@@ -14,7 +15,8 @@ public enum HttpMethod {
     OPTIONS,
     PATCH,
     TRACE,
-    CONNECT;
+    CONNECT,
+    ALL;
 
     public static HttpMethod get(String method) {
         try {

@@ -18,14 +18,14 @@ import java.util.stream.Collectors;
  * @description
  * @date 2025/10/08 17:03
  */
-public class RouteConfigManager {
+public class RouteManager {
 
     private final Router router;
     private volatile Map<String, RouteConfig> routeMap = Collections.emptyMap();
 
-    private static final Logger log = LoggerFactory.getLogger(RouteConfigManager.class);
+    private static final Logger log = LoggerFactory.getLogger(RouteManager.class);
 
-    public RouteConfigManager(Router router) {
+    public RouteManager(Router router) {
         this.router = router;
     }
 
@@ -41,7 +41,7 @@ public class RouteConfigManager {
             }
 
             Map<String, RouteConfig> newRouteMap = routeConfigs.stream()
-                    .collect(Collectors.toMap(RouteConfigManager::generateKey, Function.identity()));
+                    .collect(Collectors.toMap(RouteManager::generateKey, Function.identity()));
             Map<String, RouteConfig> oldRouteMap = this.routeMap;
             oldRouteMap.forEach((key, oldConfig) -> {
                 if (!newRouteMap.containsKey(key)) {
@@ -83,7 +83,7 @@ public class RouteConfigManager {
                 return;
             }
             this.routeMap = routeConfigs.stream()
-                    .collect(Collectors.toMap(RouteConfigManager::generateKey, Function.identity()));
+                    .collect(Collectors.toMap(RouteManager::generateKey, Function.identity()));
 
             Map<String, Object> stats = this.router.getRouteStats();
             log.info("Router initialized - Total routes: {}, Handler cache size: {}",

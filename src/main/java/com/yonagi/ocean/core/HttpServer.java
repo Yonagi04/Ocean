@@ -2,14 +2,14 @@ package com.yonagi.ocean.core;
 
 import com.yonagi.ocean.cache.StaticFileCacheFactory;
 import com.yonagi.ocean.core.configuration.KeepAliveConfig;
-import com.yonagi.ocean.core.router.RouteConfigManager;
+import com.yonagi.ocean.core.ratelimiter.RateLimiterChecker;
+import com.yonagi.ocean.core.ratelimiter.RateLimiterManager;
+import com.yonagi.ocean.core.router.RouteManager;
 import com.yonagi.ocean.core.configuration.ServerStartupConfig;
 import com.yonagi.ocean.core.configuration.source.router.ConfigSource;
-import com.yonagi.ocean.core.configuration.source.router.FallbackConfigSource;
-import com.yonagi.ocean.core.configuration.source.router.LocalConfigSource;
-import com.yonagi.ocean.core.configuration.source.router.NacosConfigSource;
 import com.yonagi.ocean.core.router.Router;
 import com.yonagi.ocean.utils.LocalConfigLoader;
+import com.yonagi.ocean.utils.NacosConfigLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,9 +34,14 @@ public class HttpServer {
     private ThreadPoolExecutor threadPool;
     private KeepAliveConfig keepAliveConfig;
     private ConnectionManager connectionManager;
+
     private Router router;
-    private RouteConfigManager routeConfigManager;
-    private ConfigSource configSource;
+    private RouteManager routeConfigManager;
+    private ConfigSource routeConfigSource;
+
+    private RateLimiterChecker rateLimiterChecker;
+    private RateLimiterManager rateLimiterManager;
+    private com.yonagi.ocean.core.configuration.source.ratelimit.ConfigSource rateLimitConfigSource;
 
     private static final Logger log = LoggerFactory.getLogger(HttpServer.class);
 
@@ -57,18 +62,30 @@ public class HttpServer {
         this.threadPool = startupConfig.getThreadPool();
         this.keepAliveConfig = startupConfig.getKeepAliveConfig();
 
+        // Nacos Setup
+        NacosConfigLoader.init();
+
         // Initialize static file cache
         StaticFileCacheFactory.init();
 
         // Initialize core components
         initializeComponents(startupConfig);
 
-        // Register configuration change listener
-        this.configSource.onChange(() -> routeConfigManager.refreshRoutes(configSource));
+        // Register route configuration change listener
+        this.routeConfigSource.onChange(() -> routeConfigManager.refreshRoutes(routeConfigSource));
+
+        // Register rate limit configuration change listener
+        this.rateLimitConfigSource.onChange(() -> rateLimiterManager.refreshRateLimiter(rateLimitConfigSource));
 
         // Initialize routes if enabled
         if (Boolean.parseBoolean(LocalConfigLoader.getProperty("server.router.enabled", "true"))) {
-            this.routeConfigManager.initializeRoutes(configSource);
+            this.routeConfigManager.initializeRoutes(routeConfigSource);
+        }
+
+        // Initialize rate limit if enabled
+        if (Boolean.parseBoolean(LocalConfigLoader.getProperty("server.rate_limit.enabled", "true"))) {
+            this.rateLimiterManager.initializeRateLimiter(rateLimitConfigSource);
+            this.rateLimiterManager.preloadGlobalLimiter();
         }
         
         log.info("HTTP Keep-Alive enabled: {}, timeout: {}s, max requests: {}", 
@@ -85,7 +102,7 @@ public class HttpServer {
             log.info("Web root: {}", webRoot);
             while (isRunning) {
                 Socket client = serverSocket.accept();
-                threadPool.execute(new ClientHandler(client, webRoot, connectionManager, router));
+                threadPool.execute(new ClientHandler(client, webRoot, connectionManager, router, rateLimiterChecker));
             }
         } catch (Exception e) {
             log.error("Error starting Ocean: {}", e.getMessage(), e);
@@ -126,7 +143,18 @@ public class HttpServer {
 
         // Initialize router, router configuration manager and initial router configuration
         this.router = new Router(webRoot);
-        this.routeConfigManager = new RouteConfigManager(router);
-        this.configSource = new FallbackConfigSource(new NacosConfigSource(), new LocalConfigSource());
+        this.routeConfigManager = new RouteManager(router);
+        this.routeConfigSource = new com.yonagi.ocean.core.configuration.source.router.FallbackConfigSource(
+                new com.yonagi.ocean.core.configuration.source.router.NacosConfigSource(),
+                new com.yonagi.ocean.core.configuration.source.router.LocalConfigSource()
+        );
+
+        // Initialize rate limiter manager and initial rate limit configuration
+        this.rateLimitConfigSource = new com.yonagi.ocean.core.configuration.source.ratelimit.FallbackConfigSource(
+                new com.yonagi.ocean.core.configuration.source.ratelimit.NacosConfigSource(),
+                new com.yonagi.ocean.core.configuration.source.ratelimit.LocalConfigSource()
+        );
+        this.rateLimiterManager = new RateLimiterManager();
+        this.rateLimiterChecker = new RateLimiterChecker(rateLimiterManager);
     }
 }
