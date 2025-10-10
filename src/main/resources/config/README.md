@@ -19,7 +19,7 @@ This file defines the routing configuration for the Ocean. Each route specifies 
 ]
 ```
 - `method`: The HTTP method for the route (e.g., GET, POST). Specifying "ALL" means the route applies to all methods.
-- `path`: The URL path for the route.
+- `path`: The URL path for the route. Use `*` to match all paths.
 - `type`: The type of route. It can be "HANDLER" for custom handlers, "STATIC" for static file serving, or "REDIRECT" for URL redirection.
 - `handler`: The fully qualified class name of the handler. This is required if the type is "HANDLER".
 - `contentType`: The Content-Type of the response (e.g., application/json, text/html).

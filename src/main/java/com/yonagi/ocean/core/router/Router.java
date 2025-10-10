@@ -179,23 +179,59 @@ public class Router {
      * 查找匹配的路由配置
      */
     private RouteConfig findRoute(HttpMethod method, String path) {
-        Map<String, RouteConfig> methodRoutes = routes.get(method);
-        if (methodRoutes == null) {
-            return null;
+//        Map<String, RouteConfig> methodRoutes = routes.get(method);
+//        if (methodRoutes == null) {
+//            // 直接在ALL方法中找
+//            methodRoutes = routes.get(HttpMethod.ALL);
+//            if (methodRoutes == null) {
+//                return null;
+//            }
+//        }
+//
+//        // 精确匹配
+//        RouteConfig exactMatch = methodRoutes.get(path);
+//        if (exactMatch != null) {
+//            return exactMatch;
+//        }
+        RouteConfig match = null;
+
+        Map<String, RouteConfig> specificMethodRoutes = routes.get(method);
+        if (specificMethodRoutes != null) {
+            match = findMatchInRoutes(specificMethodRoutes, path);
+            if (match != null) {
+                return match;
+            }
         }
-        
-        // 精确匹配
+
+        Map<String, RouteConfig> allMethodRoutes = routes.get(HttpMethod.ALL);
+        if (allMethodRoutes != null) {
+            match = findMatchInRoutes(allMethodRoutes, path);
+            if (match != null) {
+                return match;
+            }
+        }
+
+        return null;
+    }
+
+    private RouteConfig findMatchInRoutes(Map<String, RouteConfig> methodRoutes, String path) {
         RouteConfig exactMatch = methodRoutes.get(path);
         if (exactMatch != null) {
             return exactMatch;
         }
-        
-        // TODO: 可以在这里添加路径参数匹配逻辑，如 /api/users/{id}
-        // 目前只支持精确匹配
-        
+        for (Map.Entry<String, RouteConfig> entry : methodRoutes.entrySet()) {
+            String registeredPath = entry.getKey();
+
+            if (registeredPath.endsWith("*")) {
+                String prefix = registeredPath.substring(0, registeredPath.length() - 1);
+                if (path.startsWith(prefix)) {
+                    return entry.getValue();
+                }
+            }
+        }
         return null;
     }
-    
+
     /**
      * 处理自定义路由
      * @return true 如果处理成功，false 如果处理失败需要回退到默认处理器
