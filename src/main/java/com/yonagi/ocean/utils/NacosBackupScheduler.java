@@ -41,6 +41,18 @@ public class NacosBackupScheduler {
                       String backupPath,
                       int intervalSeconds,
                       int timeoutMs) {
+        if (dataId == null || dataId.isEmpty() || group == null || group.isEmpty() || backupPath == null || backupPath.isEmpty()) {
+            log.error("dataId, group, and backupPath must be provided, backup task not started");
+            return;
+        }
+        if (intervalSeconds <= 0) {
+            log.warn("Invalid intervalSeconds: {}, must be > 0", intervalSeconds);
+            intervalSeconds = 7200;
+        }
+        if (timeoutMs <= 0) {
+            log.warn("Invalid timeoutMs: {}, must be > 0", timeoutMs);
+            timeoutMs = 3000;
+        }
         String key = dataId + "-" + group;
         if (TASKS.containsKey(key)) {
             log.info("Nacos backup task already running for {}:{}", dataId, group);
@@ -54,13 +66,14 @@ public class NacosBackupScheduler {
         String contentType = fileName.contains(".") ? fileName.substring(fileName.lastIndexOf('.') + 1) : "";
         String resolvedBackupPath = backupPath.replace("${timestamp}", new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date()));
 
+        int finalTimeoutMs = timeoutMs;
         Runnable task = () -> {
             try {
                 ConfigBackupHandler handler = handlers.stream()
                         .filter(h -> h.supports(contentType))
                         .findFirst()
                         .orElseThrow(() -> new IllegalArgumentException("No handler found for " + contentType));
-                Object config = handler.load(dataId, group, timeoutMs);
+                Object config = handler.load(dataId, group, finalTimeoutMs);
                 if (config != null) {
                     handler.save(config, resolvedBackupPath);
                     log.info("Nacos config [{}] synced to {}", key, resolvedBackupPath);
