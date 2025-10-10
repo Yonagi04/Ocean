@@ -1,5 +1,8 @@
 package com.yonagi.ocean.core.protocol;
 
+import com.yonagi.ocean.core.protocol.enums.HttpMethod;
+import com.yonagi.ocean.core.protocol.enums.HttpVersion;
+
 import java.util.HashMap;
 import java.util.Map;
 

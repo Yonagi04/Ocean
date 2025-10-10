@@ -1,5 +1,7 @@
 package com.yonagi.ocean.core.protocol;
 
+import com.yonagi.ocean.core.protocol.enums.HttpMethod;
+import com.yonagi.ocean.core.protocol.enums.HttpVersion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

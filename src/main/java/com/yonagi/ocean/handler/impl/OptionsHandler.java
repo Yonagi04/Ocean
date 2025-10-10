@@ -1,6 +1,9 @@
 package com.yonagi.ocean.handler.impl;
 
 import com.yonagi.ocean.core.protocol.*;
+import com.yonagi.ocean.core.protocol.enums.HttpMethod;
+import com.yonagi.ocean.core.protocol.enums.HttpStatus;
+import com.yonagi.ocean.core.protocol.enums.HttpVersion;
 import com.yonagi.ocean.handler.RequestHandler;
 import com.yonagi.ocean.utils.LocalConfigLoader;
 import org.slf4j.Logger;

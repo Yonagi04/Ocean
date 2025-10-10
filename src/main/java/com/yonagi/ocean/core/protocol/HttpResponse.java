@@ -1,5 +1,8 @@
 package com.yonagi.ocean.core.protocol;
 
+import com.yonagi.ocean.core.protocol.enums.HttpStatus;
+import com.yonagi.ocean.core.protocol.enums.HttpVersion;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Map;

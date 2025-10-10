@@ -3,7 +3,7 @@ package com.yonagi.ocean.handler.impl;
 import com.yonagi.ocean.core.configuration.RedirectConfig;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
-import com.yonagi.ocean.core.protocol.HttpStatus;
+import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.handler.RequestHandler;
 import com.yonagi.ocean.utils.LocalConfigLoader;
 import org.slf4j.Logger;

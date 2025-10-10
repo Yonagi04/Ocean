@@ -1,4 +1,4 @@
-package com.yonagi.ocean.core.protocol;
+package com.yonagi.ocean.core.protocol.enums;
 
 /**
  * @author Yonagi

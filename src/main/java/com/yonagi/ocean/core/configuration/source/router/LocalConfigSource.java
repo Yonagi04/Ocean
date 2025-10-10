@@ -4,7 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yonagi.ocean.core.configuration.RouteConfig;
 import com.yonagi.ocean.core.router.RouteType;
-import com.yonagi.ocean.core.protocol.HttpMethod;
+import com.yonagi.ocean.core.protocol.enums.HttpMethod;
 import com.yonagi.ocean.handler.impl.RedirectHandler;
 import com.yonagi.ocean.handler.impl.StaticFileHandler;
 import com.yonagi.ocean.utils.LocalConfigLoader;

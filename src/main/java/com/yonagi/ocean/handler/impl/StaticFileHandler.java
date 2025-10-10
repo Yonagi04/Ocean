@@ -2,6 +2,8 @@ package com.yonagi.ocean.handler.impl;
 
 import com.yonagi.ocean.cache.*;
 import com.yonagi.ocean.core.protocol.*;
+import com.yonagi.ocean.core.protocol.enums.HttpStatus;
+import com.yonagi.ocean.core.protocol.enums.HttpVersion;
 import com.yonagi.ocean.handler.RequestHandler;
 import com.yonagi.ocean.utils.LocalConfigLoader;
 import com.yonagi.ocean.utils.MimeTypeUtil;
@@ -47,7 +49,7 @@ public class StaticFileHandler implements RequestHandler {
 
     public StaticFileHandler(String webRoot) {
         this.webRoot = webRoot;
-        this.errorPagePath = LocalConfigLoader.getProperty("server.404_page");
+        this.errorPagePath = LocalConfigLoader.getProperty("server.not_found_page");
     }
 
     @Override

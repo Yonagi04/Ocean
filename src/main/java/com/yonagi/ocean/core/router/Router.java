@@ -1,7 +1,7 @@
 package com.yonagi.ocean.core.router;
 
 import com.yonagi.ocean.core.configuration.RouteConfig;
-import com.yonagi.ocean.core.protocol.HttpMethod;
+import com.yonagi.ocean.core.protocol.enums.HttpMethod;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.handler.RequestHandler;
 import com.yonagi.ocean.handler.impl.*;

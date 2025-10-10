@@ -3,7 +3,7 @@ package com.yonagi.ocean.core.configuration;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
-import com.yonagi.ocean.core.protocol.HttpMethod;
+import com.yonagi.ocean.core.protocol.enums.HttpMethod;
 import com.yonagi.ocean.core.router.RouteType;
 
 /**
