@@ -1,6 +1,6 @@
-package com.yonagi.ocean.core.configuration;
+package com.yonagi.ocean.core.router;
 
-import com.yonagi.ocean.core.Router;
+import com.yonagi.ocean.core.configuration.RouteConfig;
 import com.yonagi.ocean.core.configuration.source.route.ConfigSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

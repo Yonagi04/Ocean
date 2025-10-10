@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 import com.yonagi.ocean.core.protocol.HttpMethod;
+import com.yonagi.ocean.core.router.RouteType;
 
 /**
  * @author Yonagi

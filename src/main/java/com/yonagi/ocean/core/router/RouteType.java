@@ -1,4 +1,4 @@
-package com.yonagi.ocean.core.configuration;
+package com.yonagi.ocean.core.router;
 
 /**
  * @author Yonagi

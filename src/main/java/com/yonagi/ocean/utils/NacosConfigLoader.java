@@ -90,14 +90,16 @@ public class NacosConfigLoader {
         String host = parts[0];
         int port = parts.length > 1 ? Integer.parseInt(parts[1]) : 8848;
 
-        for (int attempt = 0; attempt < maxRetries; attempt++) {
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
             try (Socket socket = new Socket()) {
                 socket.connect(new InetSocketAddress(host, port));
                 return true;
             } catch (IOException e) {
-                log.warn("Attempt {}/{}: Cannot connect to Nacos server at {}:{}", attempt + 1, maxRetries, host, port);
+                log.warn("Attempt {}/{}: Cannot connect to Nacos server at {}:{}", attempt, maxRetries, host, port);
                 try {
-                    Thread.sleep((long) retryInterval * (attempt + 1));
+                    if (attempt < maxRetries) {
+                        Thread.sleep((long) retryInterval * (attempt));
+                    }
                 } catch (InterruptedException ignored) {
 
                 }
