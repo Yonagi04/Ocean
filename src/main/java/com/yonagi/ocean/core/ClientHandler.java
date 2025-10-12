@@ -11,6 +11,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.net.Socket;
+import java.nio.charset.Charset;
+import java.nio.charset.IllegalCharsetNameException;
+import java.nio.charset.StandardCharsets;
+import java.nio.charset.UnsupportedCharsetException;
 import java.util.Map;
 
 /**
@@ -56,15 +60,35 @@ public class ClientHandler implements Runnable {
                 if (request == null) {
                     break;
                 }
-                request.setAttribute("clientIp", client.getInetAddress().getHostAddress());
+                String contentType = request.getHeaders().getOrDefault("content-type", "").toLowerCase();
+                boolean isMultiPart = contentType.contains("multipart/form-data");
 
-                boolean shouldKeepAlive = shouldKeepAlive(request);
+                boolean shouldReadSynchronously = (request.getMethod() == HttpMethod.POST || request.getMethod() == HttpMethod.PUT) &&
+                        !isMultiPart;
+                HttpRequest finalRequest = request;
+                if (shouldReadSynchronously) {
+                    byte[] bodyData = readTextBodyFromInputStream(request.getRawBodyInputStream(), request.getHeaders());
+                    log.info("BodyData Length: {}", bodyData == null ? 0 : bodyData.length);
+                    finalRequest = new HttpRequest.Builder()
+                            .method(request.getMethod())
+                            .uri(request.getUri())
+                            .httpVersion(request.getHttpVersion())
+                            .headers(request.getHeaders())
+                            .queryParams(request.getQueryParams())
+                            .body(bodyData)
+                            .rawBodyInputStream(null)
+                            .build();
+                }
+
+                finalRequest.setAttribute("clientIp", client.getInetAddress().getHostAddress());
+
+                boolean shouldKeepAlive = shouldKeepAlive(finalRequest);
                 if (!shouldKeepAlive) {
-                    handleRequest(request, output, false);
+                    handleRequest(finalRequest, output, false);
                     break;
                 }
 
-                handleRequest(request, output, true);
+                handleRequest(finalRequest, output, true);
                 connectionManager.recordRequest(client);
                 if (!connectionManager.shouldKeepAlive(client)) {
                     break;
@@ -125,5 +149,52 @@ public class ClientHandler implements Runnable {
             return true;
         }
         return !connectionHeader.equalsIgnoreCase("close");
+    }
+
+    private byte[] readTextBodyFromInputStream(InputStream rawInputStream, Map<String, String> headers) throws IOException {
+        if (rawInputStream == null) {
+            return new byte[0];
+        }
+        String contentLengthStr = headers.get("content-length");
+        int contentLength = contentLengthStr == null ? 0 : Integer.parseInt(contentLengthStr);
+
+        if (contentLength <= 0) {
+            return new byte[0];
+        }
+
+        Charset charset = StandardCharsets.UTF_8;
+        String contentType = headers.get("content-type");
+        if (contentType != null) {
+            try {
+                String[] parts = contentType.split(";");
+                for (String part : parts) {
+                    String trimmedPart = part.trim().toLowerCase();
+                    if (trimmedPart.startsWith("charset=")) {
+                        String charsetName = trimmedPart.substring("charset=".length()).trim();
+                        charset = Charset.forName(charsetName);
+                        break;
+                    }
+                }
+            } catch (IllegalCharsetNameException | UnsupportedCharsetException e) {
+                log.warn("Unsupported charset in Content-Type: {}, defaulting to UTF-8.", contentType);
+            }
+        }
+
+        InputStreamReader isr = new InputStreamReader(rawInputStream, charset);
+        BufferedReader reader = new BufferedReader(isr);
+
+        CharArrayWriter writer = new CharArrayWriter(contentLength);
+        char[] buffer = new char[1024];
+        int remaining = contentLength;
+
+        while (remaining > 0) {
+            int read = reader.read(buffer, 0, Math.min(buffer.length, remaining));
+            if (read == -1) {
+                throw new IOException("Stream ended prematurely. Excepted " + contentLength + " bytes.");
+            }
+            writer.write(buffer, 0, read);
+            remaining -= read;
+        }
+        return writer.toString().getBytes(charset);
     }
 }

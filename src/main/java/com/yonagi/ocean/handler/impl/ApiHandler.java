@@ -182,25 +182,6 @@ public class ApiHandler implements RequestHandler {
             responseData.put("data", xmlData);
         });
 
-        map.put("multipart/form-data", (request, contentType, charset, responseData) -> {
-            List<FormField> formFields = parseMultipartFormData(request.getBody(), contentType, charset);
-            Map<String, Object> formData = new HashMap<>();
-            for (FormField field : formFields) {
-                if (field.isFile()) {
-                    Map<String, Object> fileInfo = new HashMap<>();
-                    fileInfo.put("filename", field.getFilename());
-                    fileInfo.put("contentType", field.getContentType());
-                    fileInfo.put("size", field.getValue().length());
-                    formData.put(field.getName(), fileInfo);
-                } else {
-                    formData.put(field.getName(), field.getValue());
-                }
-            }
-            responseData.put("status", "ok");
-            responseData.put("data", formData);
-            responseData.put("fields", formFields.size());
-        });
-
         return map;
     }
 

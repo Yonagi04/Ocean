@@ -2,7 +2,11 @@ package com.yonagi.ocean.core.protocol;
 
 import com.yonagi.ocean.core.protocol.enums.HttpMethod;
 import com.yonagi.ocean.core.protocol.enums.HttpVersion;
+import org.apache.commons.io.input.ReaderInputStream;
 
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -20,6 +24,9 @@ public class HttpRequest {
     private Map<String, String> headers;
     private byte[] body;
     private Map<String, String> queryParams;
+
+    // FileUploadHandler 或 ApiHandler 调用这个流获取body数据
+    private InputStream rawBodyInputStream;
 
     // Ocean内部使用的属性存储
     private final Map<String, Object> attributes = new HashMap<>();
@@ -48,32 +55,12 @@ public class HttpRequest {
         return body;
     }
 
+    public InputStream getRawBodyInputStream() {
+        return rawBodyInputStream;
+    }
+
     public Map<String, String> getQueryParams() {
         return queryParams;
-    }
-
-    public void setMethod(HttpMethod method) {
-        this.method = method;
-    }
-
-    public void setUri(String uri) {
-        this.uri = uri;
-    }
-
-    public void setHttpVersion(HttpVersion httpVersion) {
-        this.httpVersion = httpVersion;
-    }
-
-    public void setHeaders(Map<String, String> headers) {
-        this.headers = headers;
-    }
-
-    public void setBody(byte[] body) {
-        this.body = body;
-    }
-
-    public void setQueryParams(Map<String, String> queryParams) {
-        this.queryParams = queryParams;
     }
 
     @Override
@@ -101,6 +88,8 @@ public class HttpRequest {
         private Map<String, String> headers;
         private byte[] body;
         private Map<String, String> queryParams;
+
+        private InputStream rawBodyInputStream;
 
         public Builder method(HttpMethod method) {
             this.method = method;
@@ -132,6 +121,11 @@ public class HttpRequest {
             return this;
         }
 
+        public Builder rawBodyInputStream(InputStream rawBodyInputStream) {
+            this.rawBodyInputStream = rawBodyInputStream;
+            return this;
+        }
+
         public HttpRequest build() {
             HttpRequest request = new HttpRequest();
             request.method = this.method;
@@ -140,6 +134,7 @@ public class HttpRequest {
             request.headers = this.headers;
             request.body = this.body;
             request.queryParams = this.queryParams;
+            request.rawBodyInputStream = this.rawBodyInputStream;
             return request;
         }
     }
