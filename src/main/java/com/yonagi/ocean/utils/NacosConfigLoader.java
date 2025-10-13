@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.yonagi.ocean.spi.ConfigRecoveryAction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,7 +17,14 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * @author Yonagi
@@ -27,62 +35,87 @@ import java.util.Properties;
  */
 public class NacosConfigLoader {
 
+    private static class ListenerRegistration {
+        final String dataId;
+        final String group;
+        final Listener listener;
+
+        public ListenerRegistration(String dataId, String group, Listener listener) {
+            this.dataId = dataId;
+            this.group = group;
+            this.listener = listener;
+        }
+    }
+
     private static final Logger log = LoggerFactory.getLogger(NacosConfigLoader.class);
-    private static volatile ConfigService configService;
+    private static volatile ConfigService configService = null;
+    private static AtomicBoolean initialized = new AtomicBoolean(false);
 
     private static boolean nacosEnabled;
     private static int maxRetries;
     private static int retryInterval;
-    private static volatile boolean initialized = false;
+    private static boolean reconnectEnabled;
+    private static int reconnectIntervalSeconds;
+
+    private static List<ConfigRecoveryAction> recoveryActions = Collections.synchronizedList(new ArrayList<>());
+    private static List<ListenerRegistration> failedListeners = Collections.synchronizedList(new ArrayList<>());
+    private static ScheduledExecutorService scheduler;
+    private static final String SCHEDULER_NAME = "Nacos-Reconnect-Scheduler";
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     public static void init() {
-        if (initialized) {
+        if (initialized.getAndSet(true)) {
             return;
         }
         nacosEnabled = Boolean.parseBoolean(LocalConfigLoader.getProperty("nacos.enabled"));
         maxRetries = Integer.parseInt(LocalConfigLoader.getProperty("nacos.max_retries"));
         retryInterval = Integer.parseInt(LocalConfigLoader.getProperty("nacos.retry_interval_ms"));
+        reconnectEnabled = Boolean.parseBoolean(LocalConfigLoader.getProperty("nacos.reconnect.enabled", "true"));
+        reconnectIntervalSeconds = Integer.parseInt(LocalConfigLoader.getProperty("nacos.reconnect.inverval_seconds", "300"));
+        String serverAddr = LocalConfigLoader.getProperty("nacos.server_addr");
 
         if (!nacosEnabled) {
             log.warn("Nacos disabled in configuration, using local configuration only.");
-            initialized = true;
+            initialized.set(true);
             return;
         }
-        synchronized (NacosConfigLoader.class) {
-            if (configService != null) {
-                initialized = true;
-                return;
+        if (tryConnectNacos(serverAddr)) {
+            log.info("Nacos ConfigService successfully initialized on startup");
+        } else {
+            log.error("Nacos server is unreachable at {}", serverAddr);
+            if (reconnectEnabled) {
+                log.info("Nacos Auto-reconnection is enabled. Starting retry polling every {} seconds", reconnectIntervalSeconds);
+                startNacosReconnectPolling(serverAddr);
+            } else {
+                log.info("Nacos Auto-reconnection is disabled. Configuration will remain local until restart");
             }
-            String serverAddr = LocalConfigLoader.getProperty("nacos.server_addr");
-            if (!checkNacosConnectivity(serverAddr)) {
-                log.error("Nacos server is unreachable at {}. Falling back to local configuration.", serverAddr);
-                initialized = true;
-                return;
-            }
-            Properties props = new Properties();
-            props.put("serverAddr", serverAddr);
-            for (int attempt = 1; attempt <= maxRetries; attempt++) {
-                try {
-                    configService = NacosFactory.createConfigService(props);
-                    log.info("Nacos ConfigService created (attempt {}/{})", attempt, maxRetries);
-
-                    configService.getServerStatus();
-                    log.info("Successfully connected to Nacos Server");
-                    initialized = true;
-                    return;
-                } catch (Exception e) {
-                    log.warn("Attempt {}/{}: Failed to connect Nacos - {}", attempt, maxRetries, e.getMessage());
-                    try {
-                        Thread.sleep((long)retryInterval * attempt);
-                    } catch (InterruptedException ignored) {}
-                }
-            }
-            configService = null;
-            log.error("Failed to connect to Nacos after {} attemps. Falling back to local configuration.", maxRetries);
-            initialized = true;
         }
+    }
+
+    private static boolean tryConnectNacos(String serverAddr) {
+        if (!checkNacosConnectivity(serverAddr)) {
+            return false;
+        }
+        Properties props = new Properties();
+        props.put("serverAddr", serverAddr);
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                ConfigService tempConfigService = NacosFactory.createConfigService(props);
+                tempConfigService.getServerStatus();
+
+                configService = tempConfigService;
+                log.info("Nacos ConfigService created and connected (attempt {}/{})", attempt, maxRetries);
+                return true;
+            } catch (Exception e) {
+                log.warn("Attempt {}/{}: Failed to connect Nacos - {}", attempt, maxRetries, e.getMessage());
+                try {
+                    Thread.sleep((long)retryInterval * attempt);
+                } catch (InterruptedException ignored) {}
+            }
+        }
+        return false;
     }
 
     private static boolean checkNacosConnectivity(String serverAddr) {
@@ -106,6 +139,73 @@ public class NacosConfigLoader {
             }
         }
         return false;
+    }
+
+    public static void registerRecoveryAction(ConfigRecoveryAction action) {
+        if (configService != null) {
+            action.recover(configService);
+        } else {
+            recoveryActions.add(action);
+        }
+    }
+
+    private static void startNacosReconnectPolling(String serverAddr) {
+        if (scheduler != null && !scheduler.isShutdown()) {
+            return;
+        }
+        scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r);
+            t.setName(SCHEDULER_NAME);
+            t.setDaemon(true);
+            return t;
+        });
+        Runnable reconnectTask = () -> {
+            if (configService != null) {
+                scheduler.shutdown();
+                return;
+            }
+            if (tryConnectNacos(serverAddr)) {
+                triggerRecoveryActions();
+            }
+        };
+
+        scheduler.scheduleAtFixedRate(reconnectTask, reconnectIntervalSeconds, reconnectIntervalSeconds, TimeUnit.SECONDS);
+        log.warn("Nacos reconnect polling started. Retry interval: {}s", reconnectIntervalSeconds);
+    }
+
+    private static void triggerRecoveryActions() {
+        if (configService == null) {
+            return;
+        }
+        log.info("Nacos reconnected successfully! Triggering {} configuration recovery actions", recoveryActions.size());
+
+        ConfigService finalConfigService = configService;
+
+        synchronized (recoveryActions) {
+            for (ConfigRecoveryAction action : recoveryActions) {
+                try {
+                    action.recover(finalConfigService);
+                } catch (Exception e) {
+                    log.error("Nacos recovery action failed for one source: {}", e.getMessage(), e);
+                }
+            }
+            recoveryActions.clear();
+        }
+        synchronized (failedListeners) {
+            for (ListenerRegistration reg : failedListeners) {
+                try {
+                    configService.addListener(reg.dataId, reg.dataId, reg.listener);
+                } catch (Exception e) {
+                    log.error("Failed to re-register listener on recovery: {}", e.getMessage(), e);
+                }
+            }
+            failedListeners.clear();
+        }
+        scheduler.shutdown();
+    }
+
+    public static ConfigService getConfigService() {
+        return configService;
     }
 
     public static Properties getPropertiesConfig(String dataId, String group, long timeoutMs) {
@@ -183,15 +283,20 @@ public class NacosConfigLoader {
     }
 
     public static void addListener(String dataId, String group, Listener listener) {
-        if (!nacosEnabled || configService == null) {
+        if (!nacosEnabled) {
             log.warn("Nacos not available, listener not registered for [{}:{}]", group, dataId);
             return;
         }
-        try {
-            configService.addListener(dataId, group, listener);
-            log.info("Listener added for [{}:{}]", group, dataId);
-        } catch (Exception e) {
-            log.error("Failed to add listener [{}:{}]", group, dataId, e);
+        if (configService != null) {
+            try {
+                configService.addListener(dataId, group, listener);
+                log.info("Listener added for [{}:{}]", group, dataId);
+            } catch (Exception e) {
+                log.error("Failed to add listener [{}:{}]", group, dataId, e);
+                failedListeners.add(new ListenerRegistration(dataId, group, listener));
+            }
+        } else {
+            failedListeners.add(new ListenerRegistration(dataId, group, listener));
         }
     }
 }

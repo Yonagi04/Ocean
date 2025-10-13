@@ -1,14 +1,14 @@
 package com.yonagi.ocean.cache;
 
+import com.alibaba.nacos.api.config.ConfigService;
+import com.yonagi.ocean.cache.configuration.source.*;
 import com.yonagi.ocean.cache.provider.CacheProvider;
 import com.yonagi.ocean.cache.provider.CaffeineCacheProvider;
 import com.yonagi.ocean.cache.provider.LRUCacheProvider;
 import com.yonagi.ocean.cache.provider.NoCacheProvider;
 import com.yonagi.ocean.cache.configuration.CacheConfig;
-import com.yonagi.ocean.cache.configuration.source.ConfigSource;
-import com.yonagi.ocean.cache.configuration.source.FallbackConfigSource;
-import com.yonagi.ocean.cache.configuration.source.LocalConfigSource;
-import com.yonagi.ocean.cache.configuration.source.NacosConfigSource;
+import com.yonagi.ocean.spi.ConfigRecoveryAction;
+import com.yonagi.ocean.utils.NacosConfigLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,11 +25,33 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public class StaticFileCacheFactory {
 
+    private static class CacheConfigRecoveryAction implements ConfigRecoveryAction {
+        private final MutableConfigSource proxy;
+
+        public CacheConfigRecoveryAction(MutableConfigSource proxy) {
+            this.proxy = proxy;
+        }
+
+        @Override
+        public void recover(ConfigService configService) {
+            log.info("Nacos reconnected. Executing recovery action for Cache Configuration");
+
+            NacosConfigSource liveSource = new NacosConfigSource(configService);
+            proxy.updateSource(liveSource);
+            liveSource.onChange(StaticFileCacheFactory::refresh);
+
+            StaticFileCacheFactory.refresh();
+
+            log.info("Cache Configuration successfully switched to Nacos primary source");
+        }
+    }
+
     private static final Logger log = LoggerFactory.getLogger(StaticFileCacheFactory.class);
 
     private static final AtomicReference<StaticFileCache> REF = new AtomicReference<>();
     private static List<CacheProvider> providers;
     private static ConfigSource configSource;
+    private static MutableConfigSource nacosConfigSourceProxy;
 
     private StaticFileCacheFactory() {}
 
@@ -42,7 +64,10 @@ public class StaticFileCacheFactory {
                 return;
             }
             providers = Arrays.asList(new LRUCacheProvider(), new CaffeineCacheProvider(), new NoCacheProvider());
-            configSource = new FallbackConfigSource(new NacosConfigSource(), new LocalConfigSource());
+            NacosConfigSource initialNacosSource = new NacosConfigSource(NacosConfigLoader.getConfigService());
+            nacosConfigSourceProxy = new MutableConfigSource(initialNacosSource);
+            configSource = new FallbackConfigSource(nacosConfigSourceProxy, new LocalConfigSource());
+            NacosConfigLoader.registerRecoveryAction(new CacheConfigRecoveryAction(nacosConfigSourceProxy));
             refresh();
             configSource.onChange(StaticFileCacheFactory::refresh);
         }

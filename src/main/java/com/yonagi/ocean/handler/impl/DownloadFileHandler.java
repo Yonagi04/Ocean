@@ -33,7 +33,6 @@ public class DownloadFileHandler implements RequestHandler {
     private static final String DOWNLOAD_PATH = LocalConfigLoader.getProperty("server.download.dir", "./uploads");
     private static final Logger log = LoggerFactory.getLogger(DownloadFileHandler.class);
     private static final String errorPagePath = LocalConfigLoader.getProperty("server.not_found_page", "./www/404.html");
-    private final StaticFileCache fileCache = StaticFileCacheFactory.getInstance();
 
     private static final String DEFAULT_404_HTML = "<html>\n" +
             "<head>\n" +
@@ -110,6 +109,7 @@ public class DownloadFileHandler implements RequestHandler {
     }
 
     private void writeNotFound(OutputStream outputStream, boolean keepAlive) throws IOException {
+        StaticFileCache fileCache = StaticFileCacheFactory.getInstance();
         File errorPage = new File(errorPagePath);
         if (errorPage.exists()) {
             try {

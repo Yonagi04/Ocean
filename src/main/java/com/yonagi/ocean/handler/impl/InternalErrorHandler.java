@@ -96,7 +96,6 @@ public class InternalErrorHandler implements RequestHandler {
             "</html>";
 
     private static final Logger log = LoggerFactory.getLogger(InternalErrorHandler.class);
-    private final StaticFileCache fileCache = StaticFileCacheFactory.getInstance();
 
     public InternalErrorHandler() {
         this.errorPagePath = LocalConfigLoader.getProperty("server.internal_error_page");
@@ -109,6 +108,7 @@ public class InternalErrorHandler implements RequestHandler {
     
     @Override
     public void handle(HttpRequest request, OutputStream outputStream, boolean keepAlive) {
+        StaticFileCache fileCache = StaticFileCacheFactory.getInstance();
         File errorPage = new File(errorPagePath);
         if (errorPage.exists()) {
             try {

@@ -97,7 +97,6 @@ public class TooManyRequestsHandler implements RequestHandler {
             "</html>";
 
     private static final Logger log = LoggerFactory.getLogger(TooManyRequestsHandler.class);
-    private final StaticFileCache fileCache = StaticFileCacheFactory.getInstance();
 
     public TooManyRequestsHandler() {
         this.errorPagePath = LocalConfigLoader.getProperty("server.too_many_requests_page", "./www/429.html");
@@ -110,6 +109,7 @@ public class TooManyRequestsHandler implements RequestHandler {
 
     @Override
     public void handle(HttpRequest request, OutputStream output, boolean keepAlive) throws IOException {
+        StaticFileCache fileCache = StaticFileCacheFactory.getInstance();
         File errorPage = new File(errorPagePath);
         if (errorPage.exists()) {
             try {

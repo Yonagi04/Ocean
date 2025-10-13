@@ -1,7 +1,11 @@
 package com.yonagi.ocean.core.router;
 
+import com.alibaba.nacos.api.config.ConfigService;
 import com.yonagi.ocean.core.configuration.RouteConfig;
 import com.yonagi.ocean.core.configuration.source.router.ConfigSource;
+import com.yonagi.ocean.core.configuration.source.router.MutableConfigSource;
+import com.yonagi.ocean.core.configuration.source.router.NacosConfigSource;
+import com.yonagi.ocean.spi.ConfigRecoveryAction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,6 +24,28 @@ import java.util.stream.Collectors;
  */
 public class RouteManager {
 
+    public static class RouteConfigRecoveryAction implements ConfigRecoveryAction {
+        private final MutableConfigSource proxy;
+        private final RouteManager globalRouteManager;
+
+        public RouteConfigRecoveryAction(MutableConfigSource proxy, RouteManager globalRouteManager) {
+            this.proxy = proxy;
+            this.globalRouteManager = globalRouteManager;
+        }
+
+        @Override
+        public void recover(ConfigService configService) {
+            log.info("Nacos reconnected. Executing recovery action for Route Configuration");
+            NacosConfigSource liveSource = new NacosConfigSource(configService);
+            proxy.updateSource(liveSource);
+            liveSource.onChange(() -> globalRouteManager.refreshRoutes(proxy));
+
+            globalRouteManager.refreshRoutes(proxy);
+            log.info("Route Configuration successfully switched to Nacos primary source");
+        }
+    }
+
+    private static volatile RouteManager INSTANCE;
     private final Router router;
     private volatile Map<String, RouteConfig> routeMap = Collections.emptyMap();
 
@@ -27,6 +53,14 @@ public class RouteManager {
 
     public RouteManager(Router router) {
         this.router = router;
+    }
+
+    public static RouteManager getInstance() {
+        return INSTANCE;
+    }
+
+    public static void setInstance(RouteManager manager) {
+        INSTANCE = manager;
     }
 
     private static String generateKey(RouteConfig routeConfig) {

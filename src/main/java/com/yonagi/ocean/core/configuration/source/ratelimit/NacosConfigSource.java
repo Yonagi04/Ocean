@@ -1,5 +1,6 @@
 package com.yonagi.ocean.core.configuration.source.ratelimit;
 
+import com.alibaba.nacos.api.config.ConfigService;
 import com.alibaba.nacos.api.config.listener.Listener;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,7 +28,20 @@ public class NacosConfigSource implements ConfigSource {
     private final ObjectMapper mapper = new ObjectMapper();
     private static final Logger log = LoggerFactory.getLogger(NacosConfigSource.class);
 
+    private ConfigService configService;
+    private String dataId;
+    private String group;
+    private int timeoutMs;
+
     public NacosConfigSource() {
+        startPeriodicSync();
+    }
+
+    public NacosConfigSource(ConfigService configService) {
+        this.configService = configService;
+        this.dataId = LocalConfigLoader.getProperty("server.rate_limit.nacos.data_id");
+        this.group = LocalConfigLoader.getProperty("server.rate_limit.nacos.group");
+        this.timeoutMs = Integer.parseInt(LocalConfigLoader.getProperty("nacos.timeout_ms", "3000"));
         startPeriodicSync();
     }
 
@@ -76,8 +90,9 @@ public class NacosConfigSource implements ConfigSource {
     }
 
     private void startPeriodicSync() {
+        boolean enabledNacos = Boolean.parseBoolean(LocalConfigLoader.getProperty("nacos.enabled", "false"));
         boolean enabledSync = Boolean.parseBoolean(LocalConfigLoader.getProperty("server.rate_limit.nacos.sync_to_local", "true"));
-        if (!enabledSync) {
+        if (!enabledNacos || !enabledSync) {
             return;
         }
         int syncIntervalSeconds = Integer.parseInt(LocalConfigLoader.getProperty("server.rate_limit.nacos.sync_interval_seconds", "7200"));

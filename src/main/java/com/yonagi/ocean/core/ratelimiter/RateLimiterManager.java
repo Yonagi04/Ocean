@@ -1,11 +1,15 @@
 package com.yonagi.ocean.core.ratelimiter;
 
+import com.alibaba.nacos.api.config.ConfigService;
 import com.yonagi.ocean.core.configuration.RateLimitConfig;
 import com.yonagi.ocean.core.configuration.enums.RateLimitType;
 import com.yonagi.ocean.core.configuration.source.ratelimit.ConfigSource;
+import com.yonagi.ocean.core.configuration.source.ratelimit.MutableConfigSource;
+import com.yonagi.ocean.core.configuration.source.ratelimit.NacosConfigSource;
 import com.yonagi.ocean.core.ratelimiter.algorithm.AllwaysAllowRateLimiter;
 import com.yonagi.ocean.core.ratelimiter.algorithm.RateLimiter;
 import com.yonagi.ocean.core.ratelimiter.algorithm.TokenBucket;
+import com.yonagi.ocean.spi.ConfigRecoveryAction;
 import com.yonagi.ocean.utils.LocalConfigLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,6 +28,29 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class RateLimiterManager {
 
+    public static class RateLimiterConfigRecoveryAction implements ConfigRecoveryAction {
+        private final MutableConfigSource proxy;
+        private final RateLimiterManager globalRateLimiterManager;
+
+        public RateLimiterConfigRecoveryAction(MutableConfigSource proxy, RateLimiterManager globalRateLimiterManager) {
+            this.proxy = proxy;
+            this.globalRateLimiterManager = globalRateLimiterManager;
+        }
+
+        @Override
+        public void recover(ConfigService configService) {
+            log.info("Nacos reconnected. Executing recovery action for Rate-limiting Configuration");
+            NacosConfigSource liveSource = new NacosConfigSource(configService);
+            proxy.updateSource(liveSource);
+            liveSource.onChange(() -> globalRateLimiterManager.refreshRateLimiter(proxy));
+
+            globalRateLimiterManager.refreshRateLimiter(proxy);
+            log.info("Rate-limiting Configuration successfully switched to Nacos primary source");
+        }
+    }
+
+    private static volatile RateLimiterManager INSTANCE;
+
     private final ConcurrentHashMap<String, RateLimiter> limiters = new ConcurrentHashMap<>();
 
     private final Map<RateLimitType, RateLimitParams> limitParams;
@@ -34,6 +61,14 @@ public class RateLimiterManager {
 
     public RateLimiterManager() {
         this.limitParams = loadLimitParams();
+    }
+
+    public static RateLimiterManager getInstance() {
+        return INSTANCE;
+    }
+
+    public static void setInstance(RateLimiterManager instance) {
+        INSTANCE = instance;
     }
 
     public void preloadGlobalLimiter() {

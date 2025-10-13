@@ -1,12 +1,13 @@
 package com.yonagi.ocean.core;
 
+import com.alibaba.nacos.api.config.ConfigService;
 import com.yonagi.ocean.cache.StaticFileCacheFactory;
 import com.yonagi.ocean.core.configuration.KeepAliveConfig;
+import com.yonagi.ocean.core.configuration.source.router.*;
 import com.yonagi.ocean.core.ratelimiter.RateLimiterChecker;
 import com.yonagi.ocean.core.ratelimiter.RateLimiterManager;
 import com.yonagi.ocean.core.router.RouteManager;
 import com.yonagi.ocean.core.configuration.ServerStartupConfig;
-import com.yonagi.ocean.core.configuration.source.router.ConfigSource;
 import com.yonagi.ocean.core.router.Router;
 import com.yonagi.ocean.utils.LocalConfigLoader;
 import com.yonagi.ocean.utils.NacosConfigLoader;
@@ -79,12 +80,13 @@ public class HttpServer {
 
         // Initialize routes if enabled
         if (Boolean.parseBoolean(LocalConfigLoader.getProperty("server.router.enabled", "true"))) {
-            this.routeConfigManager.initializeRoutes(routeConfigSource);
+            // this.routeConfigManager.initializeRoutes(routeConfigSource);
+            this.routeConfigManager.refreshRoutes(routeConfigSource);
         }
 
         // Initialize rate limit if enabled
         if (Boolean.parseBoolean(LocalConfigLoader.getProperty("server.rate_limit.enabled", "true"))) {
-            this.rateLimiterManager.initializeRateLimiter(rateLimitConfigSource);
+            this.rateLimiterManager.refreshRateLimiter(rateLimitConfigSource);
             this.rateLimiterManager.preloadGlobalLimiter();
         }
         
@@ -143,18 +145,39 @@ public class HttpServer {
 
         // Initialize router, router configuration manager and initial router configuration
         this.router = new Router(webRoot);
-        this.routeConfigManager = new RouteManager(router);
-        this.routeConfigSource = new com.yonagi.ocean.core.configuration.source.router.FallbackConfigSource(
-                new com.yonagi.ocean.core.configuration.source.router.NacosConfigSource(),
-                new com.yonagi.ocean.core.configuration.source.router.LocalConfigSource()
+        ConfigService initialConfigService = NacosConfigLoader.getConfigService();
+        NacosConfigSource initialNacosRouteSource = new NacosConfigSource(initialConfigService);
+        MutableConfigSource routeProxy = new MutableConfigSource(initialNacosRouteSource);
+        this.routeConfigSource = new FallbackConfigSource(
+                routeProxy,
+                new LocalConfigSource()
         );
 
+        this.routeConfigManager = new RouteManager(router);
+        RouteManager.setInstance(this.routeConfigManager);
+
+        RouteManager.RouteConfigRecoveryAction routeConfigRecoveryAction = new RouteManager.RouteConfigRecoveryAction(
+                routeProxy, this.routeConfigManager
+        );
+        NacosConfigLoader.registerRecoveryAction(routeConfigRecoveryAction);
+
         // Initialize rate limiter manager and initial rate limit configuration
+        com.yonagi.ocean.core.configuration.source.ratelimit.NacosConfigSource initialNacosRateLimiterSource =
+                new com.yonagi.ocean.core.configuration.source.ratelimit.NacosConfigSource(initialConfigService);
+        com.yonagi.ocean.core.configuration.source.ratelimit.MutableConfigSource ratelimitProxy =
+                new com.yonagi.ocean.core.configuration.source.ratelimit.MutableConfigSource(initialNacosRateLimiterSource);
+
         this.rateLimitConfigSource = new com.yonagi.ocean.core.configuration.source.ratelimit.FallbackConfigSource(
-                new com.yonagi.ocean.core.configuration.source.ratelimit.NacosConfigSource(),
+                ratelimitProxy,
                 new com.yonagi.ocean.core.configuration.source.ratelimit.LocalConfigSource()
         );
         this.rateLimiterManager = new RateLimiterManager();
+        RateLimiterManager.setInstance(this.rateLimiterManager);
+
+        RateLimiterManager.RateLimiterConfigRecoveryAction rateLimiterConfigRecoveryAction =
+                new RateLimiterManager.RateLimiterConfigRecoveryAction(ratelimitProxy, this.rateLimiterManager);
+        NacosConfigLoader.registerRecoveryAction(rateLimiterConfigRecoveryAction);
+
         this.rateLimiterChecker = new RateLimiterChecker(rateLimiterManager);
     }
 }

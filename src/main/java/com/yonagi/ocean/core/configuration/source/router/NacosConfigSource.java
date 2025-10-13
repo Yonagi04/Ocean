@@ -1,5 +1,6 @@
 package com.yonagi.ocean.core.configuration.source.router;
 
+import com.alibaba.nacos.api.config.ConfigService;
 import com.alibaba.nacos.api.config.listener.Listener;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -32,16 +33,22 @@ public class NacosConfigSource implements ConfigSource {
     private static final String STATIC_HANDLER_CLASS = StaticFileHandler.class.getName();
     private static final String REDIRECT_HANDLER_CLASS = RedirectHandler.class.getName();
 
-    public NacosConfigSource() {
+    private ConfigService configService;
+    private String dataId;
+    private String group;
+    private int timeoutMs;
+
+    public NacosConfigSource(ConfigService configService) {
+        this.configService = configService;
+        this.dataId = LocalConfigLoader.getProperty("server.router.nacos.data_id");
+        this.group = LocalConfigLoader.getProperty("server.router.nacos.group");
+        this.timeoutMs = Integer.parseInt(LocalConfigLoader.getProperty("nacos.timeout_ms", "3000"));
         startPeriodicSync();
     }
 
     @Override
     public List<RouteConfig> load() {
         try {
-            String dataId = LocalConfigLoader.getProperty("server.router.nacos.data_id");
-            String group = LocalConfigLoader.getProperty("server.router.nacos.group");
-            int timeoutMs = Integer.parseInt(LocalConfigLoader.getProperty("nacos.timeout_ms", "3000"));
             ArrayNode jsonArrayConfig = NacosConfigLoader.getJsonArrayConfig(dataId, group, timeoutMs);
             if (jsonArrayConfig == null) {
                 return null;
@@ -91,8 +98,9 @@ public class NacosConfigSource implements ConfigSource {
     }
 
     private void startPeriodicSync() {
+        boolean enabledNacos = Boolean.parseBoolean(LocalConfigLoader.getProperty("nacos.enabled", "false"));
         boolean enabledSync = Boolean.parseBoolean(LocalConfigLoader.getProperty("server.router.nacos.sync_to_local", "true"));
-        if (!enabledSync) {
+        if (!enabledNacos || !enabledSync) {
             return;
         }
         int syncIntervalSeconds = Integer.parseInt(LocalConfigLoader.getProperty("server.router.nacos.sync_interval_seconds", "7200"));

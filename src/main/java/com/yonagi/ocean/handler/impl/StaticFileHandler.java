@@ -45,8 +45,6 @@ public class StaticFileHandler implements RequestHandler {
     private final String webRoot;
     private final String errorPagePath;
 
-    private final StaticFileCache fileCache = StaticFileCacheFactory.getInstance();
-
     public StaticFileHandler(String webRoot) {
         this.webRoot = webRoot;
         this.errorPagePath = LocalConfigLoader.getProperty("server.not_found_page");
@@ -59,6 +57,7 @@ public class StaticFileHandler implements RequestHandler {
     
     @Override
     public void handle(HttpRequest request, OutputStream outputStream, boolean keepAlive) throws IOException {
+        StaticFileCache fileCache = StaticFileCacheFactory.getInstance();
         String uri = request.getUri();
         if ("/".equals(uri)) {
             uri = "/index.html";
@@ -132,6 +131,7 @@ public class StaticFileHandler implements RequestHandler {
     }
     
     private void writeNotFound(OutputStream outputStream, boolean keepAlive) throws IOException {
+        StaticFileCache fileCache = StaticFileCacheFactory.getInstance();
         File errorPage = new File(errorPagePath);
         if (errorPage.exists()) {
             try {
