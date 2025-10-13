@@ -4,6 +4,7 @@ import com.alibaba.nacos.api.config.ConfigService;
 import com.yonagi.ocean.cache.StaticFileCacheFactory;
 import com.yonagi.ocean.core.configuration.KeepAliveConfig;
 import com.yonagi.ocean.core.configuration.source.router.*;
+import com.yonagi.ocean.core.gzip.GzipEncoderManager;
 import com.yonagi.ocean.core.ratelimiter.RateLimiterChecker;
 import com.yonagi.ocean.core.ratelimiter.RateLimiterManager;
 import com.yonagi.ocean.core.router.RouteManager;
@@ -68,6 +69,9 @@ public class HttpServer {
 
         // Initialize static file cache
         StaticFileCacheFactory.init();
+
+        // Initialize GZIP Encoder manager
+        GzipEncoderManager.init();
 
         // Initialize core components
         initializeComponents(startupConfig);

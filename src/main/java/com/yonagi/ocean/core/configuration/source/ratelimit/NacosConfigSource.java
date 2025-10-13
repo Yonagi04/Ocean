@@ -33,10 +33,6 @@ public class NacosConfigSource implements ConfigSource {
     private String group;
     private int timeoutMs;
 
-    public NacosConfigSource() {
-        startPeriodicSync();
-    }
-
     public NacosConfigSource(ConfigService configService) {
         this.configService = configService;
         this.dataId = LocalConfigLoader.getProperty("server.rate_limit.nacos.data_id");
@@ -72,8 +68,6 @@ public class NacosConfigSource implements ConfigSource {
     @Override
     public void onChange(Runnable callback) {
         this.callback = callback;
-        String dataId = LocalConfigLoader.getProperty("server.rate_limit.nacos.data_id");
-        String group = LocalConfigLoader.getProperty("server.rate_limit.nacos.group");
         NacosConfigLoader.addListener(dataId, group, new Listener() {
             @Override
             public Executor getExecutor() {
@@ -97,9 +91,6 @@ public class NacosConfigSource implements ConfigSource {
         }
         int syncIntervalSeconds = Integer.parseInt(LocalConfigLoader.getProperty("server.rate_limit.nacos.sync_interval_seconds", "7200"));
         String syncLocalPath = LocalConfigLoader.getProperty("server.rate_limit.nacos.sync_local_path");
-        String dataId = LocalConfigLoader.getProperty("server.rate_limit.nacos.data_id");
-        String group = LocalConfigLoader.getProperty("server.rate_limit.nacos.group");
-        int timeoutMs = Integer.parseInt(LocalConfigLoader.getProperty("nacos.timeout_ms", "5000"));
         NacosBackupScheduler.start(dataId, group, syncLocalPath, syncIntervalSeconds, timeoutMs);
     }
 }

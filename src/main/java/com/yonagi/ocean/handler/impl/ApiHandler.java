@@ -2,6 +2,8 @@ package com.yonagi.ocean.handler.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
+import com.yonagi.ocean.core.gzip.GzipEncoder;
+import com.yonagi.ocean.core.gzip.GzipEncoderManager;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
@@ -143,11 +145,20 @@ public class ApiHandler implements RequestHandler {
         }
 
         String responseBody = objectMapper.writeValueAsString(responseData);
+        GzipEncoder encoder = GzipEncoderManager.getEncoderInstance();
+        String acceptEncoding = request.getHeaders().getOrDefault("accept-encoding", "");
+        byte[] finalBody = encoder.encode(responseBody.getBytes(charset), acceptEncoding);
+        Map<String, String> headers = new HashMap<>();
+        if (finalBody != responseBody.getBytes(charset)) {
+            headers.put("Content-Encoding", "gzip");
+        }
+
         HttpResponse response = new HttpResponse.Builder()
                 .httpVersion(request.getHttpVersion())
                 .httpStatus(HttpStatus.CREATED)
                 .contentType("application/json")
-                .body(responseBody.getBytes())
+                .headers(headers)
+                .body(finalBody)
                 .build();
         response.write(output, keepAlive);
         output.flush();

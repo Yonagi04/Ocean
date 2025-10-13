@@ -53,7 +53,7 @@ public class NacosConfigSource implements ConfigSource {
             if (jsonArrayConfig == null) {
                 return null;
             }
-            TypeReference<List<RouteConfig>> typeRef = new TypeReference<List<RouteConfig>>() {
+            TypeReference<List<RouteConfig>> typeRef = new TypeReference<>() {
             };
             List<RouteConfig> routeConfigs = objectMapper.convertValue(jsonArrayConfig, typeRef);
             log.info("Loaded {} router configurations from Nacos configuration", routeConfigs.size());
@@ -80,8 +80,6 @@ public class NacosConfigSource implements ConfigSource {
     @Override
     public void onChange(Runnable callback) {
         this.callback = callback;
-        String dataId = LocalConfigLoader.getProperty("server.router.nacos.data_id");
-        String group = LocalConfigLoader.getProperty("server.router.nacos.group");
         NacosConfigLoader.addListener(dataId, group, new Listener() {
             @Override
             public Executor getExecutor() {
@@ -105,9 +103,6 @@ public class NacosConfigSource implements ConfigSource {
         }
         int syncIntervalSeconds = Integer.parseInt(LocalConfigLoader.getProperty("server.router.nacos.sync_interval_seconds", "7200"));
         String syncLocalPath = LocalConfigLoader.getProperty("server.router.nacos.sync_local_path");
-        String dataId = LocalConfigLoader.getProperty("server.router.nacos.data_id");
-        String group = LocalConfigLoader.getProperty("server.router.nacos.group");
-        int timeoutMs = Integer.parseInt(LocalConfigLoader.getProperty("nacos.timeout_ms", "5000"));
         NacosBackupScheduler.start(dataId, group, syncLocalPath, syncIntervalSeconds, timeoutMs);
     }
 }

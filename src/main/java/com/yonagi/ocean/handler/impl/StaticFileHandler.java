@@ -1,6 +1,8 @@
 package com.yonagi.ocean.handler.impl;
 
 import com.yonagi.ocean.cache.*;
+import com.yonagi.ocean.core.gzip.GzipEncoder;
+import com.yonagi.ocean.core.gzip.GzipEncoderManager;
 import com.yonagi.ocean.core.protocol.*;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.core.protocol.enums.HttpVersion;
@@ -110,12 +112,18 @@ public class StaticFileHandler implements RequestHandler {
                 return;
             }
 
+            GzipEncoder encoder = GzipEncoderManager.getEncoderInstance();
+            String acceptEncoding = request.getHeaders().get("accept-encoding");
+            byte[] finalBody = encoder.encode(cf.getContent(), acceptEncoding);
+            if (finalBody != cf.getContent()) {
+                headers.put("Content-Encoding", "gzip");
+            }
             HttpResponse httpResponse = new HttpResponse.Builder()
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.OK)
                     .contentType(contentType)
                     .headers(headers)
-                    .body(cf.getContent())
+                    .body(finalBody)
                     .build();
             httpResponse.write(outputStream, keepAlive);
             outputStream.flush();
