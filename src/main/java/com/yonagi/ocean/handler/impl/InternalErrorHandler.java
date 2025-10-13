@@ -123,19 +123,19 @@ public class InternalErrorHandler implements RequestHandler {
                         .contentType(contentType)
                         .body(cf.getContent())
                         .build();
-                httpResponse.write(outputStream, keepAlive);
+                httpResponse.write(request, outputStream, keepAlive);
                 outputStream.flush();
             } catch (Exception ex) {
                 log.error("Error serving internal error page: {}", ex.getMessage(), ex);
-                writeDefaultErrorResponse(outputStream, keepAlive);
+                writeDefaultErrorResponse(request, outputStream, keepAlive);
             }
         } else {
             log.info("Error page not found, using default error response");
-            writeDefaultErrorResponse(outputStream, keepAlive);
+            writeDefaultErrorResponse(request, outputStream, keepAlive);
         }
     }
     
-    private void writeDefaultErrorResponse(OutputStream outputStream, boolean keepAlive) {
+    private void writeDefaultErrorResponse(HttpRequest request, OutputStream outputStream, boolean keepAlive) {
         try {
             HttpResponse httpResponse = new HttpResponse.Builder()
                     .httpVersion(HttpVersion.HTTP_1_1)
@@ -143,7 +143,7 @@ public class InternalErrorHandler implements RequestHandler {
                     .contentType("text/html")
                     .body(DEFAULT_500_HTML.getBytes())
                     .build();
-            httpResponse.write(outputStream, keepAlive);
+            httpResponse.write(request, outputStream, keepAlive);
             outputStream.flush();
         } catch (Exception ex) {
             ex.printStackTrace();

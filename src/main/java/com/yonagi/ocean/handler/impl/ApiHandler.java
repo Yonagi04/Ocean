@@ -122,7 +122,7 @@ public class ApiHandler implements RequestHandler {
                     .contentType("text/plain")
                     .body("Unsupported Media Type".getBytes())
                     .build();
-            response.write(output, keepAlive);
+            response.write(request, output, keepAlive);
             output.flush();
             log.warn("Client sent unsupported Content-Type: {}", contentType);
             return;
@@ -139,7 +139,7 @@ public class ApiHandler implements RequestHandler {
                     .contentType("text/plain")
                     .body((msgPrefix + e.getMessage()).getBytes())
                     .build();
-            errorResponse.write(output, keepAlive);
+            errorResponse.write(request, output, keepAlive);
             output.flush();
             return;
         }
@@ -160,7 +160,7 @@ public class ApiHandler implements RequestHandler {
                 .headers(headers)
                 .body(finalBody)
                 .build();
-        response.write(output, keepAlive);
+        response.write(request, output, keepAlive);
         output.flush();
     }
 

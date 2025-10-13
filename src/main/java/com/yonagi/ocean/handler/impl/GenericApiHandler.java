@@ -71,7 +71,7 @@ public class GenericApiHandler implements RequestHandler {
                 .body(responseBody.getBytes())
                 .build();
 
-        response.write(output, keepAlive);
+        response.write(request, output, keepAlive);
         output.flush();
     }
 

@@ -6,6 +6,7 @@ import com.yonagi.ocean.core.protocol.enums.HttpVersion;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -48,23 +49,37 @@ public class HttpResponse {
         return headers;
     }
 
-    /**
-     * 将响应以正确的 HTTP 报文格式写入输出流，避免将二进制 body 进行字符串编码导致内容损坏。
-     */
-    public void write(OutputStream outputStream) throws IOException {
-        write(outputStream, true); // Default to keep-alive
+    public Builder toBuilder() {
+        Map<String, String> headerCopy = headers != null ? new HashMap<>(headers) : null;
+        return new Builder()
+                .httpVersion(httpVersion)
+                .httpStatus(httpStatus)
+                .contentType(contentType)
+                .headers(headerCopy);
     }
-    
+
     /**
      * 将响应以正确的 HTTP 报文格式写入输出流，支持Keep-Alive
      */
-    public void write(OutputStream outputStream, boolean keepAlive) throws IOException {
+    public void write(HttpRequest request, OutputStream outputStream, boolean keepAlive) throws IOException {
+        Map<String, String> corsHeaders = (Map<String, String>) request.getAttribute("CorsResponseHeaders");
+        if (corsHeaders != null && !corsHeaders.isEmpty()) {
+            if (this.headers == null) {
+                this.headers = new HashMap<>();
+            }
+            this.headers.putAll(corsHeaders);
+        }
+
+        boolean forbidsBody = httpStatus.getCode() == 204
+                || httpStatus.getCode() == 304
+                || httpStatus.getCode() / 100 == 1;
+
         StringBuilder headerBuilder = new StringBuilder();
         headerBuilder.append(httpVersion.getVersion()).append(" ")
                 .append(httpStatus.toString()).append("\r\n");
-        headerBuilder.append("Content-Type: ").append(contentType).append("\r\n");
 
         String contentLengthValue = null;
+        String contentTypeValue = this.contentType;
 
         if (headers != null) {
             for (Map.Entry<String, String> entry : headers.entrySet()) {
@@ -72,8 +87,11 @@ public class HttpResponse {
                 if (key == null) {
                     continue;
                 }
-                if (key.equalsIgnoreCase("Content-Type") ||
-                    key.equalsIgnoreCase("Connection")) {
+                if (key.equalsIgnoreCase("Connection")) {
+                    continue;
+                }
+                if (key.equalsIgnoreCase("Content-Type")) {
+                    contentTypeValue = entry.getValue();
                     continue;
                 }
                 if (key.equalsIgnoreCase("Content-Length")) {
@@ -85,38 +103,46 @@ public class HttpResponse {
             }
         }
 
-        if (body != null) {
-            headerBuilder.append("Content-Length: ").append(body.length).append("\r\n");
-        } else if (contentLengthValue != null) {
-            headerBuilder.append("Content-Length: ").append(contentLengthValue).append("\r\n");
-        } else {
-            headerBuilder.append("Content-Length: 0\r\n");
+        if (!forbidsBody && contentTypeValue != null) {
+            headerBuilder.append("Content-Type: ").append(contentTypeValue).append("\r\n");
         }
 
-        // Add Connection header based on keepAlive parameter
+        if (!forbidsBody) {
+            if (body != null) {
+                headerBuilder.append("Content-Length: ").append(body.length).append("\r\n");
+            } else if (contentLengthValue != null) {
+                headerBuilder.append("Content-Length: ").append(contentLengthValue).append("\r\n");
+            } else {
+                headerBuilder.append("Content-Length: 0\r\n");
+            }
+        }
+
         if (keepAlive) {
             headerBuilder.append("Connection: keep-alive\r\n");
         } else {
             headerBuilder.append("Connection: close\r\n");
         }
-        
+
         headerBuilder.append("\r\n");
 
         // 写入头
-        outputStream.write(headerBuilder.toString().getBytes());
+        outputStream.write(headerBuilder.toString().getBytes(StandardCharsets.ISO_8859_1));
         // 写入体（若有）
         if (body != null && body.length > 0) {
             outputStream.write(body);
         }
     }
 
-    public void writeStreaming(OutputStream outputStream, long contentLength) throws IOException {
-        writeStreaming(outputStream, true, contentLength);
-    }
+    public void writeStreaming(HttpRequest request, OutputStream outputStream, boolean keepAlive, long contentLength) throws IOException {
+        Map<String, String> corsHeaders = (Map<String, String>) request.getAttribute("CorsResponseHeaders");
+        if (corsHeaders != null && !corsHeaders.isEmpty()) {
+            if (this.headers == null) {
+                this.headers = new HashMap<>();
+            }
+            this.headers.putAll(corsHeaders);
+        }
 
-    public void writeStreaming(OutputStream outputStream, boolean keepAlive, long contentLength) throws IOException {
         StringBuilder headerBuilder = new StringBuilder();
-
         headerBuilder.append(httpVersion.getVersion()).append(" ")
                 .append(httpStatus.toString()).append("\r\n");
         headerBuilder.append("Content-Type: ").append(contentType).append("\r\n");
@@ -194,7 +220,7 @@ public class HttpResponse {
         }
 
         public Builder headers(Map<String, String> headers) {
-            this.headers = headers;
+            this.headers = headers != null ? new HashMap<>(headers) : null;
             return this;
         }
 

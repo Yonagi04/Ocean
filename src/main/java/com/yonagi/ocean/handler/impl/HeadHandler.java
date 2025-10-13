@@ -46,11 +46,11 @@ public class HeadHandler implements RequestHandler {
         }
         File file = new File(webRoot, uri);
         if (!file.exists() || file.isDirectory()) {
-            writeNotFound(output, keepAlive);
+            writeNotFound(request, output, keepAlive);
             return;
         }
         if (!file.getCanonicalPath().startsWith(new File(webRoot).getCanonicalPath())) {
-            writeNotFound(output, keepAlive);
+            writeNotFound(request, output, keepAlive);
             log.warn("Attempted directory traversal attack: {}", uri);
             return;
         }
@@ -63,17 +63,17 @@ public class HeadHandler implements RequestHandler {
                 .httpStatus(HttpStatus.OK)
                 .contentType(contentType)
                 .build();
-        response.write(output, keepAlive);
+        response.write(request, output, keepAlive);
         output.flush();
     }
     
-    private void writeNotFound(OutputStream output, boolean keepAlive) throws IOException {
+    private void writeNotFound(HttpRequest request, OutputStream output, boolean keepAlive) throws IOException {
         HttpResponse response = new HttpResponse.Builder()
                 .httpVersion(HttpVersion.HTTP_1_1)
                 .httpStatus(HttpStatus.NOT_FOUND)
                 .contentType("text/html")
                 .build();
-        response.write(output, keepAlive);
+        response.write(request, output, keepAlive);
         output.flush();
     }
 }

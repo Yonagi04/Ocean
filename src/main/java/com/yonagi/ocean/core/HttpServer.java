@@ -73,6 +73,9 @@ public class HttpServer {
         // Initialize GZIP Encoder manager
         GzipEncoderManager.init();
 
+        // Initialize CORS manager
+        CorsManager.init();
+
         // Initialize core components
         initializeComponents(startupConfig);
 

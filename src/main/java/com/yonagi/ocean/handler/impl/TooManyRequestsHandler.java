@@ -124,19 +124,19 @@ public class TooManyRequestsHandler implements RequestHandler {
                         .contentType(contentType)
                         .body(cf.getContent())
                         .build();
-                httpResponse.write(output, keepAlive);
+                httpResponse.write(request, output, keepAlive);
                 output.flush();
             } catch (Exception e) {
                 log.error("Error serving too many requests page: {}", e.getMessage(), e);
-                writeDefaultResponse(output, keepAlive);
+                writeDefaultResponse(request, output, keepAlive);
             }
         } else {
             log.info("Error Page not found, using default error response");
-            writeDefaultResponse(output, keepAlive);
+            writeDefaultResponse(request, output, keepAlive);
         }
     }
 
-    private void writeDefaultResponse(OutputStream output, boolean keepAlive) {
+    private void writeDefaultResponse(HttpRequest request, OutputStream output, boolean keepAlive) {
         try {
             HttpResponse httpResponse = new HttpResponse.Builder()
                     .httpVersion(HttpVersion.HTTP_1_1)
@@ -144,7 +144,7 @@ public class TooManyRequestsHandler implements RequestHandler {
                     .contentType("text/html")
                     .body(DEFAULT_429_HTML.getBytes())
                     .build();
-            httpResponse.write(output, keepAlive);
+            httpResponse.write(request, output, keepAlive);
             output.flush();
         } catch (Exception ignored) {
 

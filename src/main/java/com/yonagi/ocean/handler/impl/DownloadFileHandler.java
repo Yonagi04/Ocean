@@ -59,7 +59,7 @@ public class DownloadFileHandler implements RequestHandler {
         File file = Paths.get(DOWNLOAD_PATH, fileName).toFile();
         if (!file.exists() || file.isDirectory()) {
             log.warn("File {} is not exists or is a directory", fileName);
-            writeNotFound(output, keepAlive);
+            writeNotFound(request, output, keepAlive);
             return;
         }
 
@@ -74,7 +74,7 @@ public class DownloadFileHandler implements RequestHandler {
                     .headers(headers)
                     .contentType(MimeTypeUtil.getMimeType(fileName))
                     .build();
-            response.writeStreaming(output, keepAlive, file.length());
+            response.writeStreaming(request, output, keepAlive, file.length());
             output.flush();
 
             try (FileInputStream fileInput = new FileInputStream(file)) {
@@ -108,7 +108,7 @@ public class DownloadFileHandler implements RequestHandler {
         return uri.substring(lastSlashIndex + 1);
     }
 
-    private void writeNotFound(OutputStream outputStream, boolean keepAlive) throws IOException {
+    private void writeNotFound(HttpRequest request, OutputStream outputStream, boolean keepAlive) throws IOException {
         StaticFileCache fileCache = StaticFileCacheFactory.getInstance();
         File errorPage = new File(errorPagePath);
         if (errorPage.exists()) {
@@ -124,7 +124,7 @@ public class DownloadFileHandler implements RequestHandler {
                         .contentType(contentType)
                         .body(cf.getContent())
                         .build();
-                httpResponse.write(outputStream, keepAlive);
+                httpResponse.write(request, outputStream, keepAlive);
                 outputStream.flush();
                 return;
             } catch (Exception ignore) {
@@ -137,7 +137,7 @@ public class DownloadFileHandler implements RequestHandler {
                 .contentType("text/html")
                 .body(DEFAULT_404_HTML.getBytes())
                 .build();
-        httpResponse.write(outputStream, keepAlive);
+        httpResponse.write(request, outputStream, keepAlive);
         outputStream.flush();
     }
 

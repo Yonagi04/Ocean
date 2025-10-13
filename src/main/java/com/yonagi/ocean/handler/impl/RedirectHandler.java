@@ -116,7 +116,7 @@ public class RedirectHandler implements RequestHandler {
         builder.headers(responseHeaders);
 
         HttpResponse response = builder.build();
-        response.write(output, keepAlive);
+        response.write(request, output, keepAlive);
         output.flush();
         log.info("Request path: {}, redirect to: {}, status code: {}", request.getUri(), finalLocation, statusCode);
     }

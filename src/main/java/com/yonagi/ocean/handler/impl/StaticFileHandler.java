@@ -69,11 +69,11 @@ public class StaticFileHandler implements RequestHandler {
         }
         File file = new File(webRoot, uri);
         if (!file.exists() || file.isDirectory()) {
-            writeNotFound(outputStream, keepAlive);
+            writeNotFound(request, outputStream, keepAlive);
             return;
         }
         if (!file.getCanonicalPath().startsWith(new File(webRoot).getCanonicalPath())) {
-            writeNotFound(outputStream, keepAlive);
+            writeNotFound(request, outputStream, keepAlive);
             log.warn("Attempted directory traversal attack: {}", uri);
             return;
         }
@@ -106,7 +106,7 @@ public class StaticFileHandler implements RequestHandler {
                         .contentType(contentType)
                         .headers(headers)
                         .build();
-                notModified.write(outputStream, keepAlive);
+                notModified.write(request, outputStream, keepAlive);
                 outputStream.flush();
                 log.info("Respond 304 Not Modified for {}", uri);
                 return;
@@ -125,7 +125,7 @@ public class StaticFileHandler implements RequestHandler {
                     .headers(headers)
                     .body(finalBody)
                     .build();
-            httpResponse.write(outputStream, keepAlive);
+            httpResponse.write(request, outputStream, keepAlive);
             outputStream.flush();
             log.info("Served from {}{}", isInCache ? "cache: " : "disk: ", uri);
         } catch (Exception e) {
@@ -133,12 +133,8 @@ public class StaticFileHandler implements RequestHandler {
             new InternalErrorHandler().handle(request, outputStream, keepAlive);
         }
     }
-
-    private void writeNotFound(OutputStream outputStream) throws IOException {
-        writeNotFound(outputStream, true); // Default to keep-alive
-    }
     
-    private void writeNotFound(OutputStream outputStream, boolean keepAlive) throws IOException {
+    private void writeNotFound(HttpRequest request, OutputStream outputStream, boolean keepAlive) throws IOException {
         StaticFileCache fileCache = StaticFileCacheFactory.getInstance();
         File errorPage = new File(errorPagePath);
         if (errorPage.exists()) {
@@ -154,7 +150,7 @@ public class StaticFileHandler implements RequestHandler {
                         .contentType(contentType)
                         .body(cf.getContent())
                         .build();
-                httpResponse.write(outputStream, keepAlive);
+                httpResponse.write(request, outputStream, keepAlive);
                 outputStream.flush();
                 return;
             } catch (Exception ignore) {
@@ -167,7 +163,7 @@ public class StaticFileHandler implements RequestHandler {
                 .contentType("text/html")
                 .body(DEFAULT_404_HTML.getBytes())
                 .build();
-        httpResponse.write(outputStream, keepAlive);
+        httpResponse.write(request, outputStream, keepAlive);
         outputStream.flush();
     }
 

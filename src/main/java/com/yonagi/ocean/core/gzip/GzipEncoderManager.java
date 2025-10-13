@@ -50,7 +50,6 @@ public class GzipEncoderManager {
     private GzipEncoderManager() {}
 
     public static void init() {
-        // 1. 确保 GzipEncoderManager 自身（工厂）的单例 INSTANCE 被创建 (双重检查锁定)
         if (INSTANCE == null) {
             synchronized (GzipEncoderManager.class) {
                 if (INSTANCE == null) {
@@ -59,20 +58,15 @@ public class GzipEncoderManager {
             }
         }
 
-        // 2. 如果 GzipEncoder 实例已被初始化，直接返回
         if (ENCODER_REF.get() != null) {
             return;
         }
 
-        // 3. 配置链初始化（只做一次）
         NacosConfigSource initialNacosSource = new NacosConfigSource(NacosConfigLoader.getConfigService());
         nacosConfigSourceProxy = new MutableConfigSource(initialNacosSource);
         configSource = new FallbackConfigSource(nacosConfigSourceProxy, new LocalConfigSource());
 
-        // 4. 注册 Recovery Action，传入 newly created INSTANCE
         NacosConfigLoader.registerRecoveryAction(new GzipConfigRecoveryAction(nacosConfigSourceProxy, INSTANCE));
-
-        // 5. 首次刷新和监听器注册
         refresh();
         configSource.onChange(GzipEncoderManager::refresh);
     }

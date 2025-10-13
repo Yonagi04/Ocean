@@ -1,8 +1,10 @@
 package com.yonagi.ocean.core;
 
+import com.yonagi.ocean.core.protocol.HttpResponse;
 import com.yonagi.ocean.core.protocol.enums.HttpMethod;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpRequestParser;
+import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.core.ratelimiter.RateLimiterChecker;
 import com.yonagi.ocean.core.router.Router;
 import com.yonagi.ocean.handler.impl.*;
@@ -15,6 +17,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.IllegalCharsetNameException;
 import java.nio.charset.StandardCharsets;
 import java.nio.charset.UnsupportedCharsetException;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -82,6 +85,24 @@ public class ClientHandler implements Runnable {
 
                 finalRequest.setAttribute("clientIp", client.getInetAddress().getHostAddress());
 
+                Map<String, String> corsHeaders = CorsManager.handleCors(finalRequest);
+                boolean isPreflightTerminated = corsHeaders != null && "true".equals(corsHeaders.get("__IS_PREFLIGHT__"));
+                if (isPreflightTerminated) {
+                    log.info("CORS preflight request (OPTIONS) handled and terminated");
+                    HttpResponse response = new HttpResponse.Builder()
+                            .httpVersion(finalRequest.getHttpVersion())
+                            .httpStatus(HttpStatus.NO_CONTENT)
+                            .headers(corsHeaders)
+                            .body(new byte[0])
+                            .build();
+                    response.write(finalRequest, output, false);
+                    break;
+                }
+                if (corsHeaders != null && !corsHeaders.isEmpty()) {
+                    corsHeaders.remove("__IS_PREFLIGHT__");
+                    finalRequest.setAttribute("CorsResponseHeaders", corsHeaders);
+                }
+
                 boolean shouldKeepAlive = shouldKeepAlive(finalRequest);
                 if (!shouldKeepAlive) {
                     handleRequest(finalRequest, output, false);
@@ -124,7 +145,7 @@ public class ClientHandler implements Runnable {
         // 使用Router进行路由转发
         router.route(method, path, request, output, keepAlive);
     }
-    
+
     /**
      * Determine if the connection should be kept alive based on request headers
      */

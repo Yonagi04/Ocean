@@ -101,7 +101,6 @@ public class Router {
         defaultHandlers.put(HttpMethod.GET, new StaticFileHandler(webRoot));
         defaultHandlers.put(HttpMethod.POST, new ApiHandler(webRoot));
         defaultHandlers.put(HttpMethod.HEAD, new HeadHandler(webRoot));
-        defaultHandlers.put(HttpMethod.OPTIONS, new OptionsHandler(webRoot));
     }
     
     /**
@@ -179,20 +178,6 @@ public class Router {
      * 查找匹配的路由配置
      */
     private RouteConfig findRoute(HttpMethod method, String path) {
-//        Map<String, RouteConfig> methodRoutes = routes.get(method);
-//        if (methodRoutes == null) {
-//            // 直接在ALL方法中找
-//            methodRoutes = routes.get(HttpMethod.ALL);
-//            if (methodRoutes == null) {
-//                return null;
-//            }
-//        }
-//
-//        // 精确匹配
-//        RouteConfig exactMatch = methodRoutes.get(path);
-//        if (exactMatch != null) {
-//            return exactMatch;
-//        }
         RouteConfig match = null;
 
         Map<String, RouteConfig> specificMethodRoutes = routes.get(method);

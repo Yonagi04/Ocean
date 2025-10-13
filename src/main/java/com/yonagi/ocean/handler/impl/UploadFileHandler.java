@@ -59,7 +59,7 @@ public class UploadFileHandler implements RequestHandler {
                     .body("Request body stream is missing".getBytes())
                     .contentType("application/json")
                     .build();
-            response.write(output, keepAlive);
+            response.write(request, output, keepAlive);
             output.flush();
             return;
         }
@@ -104,7 +104,7 @@ public class UploadFileHandler implements RequestHandler {
                     .contentType("application/json")
                     .body("Invalid request body".getBytes())
                     .build();
-            response.write(output, keepAlive);
+            response.write(request, output, keepAlive);
             output.flush();
             return;
         }
@@ -123,7 +123,7 @@ public class UploadFileHandler implements RequestHandler {
                         .contentType("application/json")
                         .body("Invalid request body".getBytes())
                         .build();
-                response.write(output, keepAlive);
+                response.write(request, output, keepAlive);
                 output.flush();
                 return;
             }
@@ -160,7 +160,7 @@ public class UploadFileHandler implements RequestHandler {
                     .contentType("application/json")
                     .body(responseBody.getBytes(StandardCharsets.UTF_8))
                     .build();
-            response.write(output, keepAlive);
+            response.write(request, output, keepAlive);
             output.flush();
             items.forEach(FileItem::delete);
         } catch (Exception e) {
