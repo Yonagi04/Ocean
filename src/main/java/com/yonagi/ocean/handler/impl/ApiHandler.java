@@ -8,6 +8,7 @@ import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.handler.RequestHandler;
+import com.yonagi.ocean.utils.LocalConfigLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,62 +43,6 @@ public class ApiHandler implements RequestHandler {
         this.webRoot = webRoot;
     }
 
-    /**
-     * Form-data字段表示类
-     */
-    public static class FormField {
-        private String name;
-        private String value;
-        private String filename;
-        private String contentType;
-        private boolean isFile;
-
-        public FormField(String name, String value) {
-            this.name = name;
-            this.value = value;
-            this.isFile = false;
-        }
-
-        public FormField(String name, String value, String filename, String contentType) {
-            this.name = name;
-            this.value = value;
-            this.filename = filename;
-            this.contentType = contentType;
-            this.isFile = true;
-        }
-
-        // Getters
-        public String getName() {
-            return name;
-        }
-
-        public String getValue() {
-            return value;
-        }
-
-        public String getFilename() {
-            return filename;
-        }
-
-        public String getContentType() {
-            return contentType;
-        }
-
-        public boolean isFile() {
-            return isFile;
-        }
-
-        @Override
-        public String toString() {
-            if (isFile) {
-                return String.format("FormField{name='%s', filename='%s', contentType='%s', isFile=true}",
-                        name, filename, contentType);
-            } else {
-                return String.format("FormField{name='%s', value='%s', isFile=false}", name, value);
-            }
-        }
-    }
-
     @Override
     public void handle(HttpRequest request, OutputStream output) throws IOException {
         handle(request, output, true); // Default to keep-alive
@@ -112,6 +57,21 @@ public class ApiHandler implements RequestHandler {
         if (contentType.contains("charset=")) {
             charset = contentType.split("charset=")[1].trim();
         }
+        Map<String, String> headers = new HashMap<>();
+        if ((Boolean) request.getAttribute("isSsl")) {
+            StringBuilder hstsValue = new StringBuilder();
+            long maxAge = Long.parseLong(LocalConfigLoader.getProperty("server.ssl.hsts.max_age", "31536000"));
+            hstsValue.append("max-age=").append(maxAge);
+            boolean enabledIncludeSubdomains = Boolean.parseBoolean(LocalConfigLoader.getProperty("server.ssl.hsts.enabled_include_subdomains", "false"));
+            boolean enabledPreload = Boolean.parseBoolean(LocalConfigLoader.getProperty("server.ssl.hsts.enabled_preload", "false"));
+            if (enabledIncludeSubdomains) {
+                hstsValue.append("; includeSubDomains");
+            }
+            if (enabledPreload && enabledIncludeSubdomains && maxAge >= 31536000) {
+                hstsValue.append("; preload");
+            }
+            headers.put("Strict-Transport-Security", hstsValue.toString());
+        }
 
         // 使用策略映射替代 if-else
         ContentProcessor processor = processors.get(mimeType);
@@ -120,6 +80,7 @@ public class ApiHandler implements RequestHandler {
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
                     .contentType("text/plain")
+                    .headers(headers)
                     .body("Unsupported Media Type".getBytes())
                     .build();
             response.write(request, output, keepAlive);
@@ -137,6 +98,7 @@ public class ApiHandler implements RequestHandler {
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.BAD_REQUEST)
                     .contentType("text/plain")
+                    .headers(headers)
                     .body((msgPrefix + e.getMessage()).getBytes())
                     .build();
             errorResponse.write(request, output, keepAlive);
@@ -148,7 +110,7 @@ public class ApiHandler implements RequestHandler {
         GzipEncoder encoder = GzipEncoderManager.getEncoderInstance();
         String acceptEncoding = request.getHeaders().getOrDefault("accept-encoding", "");
         byte[] finalBody = encoder.encode(responseBody.getBytes(charset), acceptEncoding);
-        Map<String, String> headers = new HashMap<>();
+
         if (finalBody != responseBody.getBytes(charset)) {
             headers.put("Content-Encoding", "gzip");
         }
@@ -226,103 +188,5 @@ public class ApiHandler implements RequestHandler {
         @SuppressWarnings("unchecked")
         Map<String, Object> xmlMap = xmlMapper.readValue(xmlContent, Map.class);
         return xmlMap;
-    }
-
-    private List<FormField> parseMultipartFormData(byte[] body, String contentType, String charset) throws IOException {
-        List<FormField> fields = new ArrayList<>();
-
-        // 从Content-Type中提取boundary
-        String boundary = extractBoundary(contentType);
-        if (boundary == null) {
-            throw new IOException("Missing boundary in multipart/form-data");
-        }
-
-        String boundaryDelimiter = "--" + boundary;
-        String bodyString = new String(body, charset);
-        log.debug("Parsing multipart form data with boundary: {}", boundary);
-        log.debug("Body length: {}", body.length);
-
-        // 按边界分割数据
-        String[] parts = bodyString.split(Pattern.quote(boundaryDelimiter));
-
-        for (String part : parts) {
-            if (part.trim().isEmpty() || part.equals("--")) {
-                continue; // 跳过空部分和结束边界
-            }
-
-            try {
-                FormField field = parseFormField(part, charset);
-                if (field != null) {
-                    fields.add(field);
-                }
-            } catch (Exception e) {
-                log.warn("Failed to parse form field: {}", e.getMessage());
-            }
-        }
-
-        return fields;
-    }
-
-    private String extractBoundary(String contentType) {
-        Pattern boundaryPattern = Pattern.compile("boundary=([^;\\s]+)");
-        Matcher matcher = boundaryPattern.matcher(contentType);
-        if (matcher.find()) {
-            return matcher.group(1);
-        }
-        return null;
-    }
-
-    private FormField parseFormField(String part, String charset) throws IOException {
-        // 查找头部和数据的分隔符
-        int headerEndIndex = part.indexOf("\r\n\r\n");
-        if (headerEndIndex == -1) {
-            headerEndIndex = part.indexOf("\n\n");
-            if (headerEndIndex == -1) {
-                return null;
-            }
-            headerEndIndex += 2;
-        } else {
-            headerEndIndex += 4;
-        }
-
-        String headers = part.substring(0, headerEndIndex);
-        String data = part.substring(headerEndIndex);
-
-        // 移除末尾的换行符
-        data = data.replaceAll("\r?\n$", "");
-
-        // 解析Content-Disposition头部
-        String name = extractFromHeader(headers, "name");
-        String filename = extractFromHeader(headers, "filename");
-        String contentType = extractFromHeader(headers, "Content-Type");
-
-        if (name == null) {
-            return null;
-        }
-
-        if (filename != null) {
-            // 文件字段
-            return new FormField(name, data, filename, contentType);
-        } else {
-            // 普通字段
-            return new FormField(name, data);
-        }
-    }
-
-    private String extractFromHeader(String headers, String attributeName) {
-        Pattern pattern = Pattern.compile(attributeName + "=\"([^\"]+)\"", Pattern.CASE_INSENSITIVE);
-        Matcher matcher = pattern.matcher(headers);
-        if (matcher.find()) {
-            return matcher.group(1);
-        }
-
-        // 尝试不带引号的格式
-        pattern = Pattern.compile(attributeName + "=([^;\\s]+)", Pattern.CASE_INSENSITIVE);
-        matcher = pattern.matcher(headers);
-        if (matcher.find()) {
-            return matcher.group(1);
-        }
-
-        return null;
     }
 }

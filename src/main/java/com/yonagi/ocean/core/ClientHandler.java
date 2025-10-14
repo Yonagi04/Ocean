@@ -135,7 +135,7 @@ public class ClientHandler implements Runnable {
                 }
 
                 finalRequest.setAttribute("clientIp", client.getInetAddress().getHostAddress());
-                finalRequest.setAttribute("requestProtocol", isSsl ? "https" : "http");
+                finalRequest.setAttribute("isSsl", isSsl);
 
                 Map<String, String> corsHeaders = CorsManager.handleCors(finalRequest);
                 boolean isPreflightTerminated = corsHeaders != null && "true".equals(corsHeaders.get("__IS_PREFLIGHT__"));

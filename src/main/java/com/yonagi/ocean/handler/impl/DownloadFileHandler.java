@@ -68,6 +68,21 @@ public class DownloadFileHandler implements RequestHandler {
             headers.put("Content-Length", String.valueOf(file.length()));
             headers.put("Content-Disposition", "attachment; filename=\"" + file.getName() + "\"");
 
+            if ((Boolean) request.getAttribute("isSsl")) {
+                StringBuilder hstsValue = new StringBuilder();
+                long maxAge = Long.parseLong(LocalConfigLoader.getProperty("server.ssl.hsts.max_age", "31536000"));
+                hstsValue.append("max-age=").append(maxAge);
+                boolean enabledIncludeSubdomains = Boolean.parseBoolean(LocalConfigLoader.getProperty("server.ssl.hsts.enabled_include_subdomains", "false"));
+                boolean enabledPreload = Boolean.parseBoolean(LocalConfigLoader.getProperty("server.ssl.hsts.enabled_preload", "false"));
+                if (enabledIncludeSubdomains) {
+                    hstsValue.append("; includeSubDomains");
+                }
+                if (enabledPreload && enabledIncludeSubdomains && maxAge >= 31536000) {
+                    hstsValue.append("; preload");
+                }
+                headers.put("Strict-Transport-Security", hstsValue.toString());
+            }
+
             HttpResponse response = new HttpResponse.Builder()
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.OK)
@@ -111,6 +126,21 @@ public class DownloadFileHandler implements RequestHandler {
     private void writeNotFound(HttpRequest request, OutputStream outputStream, boolean keepAlive) throws IOException {
         StaticFileCache fileCache = StaticFileCacheFactory.getInstance();
         File errorPage = new File(errorPagePath);
+        Map<String, String> headers = new HashMap<>();
+        if ((Boolean) request.getAttribute("isSsl")) {
+            StringBuilder hstsValue = new StringBuilder();
+            long maxAge = Long.parseLong(LocalConfigLoader.getProperty("server.ssl.hsts.max_age", "31536000"));
+            hstsValue.append("max-age=").append(maxAge);
+            boolean enabledIncludeSubdomains = Boolean.parseBoolean(LocalConfigLoader.getProperty("server.ssl.hsts.enabled_include_subdomains", "false"));
+            boolean enabledPreload = Boolean.parseBoolean(LocalConfigLoader.getProperty("server.ssl.hsts.enabled_preload", "false"));
+            if (enabledIncludeSubdomains) {
+                hstsValue.append("; includeSubDomains");
+            }
+            if (enabledPreload && enabledIncludeSubdomains && maxAge >= 31536000) {
+                hstsValue.append("; preload");
+            }
+            headers.put("Strict-Transport-Security", hstsValue.toString());
+        }
         if (errorPage.exists()) {
             try {
                 String contentType = MimeTypeUtil.getMimeType(errorPage.getName());
@@ -122,6 +152,7 @@ public class DownloadFileHandler implements RequestHandler {
                         .httpVersion(HttpVersion.HTTP_1_1)
                         .httpStatus(HttpStatus.NOT_FOUND)
                         .contentType(contentType)
+                        .headers(headers)
                         .body(cf.getContent())
                         .build();
                 httpResponse.write(request, outputStream, keepAlive);
@@ -135,6 +166,7 @@ public class DownloadFileHandler implements RequestHandler {
                 .httpVersion(HttpVersion.HTTP_1_1)
                 .httpStatus(HttpStatus.NOT_FOUND)
                 .contentType("text/html")
+                .headers(headers)
                 .body(DEFAULT_404_HTML.getBytes())
                 .build();
         httpResponse.write(request, outputStream, keepAlive);

@@ -42,7 +42,7 @@ public class RedirectHandler implements RequestHandler {
 
     @Override
     public void handle(HttpRequest request, OutputStream output) throws IOException {
-        handle(request, output, true);
+        handle(request, output);
     }
 
     @Override
@@ -58,8 +58,10 @@ public class RedirectHandler implements RequestHandler {
             statusCode = 302;
         }
 
-        String protocol = (String) request.getAttribute("requestProtocol");
-        if (protocol == null) {
+        String protocol;
+        if ((Boolean) request.getAttribute("isSsl")) {
+            protocol = "https";
+        } else {
             protocol = "http";
         }
         String host = request.getHeaders().get("Host");
@@ -68,7 +70,7 @@ public class RedirectHandler implements RequestHandler {
             if (protocol.equalsIgnoreCase("http")) {
                 host = host + LocalConfigLoader.getProperty("server.port");
             } else {
-                host = host + LocalConfigLoader.getProperty("server.ssl.port");
+                host = host + LocalConfigLoader.getProperty("server.ssl.port", "8443");
             }
         }
 
@@ -120,6 +122,20 @@ public class RedirectHandler implements RequestHandler {
                 .contentType(request.getAttribute("contentType") != null ? (String) request.getAttribute("contentType") : "text/html");
         Map<String, String> responseHeaders = new HashMap<>();
         responseHeaders.put("Location", finalLocation);
+        if ((Boolean) request.getAttribute("isSsl")) {
+            StringBuilder hstsValue = new StringBuilder();
+            long maxAge = Long.parseLong(LocalConfigLoader.getProperty("server.ssl.hsts.max_age", "31536000"));
+            hstsValue.append("max-age=").append(maxAge);
+            boolean enabledIncludeSubdomains = Boolean.parseBoolean(LocalConfigLoader.getProperty("server.ssl.hsts.enabled_include_subdomains", "false"));
+            boolean enabledPreload = Boolean.parseBoolean(LocalConfigLoader.getProperty("server.ssl.hsts.enabled_preload", "false"));
+            if (enabledIncludeSubdomains) {
+                hstsValue.append("; includeSubDomains");
+            }
+            if (enabledPreload && enabledIncludeSubdomains && maxAge >= 31536000) {
+                hstsValue.append("; preload");
+            }
+            responseHeaders.put("Strict-Transport-Security", hstsValue.toString());
+        }
         builder.headers(responseHeaders);
 
         HttpResponse response = builder.build();

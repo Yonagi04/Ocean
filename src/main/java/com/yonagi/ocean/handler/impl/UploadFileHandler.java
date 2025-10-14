@@ -51,11 +51,28 @@ public class UploadFileHandler implements RequestHandler {
             new MethodNotAllowHandler().handle(request, output, keepAlive);
             return;
         }
+        Map<String, String> headers = new HashMap<>();
+        if ((Boolean) request.getAttribute("isSsl")) {
+            StringBuilder hstsValue = new StringBuilder();
+            long maxAge = Long.parseLong(LocalConfigLoader.getProperty("server.ssl.hsts.max_age", "31536000"));
+            hstsValue.append("max-age=").append(maxAge);
+            boolean enabledIncludeSubdomains = Boolean.parseBoolean(LocalConfigLoader.getProperty("server.ssl.hsts.enabled_include_subdomains", "false"));
+            boolean enabledPreload = Boolean.parseBoolean(LocalConfigLoader.getProperty("server.ssl.hsts.enabled_preload", "false"));
+            if (enabledIncludeSubdomains) {
+                hstsValue.append("; includeSubDomains");
+            }
+            if (enabledPreload && enabledIncludeSubdomains && maxAge >= 31536000) {
+                hstsValue.append("; preload");
+            }
+            headers.put("Strict-Transport-Security", hstsValue.toString());
+        }
+
         final InputStream bodyStream = request.getRawBodyInputStream();
         if (bodyStream == null) {
             HttpResponse response = new HttpResponse.Builder()
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.BAD_REQUEST)
+                    .headers(headers)
                     .body("Request body stream is missing".getBytes())
                     .contentType("application/json")
                     .build();
@@ -102,6 +119,7 @@ public class UploadFileHandler implements RequestHandler {
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.BAD_REQUEST)
                     .contentType("application/json")
+                    .headers(headers)
                     .body("Invalid request body".getBytes())
                     .build();
             response.write(request, output, keepAlive);
@@ -121,6 +139,7 @@ public class UploadFileHandler implements RequestHandler {
                         .httpVersion(request.getHttpVersion())
                         .httpStatus(HttpStatus.BAD_REQUEST)
                         .contentType("application/json")
+                        .headers(headers)
                         .body("Invalid request body".getBytes())
                         .build();
                 response.write(request, output, keepAlive);
@@ -157,6 +176,7 @@ public class UploadFileHandler implements RequestHandler {
             HttpResponse response = new HttpResponse.Builder()
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.CREATED)
+                    .headers(headers)
                     .contentType("application/json")
                     .body(responseBody.getBytes(StandardCharsets.UTF_8))
                     .build();

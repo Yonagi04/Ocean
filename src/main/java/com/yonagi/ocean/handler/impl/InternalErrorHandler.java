@@ -15,6 +15,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.OutputStream;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * @author Yonagi
@@ -103,11 +105,27 @@ public class InternalErrorHandler implements RequestHandler {
 
     @Override
     public void handle(HttpRequest request, OutputStream outputStream) {
-        handle(request, outputStream, true); // Default to keep-alive
+        handle(request, outputStream, true);
     }
     
     @Override
     public void handle(HttpRequest request, OutputStream outputStream, boolean keepAlive) {
+        Map<String, String> headers = new HashMap<>();
+        if ((Boolean) request.getAttribute("isSsl")) {
+            StringBuilder hstsValue = new StringBuilder();
+            long maxAge = Long.parseLong(LocalConfigLoader.getProperty("server.ssl.hsts.max_age", "31536000"));
+            hstsValue.append("max-age=").append(maxAge);
+            boolean enabledIncludeSubdomains = Boolean.parseBoolean(LocalConfigLoader.getProperty("server.ssl.hsts.enabled_include_subdomains", "false"));
+            boolean enabledPreload = Boolean.parseBoolean(LocalConfigLoader.getProperty("server.ssl.hsts.enabled_preload", "false"));
+            if (enabledIncludeSubdomains) {
+                hstsValue.append("; includeSubDomains");
+            }
+            if (enabledPreload && enabledIncludeSubdomains && maxAge >= 31536000) {
+                hstsValue.append("; preload");
+            }
+            headers.put("Strict-Transport-Security", hstsValue.toString());
+        }
+
         StaticFileCache fileCache = StaticFileCacheFactory.getInstance();
         File errorPage = new File(errorPagePath);
         if (errorPage.exists()) {
@@ -121,26 +139,28 @@ public class InternalErrorHandler implements RequestHandler {
                         .httpVersion(request.getHttpVersion())
                         .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
                         .contentType(contentType)
+                        .headers(headers)
                         .body(cf.getContent())
                         .build();
                 httpResponse.write(request, outputStream, keepAlive);
                 outputStream.flush();
             } catch (Exception ex) {
                 log.error("Error serving internal error page: {}", ex.getMessage(), ex);
-                writeDefaultErrorResponse(request, outputStream, keepAlive);
+                writeDefaultErrorResponse(request, outputStream, keepAlive, headers);
             }
         } else {
             log.info("Error page not found, using default error response");
-            writeDefaultErrorResponse(request, outputStream, keepAlive);
+            writeDefaultErrorResponse(request, outputStream, keepAlive, headers);
         }
     }
     
-    private void writeDefaultErrorResponse(HttpRequest request, OutputStream outputStream, boolean keepAlive) {
+    private void writeDefaultErrorResponse(HttpRequest request, OutputStream outputStream, boolean keepAlive, Map<String, String> headers) {
         try {
             HttpResponse httpResponse = new HttpResponse.Builder()
                     .httpVersion(HttpVersion.HTTP_1_1)
                     .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
                     .contentType("text/html")
+                    .headers(headers)
                     .body(DEFAULT_500_HTML.getBytes())
                     .build();
             httpResponse.write(request, outputStream, keepAlive);

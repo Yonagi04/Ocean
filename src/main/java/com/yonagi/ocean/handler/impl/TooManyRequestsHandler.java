@@ -16,6 +16,8 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * @author Yonagi
@@ -111,6 +113,22 @@ public class TooManyRequestsHandler implements RequestHandler {
     public void handle(HttpRequest request, OutputStream output, boolean keepAlive) throws IOException {
         StaticFileCache fileCache = StaticFileCacheFactory.getInstance();
         File errorPage = new File(errorPagePath);
+        Map<String, String> headers = new HashMap<>();
+        if ((Boolean) request.getAttribute("isSsl")) {
+            StringBuilder hstsValue = new StringBuilder();
+            long maxAge = Long.parseLong(LocalConfigLoader.getProperty("server.ssl.hsts.max_age", "31536000"));
+            hstsValue.append("max-age=").append(maxAge);
+            boolean enabledIncludeSubdomains = Boolean.parseBoolean(LocalConfigLoader.getProperty("server.ssl.hsts.enabled_include_subdomains", "false"));
+            boolean enabledPreload = Boolean.parseBoolean(LocalConfigLoader.getProperty("server.ssl.hsts.enabled_preload", "false"));
+            if (enabledIncludeSubdomains) {
+                hstsValue.append("; includeSubDomains");
+            }
+            if (enabledPreload && enabledIncludeSubdomains && maxAge >= 31536000) {
+                hstsValue.append("; preload");
+            }
+            headers.put("Strict-Transport-Security", hstsValue.toString());
+        }
+
         if (errorPage.exists()) {
             try {
                 String contentType = MimeTypeUtil.getMimeType(errorPage.getName());
@@ -122,26 +140,29 @@ public class TooManyRequestsHandler implements RequestHandler {
                         .httpVersion(request.getHttpVersion())
                         .httpStatus(HttpStatus.TOO_MANY_REQUESTS)
                         .contentType(contentType)
+                        .headers(headers)
                         .body(cf.getContent())
                         .build();
                 httpResponse.write(request, output, keepAlive);
                 output.flush();
             } catch (Exception e) {
                 log.error("Error serving too many requests page: {}", e.getMessage(), e);
-                writeDefaultResponse(request, output, keepAlive);
+                writeDefaultResponse(request, output, keepAlive, headers);
             }
         } else {
             log.info("Error Page not found, using default error response");
-            writeDefaultResponse(request, output, keepAlive);
+            writeDefaultResponse(request, output, keepAlive, headers);
         }
     }
 
-    private void writeDefaultResponse(HttpRequest request, OutputStream output, boolean keepAlive) {
+    private void writeDefaultResponse(HttpRequest request, OutputStream output,
+                                      boolean keepAlive, Map<String, String> headers) throws IOException {
         try {
             HttpResponse httpResponse = new HttpResponse.Builder()
                     .httpVersion(HttpVersion.HTTP_1_1)
                     .httpStatus(HttpStatus.TOO_MANY_REQUESTS)
                     .contentType("text/html")
+                    .headers(headers)
                     .body(DEFAULT_429_HTML.getBytes())
                     .build();
             httpResponse.write(request, output, keepAlive);

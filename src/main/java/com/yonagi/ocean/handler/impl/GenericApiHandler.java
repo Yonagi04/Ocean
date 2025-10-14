@@ -5,6 +5,7 @@ import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.handler.RequestHandler;
+import com.yonagi.ocean.utils.LocalConfigLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,12 +63,28 @@ public class GenericApiHandler implements RequestHandler {
             default:
                 responseData.put("error", "Unsupported HTTP method");
         }
+        Map<String, String> headers = new HashMap<>();
+        if ((Boolean) request.getAttribute("isSsl")) {
+            StringBuilder hstsValue = new StringBuilder();
+            long maxAge = Long.parseLong(LocalConfigLoader.getProperty("server.ssl.hsts.max_age", "31536000"));
+            hstsValue.append("max-age=").append(maxAge);
+            boolean enabledIncludeSubdomains = Boolean.parseBoolean(LocalConfigLoader.getProperty("server.ssl.hsts.enabled_include_subdomains", "false"));
+            boolean enabledPreload = Boolean.parseBoolean(LocalConfigLoader.getProperty("server.ssl.hsts.enabled_preload", "false"));
+            if (enabledIncludeSubdomains) {
+                hstsValue.append("; includeSubDomains");
+            }
+            if (enabledPreload && enabledIncludeSubdomains && maxAge >= 31536000) {
+                hstsValue.append("; preload");
+            }
+            headers.put("Strict-Transport-Security", hstsValue.toString());
+        }
 
         String responseBody = objectMapper.writeValueAsString(responseData);
         HttpResponse response = new HttpResponse.Builder()
                 .httpVersion(request.getHttpVersion())
                 .httpStatus(HttpStatus.OK)
                 .contentType("application/json")
+                .headers(headers)
                 .body(responseBody.getBytes())
                 .build();
 

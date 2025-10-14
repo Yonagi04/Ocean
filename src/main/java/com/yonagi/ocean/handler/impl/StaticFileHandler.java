@@ -67,13 +67,29 @@ public class StaticFileHandler implements RequestHandler {
         if (uri.startsWith(webRoot)) {
             uri = uri.substring(webRoot.length());
         }
+        Map<String, String> headers = new HashMap<>();
+        if ((Boolean) request.getAttribute("isSsl")) {
+            StringBuilder hstsValue = new StringBuilder();
+            long maxAge = Long.parseLong(LocalConfigLoader.getProperty("server.ssl.hsts.max_age", "31536000"));
+            hstsValue.append("max-age=").append(maxAge);
+            boolean enabledIncludeSubdomains = Boolean.parseBoolean(LocalConfigLoader.getProperty("server.ssl.hsts.enabled_include_subdomains", "false"));
+            boolean enabledPreload = Boolean.parseBoolean(LocalConfigLoader.getProperty("server.ssl.hsts.enabled_preload", "false"));
+            if (enabledIncludeSubdomains) {
+                hstsValue.append("; includeSubDomains");
+            }
+            if (enabledPreload && enabledIncludeSubdomains && maxAge >= 31536000) {
+                hstsValue.append("; preload");
+            }
+            headers.put("Strict-Transport-Security", hstsValue.toString());
+        }
+
         File file = new File(webRoot, uri);
         if (!file.exists() || file.isDirectory()) {
-            writeNotFound(request, outputStream, keepAlive);
+            writeNotFound(request, outputStream, keepAlive, headers);
             return;
         }
         if (!file.getCanonicalPath().startsWith(new File(webRoot).getCanonicalPath())) {
-            writeNotFound(request, outputStream, keepAlive);
+            writeNotFound(request, outputStream, keepAlive, headers);
             log.warn("Attempted directory traversal attack: {}", uri);
             return;
         }
@@ -88,8 +104,6 @@ public class StaticFileHandler implements RequestHandler {
             CachedFile cf = fileCache.get(file);
 
             String etag = generateETag(cf);
-
-            Map<String, String> headers = new HashMap<>();
             if (Boolean.parseBoolean(LocalConfigLoader.getProperty("server.http_cache.enabled"))) {
                 String maxAgeSecond = LocalConfigLoader.getProperty("server.http_cache.max_age_seconds");
                 String cacheScope = LocalConfigLoader.getProperty("server.http_cache.cache_scope");
@@ -134,7 +148,8 @@ public class StaticFileHandler implements RequestHandler {
         }
     }
     
-    private void writeNotFound(HttpRequest request, OutputStream outputStream, boolean keepAlive) throws IOException {
+    private void writeNotFound(HttpRequest request, OutputStream outputStream,
+                               boolean keepAlive, Map<String, String> headers) throws IOException {
         StaticFileCache fileCache = StaticFileCacheFactory.getInstance();
         File errorPage = new File(errorPagePath);
         if (errorPage.exists()) {
@@ -148,6 +163,7 @@ public class StaticFileHandler implements RequestHandler {
                         .httpVersion(HttpVersion.HTTP_1_1)
                         .httpStatus(HttpStatus.NOT_FOUND)
                         .contentType(contentType)
+                        .headers(headers)
                         .body(cf.getContent())
                         .build();
                 httpResponse.write(request, outputStream, keepAlive);
@@ -161,6 +177,7 @@ public class StaticFileHandler implements RequestHandler {
                 .httpVersion(HttpVersion.HTTP_1_1)
                 .httpStatus(HttpStatus.NOT_FOUND)
                 .contentType("text/html")
+                .headers(headers)
                 .body(DEFAULT_404_HTML.getBytes())
                 .build();
         httpResponse.write(request, outputStream, keepAlive);
