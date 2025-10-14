@@ -15,9 +15,15 @@ import com.yonagi.ocean.utils.NacosConfigLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLServerSocket;
+import javax.net.ssl.SSLServerSocketFactory;
+import java.io.FileInputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.security.KeyStore;
 import java.util.concurrent.ThreadPoolExecutor;
 
 /**
@@ -29,11 +35,15 @@ import java.util.concurrent.ThreadPoolExecutor;
  */
 public class HttpServer {
 
-    private Integer port;
-    private String webRoot;
+    private ServerSocket httpServerSocket;
+    private ServerSocket httpsServerSocket;
     private Boolean isRunning;
-    private ServerSocket serverSocket;
+
+    private Integer httpPort;
+    private String webRoot;
+
     private ThreadPoolExecutor threadPool;
+    private ThreadPoolExecutor listenerPool;
     private KeepAliveConfig keepAliveConfig;
     private ConnectionManager connectionManager;
 
@@ -44,6 +54,11 @@ public class HttpServer {
     private RateLimiterChecker rateLimiterChecker;
     private RateLimiterManager rateLimiterManager;
     private com.yonagi.ocean.core.configuration.source.ratelimit.ConfigSource rateLimitConfigSource;
+
+    private int sslPort;
+    private boolean sslEnabled;
+    private boolean redirectSslEnabled;
+    private SSLServerSocketFactory sslServerSocketFactory;
 
     private static final Logger log = LoggerFactory.getLogger(HttpServer.class);
 
@@ -59,9 +74,14 @@ public class HttpServer {
                 "(_______)(_______/(_______/|/     \\||/    )_)\n" +
                 "                                             ");
         ServerStartupConfig startupConfig = new ServerStartupConfig();
-        this.port = startupConfig.getPort();
+        this.httpPort = startupConfig.getHttpPort();
+        this.sslEnabled = startupConfig.isSslEnabled();
+        this.sslPort = startupConfig.getSslPort();
+        this.redirectSslEnabled = startupConfig.isRedirectSslEnabled();
+
         this.webRoot = startupConfig.getWebRoot();
         this.threadPool = startupConfig.getThreadPool();
+        this.listenerPool = startupConfig.getListenerPool();
         this.keepAliveConfig = startupConfig.getKeepAliveConfig();
 
         // Nacos Setup
@@ -101,33 +121,73 @@ public class HttpServer {
                 keepAliveConfig.isEnabled(), 
                 keepAliveConfig.getTimeoutSeconds(), 
                 keepAliveConfig.getMaxRequests());
+
+        if (this.sslEnabled) {
+            try {
+                initSSL(startupConfig);
+            } catch (Exception e) {
+                log.error("Failed to initialize SSL context. HTTPS listener will not start: {}", e.getMessage(), e);
+                this.sslEnabled = false;
+            }
+        }
     }
 
     public void start() {
+        isRunning = true;
         try {
-            serverSocket = new ServerSocket(port);
-            isRunning = true;
-            log.info("Ocean is running at http://{}:{}", InetAddress.getLocalHost().getHostAddress(), port);
-            log.info("Web root: {}", webRoot);
-            while (isRunning) {
-                Socket client = serverSocket.accept();
-                threadPool.execute(new ClientHandler(client, webRoot, connectionManager, router, rateLimiterChecker));
-            }
+            httpServerSocket = new ServerSocket(httpPort);
+            listenerPool.execute(new ListenerThread(httpServerSocket, httpPort, false));
+            log.info("Ocean HTTP listener is running at http://{}:{}", InetAddress.getLocalHost().getHostAddress(), httpPort);
         } catch (Exception e) {
-            log.error("Error starting Ocean: {}", e.getMessage(), e);
-        } finally {
+            log.error("Failed to start HTTP listener on port {}: {}", httpPort, e.getMessage(), e);
+        }
+        if (sslEnabled && sslServerSocketFactory != null) {
+            try {
+                httpsServerSocket = sslServerSocketFactory.createServerSocket(sslPort);
+                if (httpsServerSocket instanceof SSLServerSocket) {
+                    SSLServerSocket sslSock = (SSLServerSocket) httpsServerSocket;
+                    sslSock.setNeedClientAuth(false);
+                    sslSock.setWantClientAuth(false);
+                    sslSock.setEnabledProtocols(new String[]{"TLSv1.3", "TLSv1.2"});
+                    sslSock.setEnabledCipherSuites(new String[]{
+                            "TLS_AES_256_GCM_SHA384",
+                            "TLS_AES_128_GCM_SHA256",
+                            "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
+                            "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+                    });
+                    log.info("HTTPS server configured for single-way (server) authentication only");
+                } else {
+                    log.warn("HTTPS ServerSocket is not an instance of SSLServerSocket. Cannot disable client auth");
+                }
+                listenerPool.execute(new ListenerThread(httpsServerSocket, sslPort, true));
+                log.info("Ocean HTTPS listener is running at https://{}:{}", InetAddress.getLocalHost().getHostAddress(), sslPort);
+            } catch (Exception e) {
+                log.error("Failed to start HTTPS listener on port {}: {}", sslPort, e.getMessage(), e);
+            }
+        }
+        log.info("Web root: {}", webRoot);
+        if (!httpServerSocket.isBound() && (httpsServerSocket == null || !httpsServerSocket.isBound())) {
+            log.error("Server failed to start any listeners");
             stop();
         }
     }
 
     public void stop() {
         isRunning = false;
-        if (serverSocket != null && !serverSocket.isClosed()) {
-            try {
-                serverSocket.close();
-            } catch (Exception e) {
-                log.error("Error closing socket: {}", e.getMessage(), e);
+        listenerPool.shutdownNow();
+        try {
+            if (httpServerSocket != null && !httpServerSocket.isClosed()) {
+                httpServerSocket.close();
             }
+        } catch (Exception e) {
+            log.warn("Error closing HTTP server socket: {}", e.getMessage());
+        }
+        try {
+            if (httpsServerSocket != null && !httpsServerSocket.isClosed()) {
+                httpsServerSocket.close();
+            }
+        } catch (Exception e) {
+            log.warn("Error closing HTTPS server socket: {}", e.getMessage());
         }
         if (threadPool != null && !threadPool.isShutdown()) {
             threadPool.shutdown();
@@ -143,7 +203,7 @@ public class HttpServer {
             router.shutdown();
         }
 
-        log.info("Ocean has stopped.");
+        log.info("Ocean stopped.");
     }
 
     private void initializeComponents(ServerStartupConfig startupConfig) {
@@ -186,5 +246,53 @@ public class HttpServer {
         NacosConfigLoader.registerRecoveryAction(rateLimiterConfigRecoveryAction);
 
         this.rateLimiterChecker = new RateLimiterChecker(rateLimiterManager);
+    }
+
+    private void initSSL(ServerStartupConfig startupConfig) throws Exception {
+        log.info("Initializing SSL context for HTTPS");
+
+        KeyStore keyStore = KeyStore.getInstance(startupConfig.getKeyStoreType());
+        try (FileInputStream fis = new FileInputStream(startupConfig.getKeyStorePath())) {
+            keyStore.load(fis, startupConfig.getKeyStorePassword().toCharArray());
+        }
+        KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+        kmf.init(keyStore, startupConfig.getKeyPassword().toCharArray());
+
+        SSLContext sslContext = SSLContext.getInstance("TLSv1.3");
+        sslContext.init(kmf.getKeyManagers(), null, null);
+
+        this.sslServerSocketFactory = sslContext.getServerSocketFactory();
+        log.info("SSL Context initialization complete.");
+    }
+
+    private class ListenerThread implements Runnable {
+        private final ServerSocket serverSocket;
+        private final int port;
+        private final boolean isSsl;
+
+        public ListenerThread(ServerSocket serverSocket, int port, boolean isSsl) {
+            this.serverSocket = serverSocket;
+            this.port = port;
+            this.isSsl = isSsl;
+        }
+
+        @Override
+        public void run() {
+            log.info("{} listener started on port {}", isSsl ? "HTTPS" : "HTTP", port);
+
+            while (isRunning) {
+                try {
+                    Socket client = serverSocket.accept();
+                    threadPool.execute(new ClientHandler(client, webRoot, isSsl, sslPort,
+                            redirectSslEnabled, connectionManager, router, rateLimiterChecker));
+                } catch (Exception e) {
+                    if (isRunning) {
+                        log.error("{} listener error on port {}: {}", isSsl ? "HTTPS" : "HTTP", port, e.getMessage());
+                    } else {
+                        log.info("{} listener on port {} stopped successfully.", isSsl ? "HTTPS" : "HTTP", port);
+                    }
+                }
+            }
+        }
     }
 }

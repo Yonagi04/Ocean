@@ -57,13 +57,20 @@ public class RedirectHandler implements RequestHandler {
             log.warn("Missing statusCode attribute, using default 302");
             statusCode = 302;
         }
+
+        String protocol = (String) request.getAttribute("requestProtocol");
+        if (protocol == null) {
+            protocol = "http";
+        }
         String host = request.getHeaders().get("Host");
         if (host == null) {
-            host = LocalConfigLoader.getProperty("server.url") + ":" + LocalConfigLoader.getProperty("server.port", "8080");
+            host = LocalConfigLoader.getProperty("server.url") + ":";
+            if (protocol.equalsIgnoreCase("http")) {
+                host = host + LocalConfigLoader.getProperty("server.port");
+            } else {
+                host = host + LocalConfigLoader.getProperty("server.ssl.port");
+            }
         }
-
-        // TODO support https
-        String protocol = "http";
 
         String finalLocation;
         if (targetUrl.startsWith("http://") || targetUrl.startsWith("https://")) {
@@ -116,7 +123,7 @@ public class RedirectHandler implements RequestHandler {
         builder.headers(responseHeaders);
 
         HttpResponse response = builder.build();
-        response.write(request, output, keepAlive);
+        response.write(request, output, false);
         output.flush();
         log.info("Request path: {}, redirect to: {}, status code: {}", request.getUri(), finalLocation, statusCode);
     }

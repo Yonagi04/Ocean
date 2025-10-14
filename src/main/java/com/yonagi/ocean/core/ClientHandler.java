@@ -11,6 +11,8 @@ import com.yonagi.ocean.handler.impl.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.net.ssl.SSLException;
+import javax.net.ssl.SSLSocket;
 import java.io.*;
 import java.net.Socket;
 import java.nio.charset.Charset;
@@ -19,6 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.charset.UnsupportedCharsetException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * @author Yonagi
@@ -30,17 +33,24 @@ import java.util.Map;
 public class ClientHandler implements Runnable {
 
     private static final Logger log = LoggerFactory.getLogger(ClientHandler.class);
+    private static final Pattern ABORT_PATTERN = Pattern.compile("connection (reset|abort)|主机中的软件中止|socket closed", Pattern.CASE_INSENSITIVE);
 
     private final Socket client;
     private final String webRoot;
     private final ConnectionManager connectionManager;
     private final Router router;
     private final RateLimiterChecker rateLimiterChecker;
+    private final boolean isSsl;
+    private final boolean redirectSslEnabled;
+    private final int sslPort;
 
-    public ClientHandler(Socket client, String webRoot, ConnectionManager connectionManager,
-                         Router router, RateLimiterChecker rateLimiterChecker) {
+    public ClientHandler(Socket client, String webRoot, boolean isSsl, int sslPort, boolean redirectSslEnabled,
+                         ConnectionManager connectionManager, Router router, RateLimiterChecker rateLimiterChecker) {
         this.client = client;
         this.webRoot = webRoot;
+        this.isSsl = isSsl;
+        this.sslPort = sslPort;
+        this.redirectSslEnabled = redirectSslEnabled;
         this.connectionManager = connectionManager;
         this.router = router;
         this.rateLimiterChecker = rateLimiterChecker;
@@ -50,7 +60,26 @@ public class ClientHandler implements Runnable {
     public void run() {
         // Register this connection for Keep-Alive management
         connectionManager.registerConnection(client);
-        
+
+        if (isSsl && client instanceof SSLSocket) {
+            try {
+                ((SSLSocket) client).startHandshake();
+            } catch (SSLException e) {
+                log.error("SSL/TLS Handshake failed for client: {}", e.getMessage());
+                performHandshakeCleanup(client);
+                return;
+            } catch (IOException e) {
+                String msg = e.getMessage();
+                if (msg != null && ABORT_PATTERN.matcher(msg).find()) {
+                    log.info("Client actively closed connection during SSL Handshake for client {}: {}", client.getInetAddress().getHostAddress(), msg);
+                } else {
+                    log.error("I/O error during SSL Handshake for client {}: {}", client.getInetAddress().getHostAddress(), msg, e);
+                }
+                performHandshakeCleanup(client);
+                return;
+            }
+        }
+
         try (InputStream input = client.getInputStream();
              OutputStream output = client.getOutputStream()) {
             
@@ -63,6 +92,28 @@ public class ClientHandler implements Runnable {
                 if (request == null) {
                     break;
                 }
+                if (!isSsl && redirectSslEnabled) {
+                    String host = client.getLocalAddress().getHostAddress();
+                    if (host.equals("0.0.0.0") || host.equals("127.0.0.1")) {
+                        String hostHeader = request.getHeaders().getOrDefault("Host", "localhost");
+                        host = hostHeader.split(":")[0];
+                    }
+                    String originalUri = request.getUri();
+                    String redirectLocation = "https://" + host + ":" + sslPort + originalUri;
+                    Map<String, String> responseHeaders = new HashMap<>();
+                    responseHeaders.put("Location", redirectLocation);
+                    HttpResponse redirectResponse = new HttpResponse.Builder()
+                            .httpVersion(request.getHttpVersion())
+                            .httpStatus(HttpStatus.MOVED_PERMANENTLY)
+                            .contentType("text/html")
+                            .headers(responseHeaders)
+                            .body(String.format("Redirecting to %s", redirectLocation).getBytes())
+                            .build();
+                    redirectResponse.write(request, output, false);
+                    log.info("Redirected HTTP request to HTTPS: {}", redirectLocation);
+                    break;
+                }
+
                 String contentType = request.getHeaders().getOrDefault("content-type", "").toLowerCase();
                 boolean isMultiPart = contentType.contains("multipart/form-data");
 
@@ -84,6 +135,7 @@ public class ClientHandler implements Runnable {
                 }
 
                 finalRequest.setAttribute("clientIp", client.getInetAddress().getHostAddress());
+                finalRequest.setAttribute("requestProtocol", isSsl ? "https" : "http");
 
                 Map<String, String> corsHeaders = CorsManager.handleCors(finalRequest);
                 boolean isPreflightTerminated = corsHeaders != null && "true".equals(corsHeaders.get("__IS_PREFLIGHT__"));
@@ -116,7 +168,12 @@ public class ClientHandler implements Runnable {
                 }
             }
         } catch (IOException e) {
-            log.error("Error handling client: {}", e.getMessage(), e);
+            String msg = e.getMessage();
+            if (msg != null && ABORT_PATTERN.matcher(msg).find()) {
+                log.info("Client actively closed connection during I/O: {}", msg);
+            } else {
+                log.error("Error handling client: {}", e.getMessage(), e);
+            }
         } finally {
             try {
                 connectionManager.removeConnection(client);
@@ -126,7 +183,16 @@ public class ClientHandler implements Runnable {
             }
         }
     }
-    
+
+    private void performHandshakeCleanup(Socket client) {
+        connectionManager.removeConnection(client);
+        try {
+            client.close();
+        } catch (IOException closeE) {
+            log.warn("Error closing client after SSL handshake failure: {}", closeE.getMessage());
+        }
+    }
+
     private void handleRequest(HttpRequest request, OutputStream output, boolean keepAlive) throws IOException {
         HttpMethod method = request.getMethod();
         String path = request.getUri();
