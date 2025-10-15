@@ -47,7 +47,7 @@ public class RouteManager {
 
     private static volatile RouteManager INSTANCE;
     private final Router router;
-    private volatile Map<String, RouteConfig> routeMap = Collections.emptyMap();
+    private volatile Map<String, RouteConfig> dynamicRouteMap = Collections.emptyMap();
 
     private static final Logger log = LoggerFactory.getLogger(RouteManager.class);
 
@@ -73,37 +73,41 @@ public class RouteManager {
             if (routeConfigs == null) {
                 return;
             }
+            List<RouteConfig> filteredConfigs = routeConfigs.stream()
+                    .filter(c -> c.getRouteType() != RouteType.CONTROLLER)
+                    .collect(Collectors.toList());
 
-            Map<String, RouteConfig> newRouteMap = routeConfigs.stream()
-                    .collect(Collectors.toMap(RouteManager::generateKey, Function.identity()));
-            Map<String, RouteConfig> oldRouteMap = this.routeMap;
+            Map<String, RouteConfig> newRouteMap = filteredConfigs.stream()
+                    .collect(Collectors.toMap(RouteManager::generateKey, Function.identity(), (e1, e2) -> e2));
+            Map<String, RouteConfig> oldRouteMap = this.dynamicRouteMap;
+
             oldRouteMap.forEach((key, oldConfig) -> {
                 if (!newRouteMap.containsKey(key)) {
                     router.unregisterRoute(oldConfig);
-                    log.info("Unregistered router: {}", key);
+                    log.info("Unregistered dynamic router: {}", key);
                 }
             });
             newRouteMap.forEach((key, newConfig) -> {
                 if (!newConfig.isEnabled()) {
                     router.unregisterRoute(newConfig);
-                    log.info("Disabled router: {}", key);
+                    log.info("Disabled dynamic router: {}", key);
                     return;
                 }
                 RouteConfig oldConfig = oldRouteMap.get(key);
                 if (oldConfig == null) {
                     router.registerRoute(newConfig);
-                    log.info("Registered router: {}", key);
+                    log.info("Registered dynamic router: {}", key);
                 } else if (!newConfig.equals(oldConfig)) {
                     router.updateRoute(oldConfig, newConfig);
-                    log.info("Updated router: {}", key);
+                    log.info("Updated dynamic router: {}", key);
                 }
             });
-            this.routeMap = newRouteMap;
-            log.info("Router refresh with {} custom routes", routeMap.size());
+            this.dynamicRouteMap = newRouteMap;
+            log.info("Dynamic Router refresh with {} custom routes", dynamicRouteMap.size());
 
             Map<String, Object> routeStats = router.getRouteStats();
-            log.info("Router refreshed - Total routes: {}, Handler cache size: {}",
-                    routeStats.get("totalRoutes"), routeStats.get("handlerCacheSize"));
+            log.info("Router refreshed - Total routes: {}, Static routes: {}, Dynamic routes: {}, Handler cache size: {}",
+                    routeStats.get("totalRoutes"), routeStats.get("staticRoutes"), routeStats.get("dynamicRoutes"), routeStats.get("handlerCacheSize"));
         } catch (Exception e) {
             log.error("Failed to refresh router: {}", e.getMessage(), e);
         }
@@ -112,16 +116,21 @@ public class RouteManager {
     public void initializeRoutes(ConfigSource configSource) {
         try {
             List<RouteConfig> routeConfigs = configSource.load();
-            this.router.registerRoutes(routeConfigs);
             if (routeConfigs == null || routeConfigs.isEmpty()) {
                 return;
             }
-            this.routeMap = routeConfigs.stream()
-                    .collect(Collectors.toMap(RouteManager::generateKey, Function.identity()));
+
+            List<RouteConfig> filteredRouteConfigs = routeConfigs.stream()
+                    .filter(c -> c.getRouteType() != RouteType.CONTROLLER)
+                    .collect(Collectors.toList());
+            filteredRouteConfigs.forEach(router::registerRoute);
+
+            this.dynamicRouteMap = filteredRouteConfigs.stream()
+                    .collect(Collectors.toMap(RouteManager::generateKey, Function.identity(), (e1, e2) -> e2));
 
             Map<String, Object> stats = this.router.getRouteStats();
-            log.info("Router initialized - Total routes: {}, Handler cache size: {}",
-                    stats.get("totalRoutes"), stats.get("handlerCacheSize"));
+            log.info("Router initialized - Total routes: {}, Static routes: {}, Dynamic routes: {}, Handler cache size: {}",
+                    stats.get("totalRoutes"), stats.get("staticRoutes"), stats.get("dynamicRoutes"), stats.get("handlerCacheSize"));
         } catch (Exception e) {
             log.error("Failed to initialize router: {}", e.getMessage(), e);
         }

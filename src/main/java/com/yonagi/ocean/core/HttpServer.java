@@ -4,6 +4,7 @@ import com.alibaba.nacos.api.config.ConfigService;
 import com.yonagi.ocean.cache.StaticFileCacheFactory;
 import com.yonagi.ocean.core.configuration.KeepAliveConfig;
 import com.yonagi.ocean.core.configuration.source.router.*;
+import com.yonagi.ocean.core.framework.ControllerRegistry;
 import com.yonagi.ocean.core.gzip.GzipEncoderManager;
 import com.yonagi.ocean.core.ratelimiter.RateLimiterChecker;
 import com.yonagi.ocean.core.ratelimiter.RateLimiterManager;
@@ -107,7 +108,6 @@ public class HttpServer {
 
         // Initialize routes if enabled
         if (Boolean.parseBoolean(LocalConfigLoader.getProperty("server.router.enabled", "true"))) {
-            // this.routeConfigManager.initializeRoutes(routeConfigSource);
             this.routeConfigManager.refreshRoutes(routeConfigSource);
         }
 
@@ -210,8 +210,24 @@ public class HttpServer {
         // Initialize connection manager
         this.connectionManager = new ConnectionManager(startupConfig.getKeepAliveConfig());
 
-        // Initialize router, router configuration manager and initial router configuration
+        // Initialize router
         this.router = new Router(webRoot);
+
+        // Scan Controller and register to Static Router
+        final String DEFAULT_BASE_PACKAGE = "";
+        String basePackageToScan = LocalConfigLoader.getProperty("server.controller.base_package", DEFAULT_BASE_PACKAGE);
+        if (basePackageToScan.equals(DEFAULT_BASE_PACKAGE)) {
+            log.info("Starting Controller scanning using IMPLICIT global classpath search. To optimize startup time, set 'server.controller.base_package'.");
+        } else {
+            log.info("Starting Controller scanning in EXPLICIT base package: {}", basePackageToScan);
+        }
+
+        ControllerRegistry controllerRegistry = new ControllerRegistry(this.router, basePackageToScan);
+        controllerRegistry.scanAndRegister();
+
+        log.info("Controller scanning and static route registration completed.");
+
+        // Initialize router configuration manager and initial router configuration
         ConfigService initialConfigService = NacosConfigLoader.getConfigService();
         NacosConfigSource initialNacosRouteSource = new NacosConfigSource(initialConfigService);
         MutableConfigSource routeProxy = new MutableConfigSource(initialNacosRouteSource);

@@ -209,6 +209,7 @@ public class HttpResponse {
             return this;
         }
 
+        // TODO contentType
         public Builder contentType(String contentType) {
             this.contentType = contentType;
             return this;

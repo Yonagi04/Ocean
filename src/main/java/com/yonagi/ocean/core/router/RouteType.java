@@ -10,7 +10,8 @@ package com.yonagi.ocean.core.router;
 public enum RouteType {
     STATIC,
     HANDLER,
-    REDIRECT;
+    REDIRECT,
+    CONTROLLER;
 
     public static RouteType getRouteType(String type) {
         try {

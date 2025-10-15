@@ -1,5 +1,6 @@
 package com.yonagi.ocean.core.router;
 
+import com.alibaba.nacos.api.remote.request.Request;
 import com.yonagi.ocean.core.configuration.RouteConfig;
 import com.yonagi.ocean.core.protocol.enums.HttpMethod;
 import com.yonagi.ocean.core.protocol.HttpRequest;
@@ -26,10 +27,45 @@ import java.util.concurrent.TimeUnit;
  */
 public class Router {
     private static final Logger log = LoggerFactory.getLogger(Router.class);
-    
-    // 路由映射表: method -> path -> RouteConfig
-    private final Map<HttpMethod, Map<String, RouteConfig>> routes = new ConcurrentHashMap<>();
-    
+
+    public static class RouteEntry {
+        public final RouteConfig config;
+
+        public final RequestHandler handler;
+
+        public RouteEntry(RouteConfig config, RequestHandler handler) {
+            this.config = config;
+            this.handler = handler;
+        }
+
+        public RouteEntry(RouteConfig config) {
+            this(config, null);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(config);
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null || getClass() != obj.getClass()) {
+                return false;
+            }
+            RouteEntry that = (RouteEntry) obj;
+            return Objects.equals(config, that.config);
+        }
+    }
+
+    // 稳定层路由
+    private final Map<HttpMethod, Map<String, RouteEntry>> staticRoutes = new ConcurrentHashMap<>();
+
+    // 动态层路由
+    private volatile Map<HttpMethod, Map<String, RouteEntry>> dynamicRoutes = new ConcurrentHashMap<>();
+
     // 处理器实例缓存: class name -> handler instance (使用LRU+TTL缓存)
     private final LRUCache<String, RequestHandler> handlerCache;
     
@@ -76,7 +112,7 @@ public class Router {
 
     @Override
     public int hashCode() {
-        return Objects.hash(this.routes, this.handlerCache, this.defaultHandlers, this.webRoot);
+        return Objects.hash(this.staticRoutes, this.dynamicRoutes, this.handlerCache, this.defaultHandlers, this.webRoot);
     }
 
     @Override
@@ -89,7 +125,8 @@ public class Router {
         }
         Router that = (Router) obj;
         return Objects.equals(this.webRoot, that.webRoot) &&
-               Objects.equals(this.routes, that.routes) &&
+               Objects.equals(this.staticRoutes, that.staticRoutes) &&
+               Objects.equals(this.dynamicRoutes, that.dynamicRoutes) &&
                Objects.equals(this.handlerCache, that.handlerCache) &&
                Objects.equals(this.defaultHandlers, that.defaultHandlers);
     }
@@ -114,43 +151,62 @@ public class Router {
         }
         log.info("Router initialized with {} custom routes", routeConfigs.size());
     }
-    
+
     /**
-     * 注册单个路由
+     * 注册稳定路由（Controller注入专用）
      */
-    public void registerRoute(RouteConfig config) {
-        if (config == null) {
+    public void registerRoute(RouteConfig config, RequestHandler handler) {
+        if (config == null || config.getRouteType() != RouteType.CONTROLLER) {
+            log.warn("Attempted to register non-Controller route with instance method: {}", config);
             return;
         }
         HttpMethod method = config.getMethod();
         String path = config.getPath();
-        
-        routes.computeIfAbsent(method, k -> new ConcurrentHashMap<>())
-              .put(path, config);
-        
-        log.debug("Registered router: {} {}", method, path);
+        RouteEntry entry = new RouteEntry(config, handler);
+
+        staticRoutes.computeIfAbsent(method, k -> new ConcurrentHashMap<>()).put(path, entry);
+        log.debug("Registered static controller: {} {} (Type: {})", method, path, config.getRouteType().name());
     }
 
     /**
-     * 注销路由配置
+     * 注册单个路由(动态化配置专用)
+     */
+    public void registerRoute(RouteConfig config) {
+        if (config == null || config.getRouteType() == RouteType.CONTROLLER) {
+            return;
+        }
+        HttpMethod method = config.getMethod();
+        String path = config.getPath();
+        RouteEntry entry = new RouteEntry(config);
+
+        dynamicRoutes.computeIfAbsent(method, k -> new ConcurrentHashMap<>())
+              .put(path, entry);
+        
+        log.debug("Registered dynamic router: {} {} (Type: {})", method, path, config.getRouteType().name());
+    }
+
+    /**
+     * 注销路由配置(动态化配置)
      */
     public void unregisterRoute(RouteConfig config) {
         HttpMethod method = config.getMethod();
         String path = config.getPath();
-        Map<String, RouteConfig> methodRoutes = routes.get(method);
+
+        Map<String, RouteEntry> methodRoutes = dynamicRoutes.get(method);
         if (methodRoutes != null) {
-            methodRoutes.remove(path);
-            log.debug("Unregistered router: {} {}", method, path);
+            if (methodRoutes.remove(path) != null) {
+                log.debug("Unregistered dynamic router: {} {}", method, path);
+            }
         }
     }
 
     /**
-     * 更新路由配置
+     * 更新路由配置(动态化配置)
      */
     public void updateRoute(RouteConfig oldConfig, RouteConfig newConfig) {
         unregisterRoute(oldConfig);
         registerRoute(newConfig);
-        log.debug("Updated router: {} {}", newConfig.getMethod(), newConfig.getPath());
+        log.debug("Updated dynamic router: {} {}", newConfig.getMethod(), newConfig.getPath());
     }
     
     /**
@@ -158,10 +214,17 @@ public class Router {
      */
     public void route(HttpMethod method, String path, HttpRequest request,
                      OutputStream output, boolean keepAlive) throws IOException {
-        // 首先尝试精确匹配自定义路由
-        RouteConfig routeConfig = findRoute(method, path);
-        if (routeConfig != null) {
-            if (handleCustomRoute(routeConfig, request, output, keepAlive)) {
+        RouteEntry entry = null;
+
+        // 查找稳定路由（Controller）
+        entry = findRouteEntry(staticRoutes, method, path);
+        // 如果稳定路由未命中，则查找动态路由
+        if (entry == null) {
+            entry = findRouteEntry(dynamicRoutes, method, path);
+        }
+
+        if (entry != null) {
+            if (handleRouteEntry(entry, request, output, keepAlive)) {
                 return;
             }
             log.warn("Custom router failed, falling back to default handler for {} {}", method, path);
@@ -173,14 +236,14 @@ public class Router {
             new MethodNotAllowHandler().handle(request, output, keepAlive);
         }
     }
-    
+
     /**
      * 查找匹配的路由配置
      */
-    private RouteConfig findRoute(HttpMethod method, String path) {
-        RouteConfig match = null;
+    private RouteEntry findRouteEntry(Map<HttpMethod, Map<String, RouteEntry>> routes, HttpMethod method, String path) {
+        RouteEntry match = null;
 
-        Map<String, RouteConfig> specificMethodRoutes = routes.get(method);
+        Map<String, RouteEntry> specificMethodRoutes = routes.get(method);
         if (specificMethodRoutes != null) {
             match = findMatchInRoutes(specificMethodRoutes, path);
             if (match != null) {
@@ -188,23 +251,22 @@ public class Router {
             }
         }
 
-        Map<String, RouteConfig> allMethodRoutes = routes.get(HttpMethod.ALL);
+        Map<String, RouteEntry> allMethodRoutes = routes.get(HttpMethod.ALL);
         if (allMethodRoutes != null) {
             match = findMatchInRoutes(allMethodRoutes, path);
             if (match != null) {
                 return match;
             }
         }
-
         return null;
     }
 
-    private RouteConfig findMatchInRoutes(Map<String, RouteConfig> methodRoutes, String path) {
-        RouteConfig exactMatch = methodRoutes.get(path);
+    private RouteEntry findMatchInRoutes(Map<String, RouteEntry> methodRoutes, String path) {
+        RouteEntry exactMatch = methodRoutes.get(path);
         if (exactMatch != null) {
             return exactMatch;
         }
-        for (Map.Entry<String, RouteConfig> entry : methodRoutes.entrySet()) {
+        for (Map.Entry<String, RouteEntry> entry : methodRoutes.entrySet()) {
             String registeredPath = entry.getKey();
 
             if (registeredPath.endsWith("*")) {
@@ -221,24 +283,35 @@ public class Router {
      * 处理自定义路由
      * @return true 如果处理成功，false 如果处理失败需要回退到默认处理器
      */
-    private boolean handleCustomRoute(RouteConfig routeConfig, HttpRequest request,
-                                      OutputStream output, boolean keepAlive) throws IOException {
+    private boolean handleRouteEntry(RouteEntry entry, HttpRequest request,
+                                     OutputStream output, boolean keepAlive) throws IOException {
+        RouteConfig routeConfig = entry.config;
         RouteType routeType = routeConfig.getRouteType();
+
+        // 优先处理稳定路由
+        if (routeType == RouteType.CONTROLLER && entry.handler != null) {
+            log.debug("Handling request with Controller instance: {} -> {}",
+                    request.getUri(), routeConfig.getHandlerClassName());
+            entry.handler.handle(request, output, keepAlive);
+            return true;
+        }
+
+        // 处理动态路由
         RequestHandler handler = null;
         String handlerClassName = "";
         if (routeType == RouteType.HANDLER) {
             handlerClassName = routeConfig.getHandlerClassName();
-            handler = getOrCreateHandler(handlerClassName);
         } else if (routeType == RouteType.STATIC) {
             handlerClassName = STATIC_HANDLER_CLASS;
-            handler = getOrCreateHandler(handlerClassName);
         } else if (routeType == RouteType.REDIRECT) {
             handlerClassName = REDIRECT_HANDLER_CLASS;
+        }
+        if (!handlerClassName.isEmpty()) {
             handler = getOrCreateHandler(handlerClassName);
         }
-        
+
         if (handler != null) {
-            log.debug("Handling request with custom router: {} -> {}", request.getUri(), handlerClassName);
+            log.debug("Handling request with dynamic router: {} -> {}", request.getUri(), handlerClassName);
             if (routeType == RouteType.REDIRECT) {
                 // 对于重定向，传递目标URL和状态码
                 request.setAttribute("targetUrl", routeConfig.getTargetUrl());
@@ -298,20 +371,12 @@ public class Router {
     public Map<String, Object> getRouteStats() {
         Map<String, Object> stats = new HashMap<>();
         
-        int totalRoutes = 0;
-        Map<String, Integer> methodStats = new HashMap<>();
+        int staticCount = staticRoutes.values().stream().mapToInt(Map::size).sum();
+        int dynamicCount = dynamicRoutes.values().stream().mapToInt(Map::size).sum();
         
-        for (Map.Entry<HttpMethod, Map<String, RouteConfig>> entry : routes.entrySet()) {
-            HttpMethod method = entry.getKey();
-            Map<String, RouteConfig> methodRoutes = entry.getValue();
-            int methodRouteCount = methodRoutes.size();
-            
-            methodStats.put(method.toString(), methodRouteCount);
-            totalRoutes += methodRouteCount;
-        }
-        
-        stats.put("totalRoutes", totalRoutes);
-        stats.put("methodStats", methodStats);
+        stats.put("totalRoutes", staticCount + dynamicCount);
+        stats.put("staticRoutes", staticCount);
+        stats.put("dynamicRoutes", dynamicCount);
         stats.put("handlerCacheSize", handlerCache.size());
         
         return stats;
