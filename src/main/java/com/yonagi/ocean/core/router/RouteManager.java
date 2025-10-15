@@ -106,8 +106,11 @@ public class RouteManager {
             log.info("Dynamic Router refresh with {} custom routes", dynamicRouteMap.size());
 
             Map<String, Object> routeStats = router.getRouteStats();
-            log.info("Router refreshed - Total routes: {}, Static routes: {}, Dynamic routes: {}, Handler cache size: {}",
-                    routeStats.get("totalRoutes"), routeStats.get("staticRoutes"), routeStats.get("dynamicRoutes"), routeStats.get("handlerCacheSize"));
+            log.info("Router refreshed - Total routes: {}, Static routes: {}, " +
+                            "Dynamic simple routes: {}, Dynamic path variable routes: {}, Total dynamic routes: {}, Handler cache size: {}",
+                    routeStats.get("totalRoutes"), routeStats.get("staticControllerRoutes"),
+                    routeStats.get("dynamicSimpleRoutes"), routeStats.get("dynamicPathVariableRoutes"),
+                    routeStats.get("totalDynamicRoutes"), routeStats.get("handlerCacheSize"));
         } catch (Exception e) {
             log.error("Failed to refresh router: {}", e.getMessage(), e);
         }
@@ -128,9 +131,12 @@ public class RouteManager {
             this.dynamicRouteMap = filteredRouteConfigs.stream()
                     .collect(Collectors.toMap(RouteManager::generateKey, Function.identity(), (e1, e2) -> e2));
 
-            Map<String, Object> stats = this.router.getRouteStats();
-            log.info("Router initialized - Total routes: {}, Static routes: {}, Dynamic routes: {}, Handler cache size: {}",
-                    stats.get("totalRoutes"), stats.get("staticRoutes"), stats.get("dynamicRoutes"), stats.get("handlerCacheSize"));
+            Map<String, Object> routeStats = this.router.getRouteStats();
+            log.info("Router refreshed - Total routes: {}, Static routes: {}, " +
+                            "Dynamic simple routes: {}, Dynamic path variable routes: {}, Total dynamic routes: {}, Handler cache size: {}",
+                    routeStats.get("totalRoutes"), routeStats.get("staticControllerRoutes"),
+                    routeStats.get("dynamicSimpleRoutes"), routeStats.get("dynamicPathVariableRoutes"),
+                    routeStats.get("totalDynamicRoutes"), routeStats.get("handlerCacheSize"));
         } catch (Exception e) {
             log.error("Failed to initialize router: {}", e.getMessage(), e);
         }
