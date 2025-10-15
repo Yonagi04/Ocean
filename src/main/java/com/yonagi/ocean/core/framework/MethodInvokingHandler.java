@@ -1,5 +1,7 @@
 package com.yonagi.ocean.core.framework;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.yonagi.ocean.annotation.RequestBody;
 import com.yonagi.ocean.annotation.RequestParam;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
@@ -7,6 +9,7 @@ import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.core.protocol.enums.HttpVersion;
 import com.yonagi.ocean.handler.RequestHandler;
 import com.yonagi.ocean.handler.impl.InternalErrorHandler;
+import com.yonagi.ocean.utils.JsonDeserializer;
 import com.yonagi.ocean.utils.JsonSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,6 +66,25 @@ public class MethodInvokingHandler implements RequestHandler {
                     .build();
             response.write(request, output, keepAlive);
             output.flush();
+        } catch (JsonProcessingException e) {
+            log.warn("Json processing error: {}", e.getMessage(), e);
+            HttpResponse response = new HttpResponse.Builder()
+                    .httpVersion(request.getHttpVersion())
+                    .httpStatus(HttpStatus.BAD_REQUEST)
+                    .contentType("text/plain")
+                    .body(("Fail to deserialize body: " + e.getMessage()).getBytes())
+                    .build();
+            response.write(request, output, keepAlive);
+            output.flush();
+        } catch (BadRequestException e) {
+            HttpResponse response = new HttpResponse.Builder()
+                    .httpVersion(request.getHttpVersion())
+                    .httpStatus(HttpStatus.BAD_REQUEST)
+                    .contentType("text/plain")
+                    .body(("Bad Request: " + e.getMessage()).getBytes())
+                    .build();
+            response.write(request, output, keepAlive);
+            output.flush();
         } catch (IllegalAccessException | IllegalArgumentException e) {
             log.error("Illegal Access or Illegal Argument on Controller method {}: {}", handlerMethod.getName(), e.getMessage(), e);
             new InternalErrorHandler().handle(request, output, keepAlive);
@@ -73,7 +95,7 @@ public class MethodInvokingHandler implements RequestHandler {
         }
     }
 
-    private Object[] resolveMethodArguments(HttpRequest request, OutputStream output, boolean keepAlive) throws MissingRequiredParameterException {
+    private Object[] resolveMethodArguments(HttpRequest request, OutputStream output, boolean keepAlive) throws MissingRequiredParameterException, JsonProcessingException, BadRequestException {
         Parameter[] parameters = handlerMethod.getParameters();
         Object[] args = new Object[parameters.length];
 
@@ -85,13 +107,27 @@ public class MethodInvokingHandler implements RequestHandler {
             Parameter parameter = parameters[i];
             Class<?> paramType = parameter.getType();
             String paramName = parameter.getName();
-            String value = null;
 
             if (paramType.isAssignableFrom(HttpRequest.class)) {
                 args[i] = request;
                 continue;
             }
+            RequestBody requestBody = parameter.getAnnotation(RequestBody.class);
+            if (requestBody != null) {
+                byte[] body = request.getBody();
+                if ((body == null || body.length == 0)) {
+                    if (requestBody.required()) {
+                        throw new BadRequestException(
+                                String.format("Request body (type: %s) is required but missing or empty.", paramType.getSimpleName()));
+                    }
+                    args[i] = null;
+                } else {
+                    args[i] = JsonDeserializer.deserialize(body, paramType);
+                }
+                continue;
+            }
 
+            String value = null;
             RequestParam requestParam = parameter.getAnnotation(RequestParam.class);
             if (requestParam != null) {
                 String paramKey = requestParam.value().isEmpty() ? paramName : requestParam.value();
@@ -206,9 +242,14 @@ public class MethodInvokingHandler implements RequestHandler {
         }
     }
 
-
     private static class MissingRequiredParameterException extends Exception {
         public MissingRequiredParameterException(String message) {
+            super(message);
+        }
+    }
+
+    private static class BadRequestException extends Exception {
+        public BadRequestException(String message) {
             super(message);
         }
     }
