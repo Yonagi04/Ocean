@@ -1,4 +1,4 @@
-package com.yonagi.ocean.utils;
+package com.yonagi.ocean.framework.utils;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

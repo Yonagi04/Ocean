@@ -1,4 +1,4 @@
-package com.yonagi.ocean.utils;
+package com.yonagi.ocean.framework.utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;

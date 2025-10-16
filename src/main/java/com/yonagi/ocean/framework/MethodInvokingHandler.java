@@ -1,4 +1,4 @@
-package com.yonagi.ocean.core.framework;
+package com.yonagi.ocean.framework;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
@@ -15,9 +15,9 @@ import com.yonagi.ocean.exception.MissingRequiredParameterException;
 import com.yonagi.ocean.exception.UnsupportedMediaTypeException;
 import com.yonagi.ocean.handler.RequestHandler;
 import com.yonagi.ocean.handler.impl.InternalErrorHandler;
-import com.yonagi.ocean.utils.FormBinder;
-import com.yonagi.ocean.utils.JsonDeserializer;
-import com.yonagi.ocean.utils.JsonSerializer;
+import com.yonagi.ocean.framework.utils.FormBinder;
+import com.yonagi.ocean.framework.utils.JsonDeserializer;
+import com.yonagi.ocean.framework.utils.JsonSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
