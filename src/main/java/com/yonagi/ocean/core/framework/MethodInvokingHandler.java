@@ -1,14 +1,21 @@
 package com.yonagi.ocean.core.framework;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.dataformat.xml.XmlMapper;
+import com.yonagi.ocean.annotation.PathVariable;
 import com.yonagi.ocean.annotation.RequestBody;
 import com.yonagi.ocean.annotation.RequestParam;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.core.protocol.enums.HttpVersion;
+import com.yonagi.ocean.exception.BadRequestException;
+import com.yonagi.ocean.exception.DeserializationException;
+import com.yonagi.ocean.exception.MissingRequiredParameterException;
+import com.yonagi.ocean.exception.UnsupportedMediaTypeException;
 import com.yonagi.ocean.handler.RequestHandler;
 import com.yonagi.ocean.handler.impl.InternalErrorHandler;
+import com.yonagi.ocean.utils.FormBinder;
 import com.yonagi.ocean.utils.JsonDeserializer;
 import com.yonagi.ocean.utils.JsonSerializer;
 import org.slf4j.Logger;
@@ -16,10 +23,12 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
-import java.util.Collections;
+import java.net.URLDecoder;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -31,12 +40,66 @@ import java.util.Map;
  */
 public class MethodInvokingHandler implements RequestHandler {
 
+    @FunctionalInterface
+    private interface ContentProcessor {
+        Object process(HttpRequest request, String contentType, String charSet, Class<?> paramType) throws JsonProcessingException, BadRequestException, UnsupportedEncodingException;
+    }
+
+    private final Map<String, ContentProcessor> processors = initProcessors();
+
+    private Map<String, ContentProcessor> initProcessors() {
+        Map<String, ContentProcessor> map = new HashMap<>();
+
+        map.put("application/json", (request, contentType, charSet, paramType) -> {
+            byte[] body = request.getBody();
+            if (body == null || body.length == 0) {
+                throw new BadRequestException("JSON body is missing for required @RequestBody parameter: " + paramType.getSimpleName());
+            }
+            return JsonDeserializer.deserialize(body, paramType);
+        });
+
+        map.put("application/x-www-form-urlencoded", (request, contentType, charSet, paramType) -> {
+            Map<String, String> formParams = parseFormData(request.getBody(), charSet);
+            return FormBinder.bind(formParams, paramType);
+        });
+
+        map.put("application/xml", (request, contentType, charSet, paramType) -> {
+            byte[] body = request.getBody();
+            String xmlContent = new String(body, charSet);
+            if (xmlContent == null || xmlContent.length() == 0) {
+                throw new BadRequestException("XML body is missing for required @RequestBody parameter: " + paramType.getSimpleName());
+            }
+            return xmlMapper.readValue(xmlContent, paramType);
+        });
+
+        return map;
+    }
+
+    private Map<String, String> parseFormData(byte[] body, String charset) {
+        String formData = new String(body);
+        Map<String, String> result = new HashMap<>();
+        if (formData == null || formData.isEmpty()) {
+            return result;
+        }
+        String[] pairs = formData.split("&");
+        for (String pair : pairs) {
+            try {
+                String[] kv = pair.split("=", 2);
+                String key = URLDecoder.decode(kv[0], charset);
+                String value = kv.length > 1 ? URLDecoder.decode(kv[1], charset) : "";
+                result.put(key, value);
+            } catch (UnsupportedEncodingException e) {
+                log.error("Error decoding form data: {}, client sent charset type: {}", e.getMessage(), charset, e);
+            }
+        }
+        return result;
+    }
+
     private static final Logger log = LoggerFactory.getLogger(MethodInvokingHandler.class);
+    private static final XmlMapper xmlMapper = new XmlMapper();
 
     private final Object controllerInstance;
     private final Method handlerMethod;
-
-    private static final String DEFAULT_VALUE_PLACEHOLDER = "\n\t\t\n\t\t\n\u0000\n\t\t\t\n\u0000\n\t\t\n\u0000\n\t\t\n\t\t\n";
 
     public MethodInvokingHandler(Object controllerInstance, Method handlerMethod) {
         this.controllerInstance = controllerInstance;
@@ -52,9 +115,8 @@ public class MethodInvokingHandler implements RequestHandler {
     @Override
     public void handle(HttpRequest request, OutputStream output, boolean keepAlive) throws IOException {
         try {
-            Object[] args = resolveMethodArguments(request, output, keepAlive);
+            Object[] args = resolveMethodArguments(request);
             Object result = handlerMethod.invoke(controllerInstance, args);
-
             handleReturnValue(request, result, output, keepAlive);
         } catch (MissingRequiredParameterException e) {
             log.warn("Missing required parameter for method {}: {}", handlerMethod.getName(), e.getMessage());
@@ -76,7 +138,18 @@ public class MethodInvokingHandler implements RequestHandler {
                     .build();
             response.write(request, output, keepAlive);
             output.flush();
+        } catch (DeserializationException e) {
+            log.warn("Deserialization error: {}", e.getMessage(), e);
+            HttpResponse response = new HttpResponse.Builder()
+                    .httpVersion(request.getHttpVersion())
+                    .httpStatus(HttpStatus.BAD_REQUEST)
+                    .contentType("text/plain")
+                    .body(("Fail to deserialize body: " + e.getMessage()).getBytes())
+                    .build();
+            response.write(request, output, keepAlive);
+            output.flush();
         } catch (BadRequestException e) {
+            log.warn("Bad Request (400) for {}: {}", request.getUri(), e.getMessage());
             HttpResponse response = new HttpResponse.Builder()
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.BAD_REQUEST)
@@ -85,7 +158,17 @@ public class MethodInvokingHandler implements RequestHandler {
                     .build();
             response.write(request, output, keepAlive);
             output.flush();
-        } catch (IllegalAccessException | IllegalArgumentException e) {
+        } catch (UnsupportedMediaTypeException e) {
+            log.warn("Unsupported media type for {}: {}", request.getUri(), e.getMessage());
+            HttpResponse response = new HttpResponse.Builder()
+                    .httpVersion(request.getHttpVersion())
+                    .httpStatus(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+                    .contentType("text/plain")
+                    .body(("Unsupport Media Type: " + e.getMessage()).getBytes())
+                    .build();
+            response.write(request, output, keepAlive);
+            output.flush();
+        }catch (IllegalAccessException | IllegalArgumentException e) {
             log.error("Illegal Access or Illegal Argument on Controller method {}: {}", handlerMethod.getName(), e.getMessage(), e);
             new InternalErrorHandler().handle(request, output, keepAlive);
         } catch (InvocationTargetException e) {
@@ -95,73 +178,98 @@ public class MethodInvokingHandler implements RequestHandler {
         }
     }
 
-    private Object[] resolveMethodArguments(HttpRequest request, OutputStream output, boolean keepAlive) throws MissingRequiredParameterException, JsonProcessingException, BadRequestException {
+    private Object[] resolveMethodArguments(HttpRequest request) throws MissingRequiredParameterException, JsonProcessingException, BadRequestException, UnsupportedEncodingException {
         Parameter[] parameters = handlerMethod.getParameters();
         Object[] args = new Object[parameters.length];
 
         @SuppressWarnings("unchecked")
         Map<String, String> pathVariables = (Map<String, String>) request.getAttribute("PathVariableAttributes");
-        Map<String, String> queryParameters = request.getQueryParams() != null ? request.getQueryParams() : Collections.emptyMap();
+        Map<String, String> queryParameters = request.getQueryParams();
 
         for (int i = 0; i < parameters.length; i++) {
             Parameter parameter = parameters[i];
             Class<?> paramType = parameter.getType();
-            String paramName = parameter.getName();
 
             if (paramType.isAssignableFrom(HttpRequest.class)) {
                 args[i] = request;
                 continue;
             }
-            RequestBody requestBody = parameter.getAnnotation(RequestBody.class);
-            if (requestBody != null) {
-                byte[] body = request.getBody();
-                if ((body == null || body.length == 0)) {
-                    if (requestBody.required()) {
-                        throw new BadRequestException(
-                                String.format("Request body (type: %s) is required but missing or empty.", paramType.getSimpleName()));
-                    }
-                    args[i] = null;
-                } else {
-                    args[i] = JsonDeserializer.deserialize(body, paramType);
-                }
+            if (parameter.isAnnotationPresent(RequestBody.class)) {
+                args[i] = resolveRequestBody(request, paramType);
+                continue;
+            }
+            if (parameter.isAnnotationPresent(PathVariable.class)) {
+                args[i] = resolvePathVariable(parameter, paramType, pathVariables);
+                continue;
+            }
+            if (parameter.isAnnotationPresent(RequestParam.class)) {
+                args[i] = resolveRequestParam(parameter, paramType, queryParameters);
                 continue;
             }
 
-            String value = null;
-            RequestParam requestParam = parameter.getAnnotation(RequestParam.class);
-            if (requestParam != null) {
-                String paramKey = requestParam.value().isEmpty() ? paramName : requestParam.value();
-                value = queryParameters.get(paramKey);
-
-                if (value == null || value.isEmpty()) {
-                    if (!requestParam.defaultValue().equals(DEFAULT_VALUE_PLACEHOLDER)) {
-                        value = requestParam.defaultValue();
-                    } else if (requestParam.required()) {
-                        throw new MissingRequiredParameterException(
-                                String.format("Query parameter '%s' is required but not found.", paramKey));
-                    }
-                }
-            } else if (pathVariables != null && pathVariables.containsKey(paramName)) {
-                value = pathVariables.get(paramName);
-            }
-
-            if (value != null) {
+            // 默认回退：尝试从路径变量中通过参数名匹配 (仅当 -parameters 编译时有效)
+            String paramName = parameter.getName();
+            if (pathVariables != null && pathVariables.containsKey(paramName)) {
+                String value = pathVariables.get(paramName);
                 args[i] = convertValue(value, paramType);
-            } else {
-                if (paramType == String.class && value == null) {
-                    args[i] = "";
-                    log.debug("Parameter {} {} resolved to empty string.", paramType.getSimpleName(), paramName);
-                } else if (!paramType.isPrimitive()) {
-                    args[i] = null;
-                    log.debug("Parameter {} {} resolved to null.", paramName, paramType.getSimpleName());
-                } else {
-                    args[i] = getDefaultValueForType(paramType);
-                    log.warn("Unresolved primitive parameter: {} {} for method {}. Using default value.",
-                            paramType.getSimpleName(), paramName, handlerMethod.getName());
-                }
+                continue;
             }
+
+            log.warn("Unresolved parameter: {} {} for method {}. Using default value.",
+                    paramType.getSimpleName(), paramName, handlerMethod.getName());
+            args[i] = getDefaultValueForType(paramType);
         }
         return args;
+    }
+
+    private Object resolveRequestBody(HttpRequest request, Class<?> paramType) throws DeserializationException, BadRequestException, JsonProcessingException, UnsupportedEncodingException {
+        String contentType = request.getHeaders().getOrDefault("content-type", "");
+        String mimeType = contentType.split(";")[0].trim().toLowerCase();
+        String charset = "UTF-8";
+        if (contentType.contains("chatset=")) {
+            charset = contentType.split("charset=")[1].trim();
+        }
+        ContentProcessor processor = processors.get(mimeType);
+        if (processor == null) {
+            throw new UnsupportedMediaTypeException("Media type '" + mimeType + "' is not supported for @RequestBody.");
+        }
+        return processor.process(request, contentType, charset, paramType);
+    }
+
+    private Object resolvePathVariable(Parameter parameter, Class<?> paramType, Map<String, String> pathVariables) throws BadRequestException {
+        PathVariable annotation = parameter.getAnnotation(PathVariable.class);
+        String name = annotation.value().isEmpty() ? parameter.getName() : annotation.value();
+
+        if (pathVariables == null || !pathVariables.containsKey(name)) {
+            throw new BadRequestException("Missing required PathVariable: {" + name + "}");
+        }
+
+        String value = pathVariables.get(name);
+        return convertValue(value, paramType);
+    }
+
+    private Object resolveRequestParam(Parameter parameter, Class<?> paramType, Map<String, String> queryParameters) throws BadRequestException {
+        RequestParam annotation = parameter.getAnnotation(RequestParam.class);
+        String name = annotation.value().isEmpty() ? parameter.getName() : annotation.value();
+        String defaultValue = annotation.defaultValue().equals(RequestParam.NO_DEFAULT_VALUE) ? null : annotation.defaultValue();
+        boolean required = annotation.required();
+
+        String value = queryParameters.get(name);
+
+        if (value == null) {
+            if (defaultValue != null) {
+                value = defaultValue;
+            } else if (required) {
+                throw new BadRequestException("Missing required Query Parameter: " + name);
+            } else {
+                return getDefaultValueForType(paramType);
+            }
+        }
+        if (value.isEmpty() && paramType != String.class && defaultValue == null && required) {
+            throw new BadRequestException("Required Query Parameter '" + name + "' cannot be empty.");
+        }
+
+        return convertValue(value, paramType);
     }
 
     private Object convertValue(String value, Class<?> targetType) {
@@ -239,18 +347,6 @@ public class MethodInvokingHandler implements RequestHandler {
             response.write(request, output, keepAlive);
             output.flush();
             log.debug("Successfully wrote JSON response for return value: {}", handlerMethod.getReturnType().getSimpleName());
-        }
-    }
-
-    private static class MissingRequiredParameterException extends Exception {
-        public MissingRequiredParameterException(String message) {
-            super(message);
-        }
-    }
-
-    private static class BadRequestException extends Exception {
-        public BadRequestException(String message) {
-            super(message);
         }
     }
 }

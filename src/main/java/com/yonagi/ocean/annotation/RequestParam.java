@@ -13,5 +13,7 @@ public @interface RequestParam {
 
     boolean required() default true;
 
-    String defaultValue() default "\n\t\t\n\t\t\n\u0000\n\t\t\t\n\u0000\n\t\t\n\u0000\n\t\t\n\t\t\n";
+    String defaultValue() default NO_DEFAULT_VALUE;
+
+    String NO_DEFAULT_VALUE = "\n\t\t\n\t\t\n\u0000\n\t\t\t\n\u0000\n\t\t\n\u0000\n\t\t\n\t\t\n";
 }

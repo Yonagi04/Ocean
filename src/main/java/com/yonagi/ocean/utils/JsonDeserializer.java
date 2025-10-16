@@ -2,6 +2,7 @@ package com.yonagi.ocean.utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yonagi.ocean.exception.DeserializationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,14 +34,5 @@ public class JsonDeserializer {
         }
         T result = mapper.readValue(jsonString, targetType);
         return result;
-    }
-
-    public static class DeserializationException extends RuntimeException {
-        public DeserializationException(String message) {
-            super(message);
-        }
-        public DeserializationException(String message, Throwable cause) {
-            super(message, cause);
-        }
     }
 }

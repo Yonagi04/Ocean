@@ -28,6 +28,4 @@ public class JsonSerializer {
                 object.getClass().getSimpleName(),
                 object.toString().replaceAll("\"", "\\\"").replaceAll("\n", "\\n"));
     }
-
-
 }
