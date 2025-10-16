@@ -113,7 +113,7 @@ public class ClientHandler implements Runnable {
                     responseHeaders.put("Location", redirectLocation);
                     HttpResponse redirectResponse = new HttpResponse.Builder()
                             .httpVersion(request.getHttpVersion())
-                            .httpStatus(HttpStatus.MOVED_PERMANENTLY)
+                            .httpStatus(HttpStatus.PERMANENT_REDIRECT)
                             .contentType("text/html")
                             .headers(responseHeaders)
                             .body(String.format("Redirecting to %s", redirectLocation).getBytes())
@@ -131,7 +131,6 @@ public class ClientHandler implements Runnable {
                 HttpRequest finalRequest = request;
                 if (shouldReadSynchronously) {
                     byte[] bodyData = readTextBodyFromInputStream(request.getRawBodyInputStream(), request.getHeaders());
-                    log.info("BodyData Length: {}", bodyData == null ? 0 : bodyData.length);
                     finalRequest = new HttpRequest.Builder()
                             .method(request.getMethod())
                             .uri(request.getUri())
