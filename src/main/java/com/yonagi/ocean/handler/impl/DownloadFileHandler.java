@@ -64,24 +64,9 @@ public class DownloadFileHandler implements RequestHandler {
         }
 
         try {
-            Map<String, String> headers = new HashMap<>();
+            Map<String, String> headers = (Map<String, String>) request.getAttribute("HstsHeaders");
             headers.put("Content-Length", String.valueOf(file.length()));
             headers.put("Content-Disposition", "attachment; filename=\"" + file.getName() + "\"");
-
-            if ((Boolean) request.getAttribute("isSsl")) {
-                StringBuilder hstsValue = new StringBuilder();
-                long maxAge = Long.parseLong(LocalConfigLoader.getProperty("server.ssl.hsts.max_age", "31536000"));
-                hstsValue.append("max-age=").append(maxAge);
-                boolean enabledIncludeSubdomains = Boolean.parseBoolean(LocalConfigLoader.getProperty("server.ssl.hsts.enabled_include_subdomains", "false"));
-                boolean enabledPreload = Boolean.parseBoolean(LocalConfigLoader.getProperty("server.ssl.hsts.enabled_preload", "false"));
-                if (enabledIncludeSubdomains) {
-                    hstsValue.append("; includeSubDomains");
-                }
-                if (enabledPreload && enabledIncludeSubdomains && maxAge >= 31536000) {
-                    hstsValue.append("; preload");
-                }
-                headers.put("Strict-Transport-Security", hstsValue.toString());
-            }
 
             HttpResponse response = new HttpResponse.Builder()
                     .httpVersion(request.getHttpVersion())

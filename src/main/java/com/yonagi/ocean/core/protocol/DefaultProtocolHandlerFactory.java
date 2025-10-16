@@ -2,6 +2,7 @@ package com.yonagi.ocean.core.protocol;
 
 import com.yonagi.ocean.core.protocol.handler.HttpProtocolHandler;
 import com.yonagi.ocean.core.protocol.handler.impl.CorsPreflightProtocolHandler;
+import com.yonagi.ocean.core.protocol.handler.impl.HstsProtocolHandler;
 import com.yonagi.ocean.core.protocol.handler.impl.HttpsRedirectProtocolHandler;
 import com.yonagi.ocean.core.protocol.handler.impl.RequestBodyReaderProtocolHandler;
 
@@ -25,6 +26,7 @@ public class DefaultProtocolHandlerFactory implements ProtocolHandlerFactory {
             handlers.add(new HttpsRedirectProtocolHandler(sslPort));
         }
         handlers.add(new RequestBodyReaderProtocolHandler());
+        handlers.add(new HstsProtocolHandler(isSsl));
         handlers.add(new CorsPreflightProtocolHandler(isSsl));
 
         return handlers;

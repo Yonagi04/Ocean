@@ -58,7 +58,7 @@ public class CorsPreflightProtocolHandler implements HttpProtocolHandler {
         boolean isPreflightTerminated = headers != null && "true".equals(headers.get("__IS_PREFLIGHT__"));
         if (isPreflightTerminated) {
             log.info("CORS preflight request (OPTIONS) handled and terminated");
-            Map<String, String> hstsHeaders = applyHstsHeader();
+            Map<String, String> hstsHeaders = (Map<String, String>) request.getAttribute("HstsHeaders");
             if (hstsHeaders != null && !hstsHeaders.isEmpty()) {
                 headers.putAll(hstsHeaders);
             }

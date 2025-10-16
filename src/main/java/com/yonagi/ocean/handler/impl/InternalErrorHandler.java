@@ -110,21 +110,7 @@ public class InternalErrorHandler implements RequestHandler {
     
     @Override
     public void handle(HttpRequest request, OutputStream outputStream, boolean keepAlive) {
-        Map<String, String> headers = new HashMap<>();
-        if ((Boolean) request.getAttribute("isSsl")) {
-            StringBuilder hstsValue = new StringBuilder();
-            long maxAge = Long.parseLong(LocalConfigLoader.getProperty("server.ssl.hsts.max_age", "31536000"));
-            hstsValue.append("max-age=").append(maxAge);
-            boolean enabledIncludeSubdomains = Boolean.parseBoolean(LocalConfigLoader.getProperty("server.ssl.hsts.enabled_include_subdomains", "false"));
-            boolean enabledPreload = Boolean.parseBoolean(LocalConfigLoader.getProperty("server.ssl.hsts.enabled_preload", "false"));
-            if (enabledIncludeSubdomains) {
-                hstsValue.append("; includeSubDomains");
-            }
-            if (enabledPreload && enabledIncludeSubdomains && maxAge >= 31536000) {
-                hstsValue.append("; preload");
-            }
-            headers.put("Strict-Transport-Security", hstsValue.toString());
-        }
+        Map<String, String> headers = (Map<String, String>) request.getAttribute("HstsHeaders");
 
         StaticFileCache fileCache = StaticFileCacheFactory.getInstance();
         File errorPage = new File(errorPagePath);

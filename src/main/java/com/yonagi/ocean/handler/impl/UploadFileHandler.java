@@ -52,21 +52,7 @@ public class UploadFileHandler implements RequestHandler {
             new MethodNotAllowHandler().handle(request, output, keepAlive);
             return;
         }
-        Map<String, String> headers = new HashMap<>();
-        if ((Boolean) request.getAttribute("isSsl")) {
-            StringBuilder hstsValue = new StringBuilder();
-            long maxAge = Long.parseLong(LocalConfigLoader.getProperty("server.ssl.hsts.max_age", "31536000"));
-            hstsValue.append("max-age=").append(maxAge);
-            boolean enabledIncludeSubdomains = Boolean.parseBoolean(LocalConfigLoader.getProperty("server.ssl.hsts.enabled_include_subdomains", "false"));
-            boolean enabledPreload = Boolean.parseBoolean(LocalConfigLoader.getProperty("server.ssl.hsts.enabled_preload", "false"));
-            if (enabledIncludeSubdomains) {
-                hstsValue.append("; includeSubDomains");
-            }
-            if (enabledPreload && enabledIncludeSubdomains && maxAge >= 31536000) {
-                hstsValue.append("; preload");
-            }
-            headers.put("Strict-Transport-Security", hstsValue.toString());
-        }
+        Map<String, String> headers = (Map<String, String>) request.getAttribute("HstsHeaders");
 
         final InputStream bodyStream = request.getRawBodyInputStream();
         if (bodyStream == null) {

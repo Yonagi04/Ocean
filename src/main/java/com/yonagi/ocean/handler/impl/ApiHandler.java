@@ -54,21 +54,7 @@ public class ApiHandler implements RequestHandler {
         if (contentType.contains("charset=")) {
             charset = contentType.split("charset=")[1].trim();
         }
-        Map<String, String> headers = new HashMap<>();
-        if ((Boolean) request.getAttribute("isSsl")) {
-            StringBuilder hstsValue = new StringBuilder();
-            long maxAge = Long.parseLong(LocalConfigLoader.getProperty("server.ssl.hsts.max_age", "31536000"));
-            hstsValue.append("max-age=").append(maxAge);
-            boolean enabledIncludeSubdomains = Boolean.parseBoolean(LocalConfigLoader.getProperty("server.ssl.hsts.enabled_include_subdomains", "false"));
-            boolean enabledPreload = Boolean.parseBoolean(LocalConfigLoader.getProperty("server.ssl.hsts.enabled_preload", "false"));
-            if (enabledIncludeSubdomains) {
-                hstsValue.append("; includeSubDomains");
-            }
-            if (enabledPreload && enabledIncludeSubdomains && maxAge >= 31536000) {
-                hstsValue.append("; preload");
-            }
-            headers.put("Strict-Transport-Security", hstsValue.toString());
-        }
+        Map<String, String> headers = (Map<String, String>) request.getAttribute("HstsHeaders");
 
         // 使用策略映射替代 if-else
         ContentProcessor processor = processors.get(mimeType);
@@ -76,7 +62,7 @@ public class ApiHandler implements RequestHandler {
             HttpResponse response = new HttpResponse.Builder()
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
-                    .contentType("text/plain")
+                    .contentType("text/plain; charset=utf-8")
                     .headers(headers)
                     .body("Unsupported Media Type".getBytes())
                     .build();
@@ -94,7 +80,7 @@ public class ApiHandler implements RequestHandler {
             HttpResponse errorResponse = new HttpResponse.Builder()
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.BAD_REQUEST)
-                    .contentType("text/plain")
+                    .contentType("text/plain; charset=utf-8")
                     .headers(headers)
                     .body((msgPrefix + e.getMessage()).getBytes())
                     .build();
