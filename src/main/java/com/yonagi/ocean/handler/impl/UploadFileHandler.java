@@ -7,6 +7,7 @@ import com.yonagi.ocean.core.protocol.enums.HttpMethod;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.handler.RequestHandler;
 import com.yonagi.ocean.utils.LocalConfigLoader;
+import com.yonagi.ocean.utils.UUIDUtil;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.RequestContext;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
@@ -74,7 +75,7 @@ public class UploadFileHandler implements RequestHandler {
                     .httpStatus(HttpStatus.BAD_REQUEST)
                     .headers(headers)
                     .body("Request body stream is missing".getBytes())
-                    .contentType("application/json")
+                    .contentType("text/plain; charset=utf-8")
                     .build();
             response.write(request, output, keepAlive);
             output.flush();
@@ -118,7 +119,7 @@ public class UploadFileHandler implements RequestHandler {
             HttpResponse response = new HttpResponse.Builder()
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.BAD_REQUEST)
-                    .contentType("application/json")
+                    .contentType("text/plain; charset=utf-8")
                     .headers(headers)
                     .body("Invalid request body".getBytes())
                     .build();
@@ -138,7 +139,7 @@ public class UploadFileHandler implements RequestHandler {
                 HttpResponse response = new HttpResponse.Builder()
                         .httpVersion(request.getHttpVersion())
                         .httpStatus(HttpStatus.BAD_REQUEST)
-                        .contentType("application/json")
+                        .contentType("text/plain; charset=utf-8")
                         .headers(headers)
                         .body("Invalid request body".getBytes())
                         .build();
@@ -150,7 +151,16 @@ public class UploadFileHandler implements RequestHandler {
             List<Map<String, Object>> uploadedFiles = new ArrayList<>();
             for (FileItem item : items) {
                 if (!item.isFormField()) {
-                    String fileName = sanitizeFilename(item.getName());
+                    String extension = extractExtension(item.getName());
+                    String candidate = UUIDUtil.getShortUUIDWithPrefix("file_");
+                    String fileName = candidate + extension;
+                    if (Paths.get(UPLOAD_DIR, fileName).toFile().exists()) {
+                        candidate = UUIDUtil.getTimeBasedShortUUIDWithPrefix("file_");
+                        fileName = candidate + extension;
+                        if (Paths.get(UPLOAD_DIR, fileName).toFile().exists()) {
+                            new InternalErrorHandler().handle(request, output, keepAlive);
+                        }
+                    }
                     File storeFile = Paths.get(UPLOAD_DIR, fileName).toFile();
 
                     storeFile.getParentFile().mkdirs();
@@ -194,5 +204,16 @@ public class UploadFileHandler implements RequestHandler {
             return "unknown_file";
         }
         return Paths.get(fileName).getFileName().toString();
+    }
+
+    private static String extractExtension(String originalFilename) {
+        if (originalFilename == null) {
+            return "";
+        }
+        int lastDot = originalFilename.lastIndexOf('.');
+        if (lastDot <= 0 || lastDot == originalFilename.length() - 1) {
+            return "";
+        }
+        return originalFilename.substring(lastDot);
     }
 }
