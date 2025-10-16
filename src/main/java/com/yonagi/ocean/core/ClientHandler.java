@@ -1,14 +1,16 @@
 package com.yonagi.ocean.core;
 
+import com.yonagi.ocean.core.protocol.DefaultProtocolHandlerFactory;
 import com.yonagi.ocean.core.protocol.HttpResponse;
 import com.yonagi.ocean.core.protocol.enums.HttpMethod;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpRequestParser;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
+import com.yonagi.ocean.core.protocol.handler.HttpProtocolHandler;
 import com.yonagi.ocean.core.ratelimiter.RateLimiterChecker;
 import com.yonagi.ocean.core.router.Router;
 import com.yonagi.ocean.handler.impl.*;
-import com.yonagi.ocean.utils.LocalConfigLoader;
+import com.yonagi.ocean.middleware.FilterChain;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,7 +22,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.IllegalCharsetNameException;
 import java.nio.charset.StandardCharsets;
 import java.nio.charset.UnsupportedCharsetException;
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
@@ -46,6 +48,9 @@ public class ClientHandler implements Runnable {
     private final boolean redirectSslEnabled;
     private final int sslPort;
 
+    private final FilterChain chain = new FilterChain();
+    private final List<HttpProtocolHandler> protocolHandlers;
+
     public ClientHandler(Socket client, String webRoot, boolean sslEnabled, boolean isSsl, int sslPort, boolean redirectSslEnabled,
                          ConnectionManager connectionManager, Router router, RateLimiterChecker rateLimiterChecker) {
         this.client = client;
@@ -57,6 +62,10 @@ public class ClientHandler implements Runnable {
         this.connectionManager = connectionManager;
         this.router = router;
         this.rateLimiterChecker = rateLimiterChecker;
+
+        this.protocolHandlers = new DefaultProtocolHandlerFactory().createHandlers(isSsl, sslEnabled, redirectSslEnabled, sslPort);
+
+        initFiterChain();
     }
 
     @Override
@@ -95,81 +104,28 @@ public class ClientHandler implements Runnable {
                 if (request == null) {
                     break;
                 }
-                if (!isSsl && sslEnabled && redirectSslEnabled) {
-//                    String host = client.getLocalAddress().getHostAddress();
-//                    if (host.equals("0.0.0.0") || host.equals("127.0.0.1")) {
-//                        String hostHeader = request.getHeaders().getOrDefault("Host", "localhost");
-//                        host = hostHeader.split(":")[0];
-//                    }
-                    String host = request.getHeaders().get("Host");
-                    if (host == null) {
-                        host = LocalConfigLoader.getProperty("server.url");
-                    } else {
-                        host = host.split(":")[0];
+                HttpRequest currentRequest = request;
+
+                for (HttpProtocolHandler handler : protocolHandlers) {
+                    currentRequest = handler.handle(currentRequest, output);
+                    if (currentRequest == null) {
+                        break;
                     }
-                    String originalUri = request.getUri();
-                    String redirectLocation = "https://" + host + ":" + sslPort + originalUri;
-                    Map<String, String> responseHeaders = new HashMap<>();
-                    responseHeaders.put("Location", redirectLocation);
-                    HttpResponse redirectResponse = new HttpResponse.Builder()
-                            .httpVersion(request.getHttpVersion())
-                            .httpStatus(HttpStatus.PERMANENT_REDIRECT)
-                            .contentType("text/html")
-                            .headers(responseHeaders)
-                            .body(String.format("Redirecting to %s", redirectLocation).getBytes())
-                            .build();
-                    redirectResponse.write(request, output, false);
-                    log.info("Redirected HTTP request to HTTPS: {}", redirectLocation);
+                }
+                if (currentRequest == null) {
                     break;
                 }
+                currentRequest.setAttribute("clientIp", client.getInetAddress().getHostAddress());
+                currentRequest.setAttribute("isSsl", isSsl);
 
-                String contentType = request.getHeaders().getOrDefault("content-type", "").toLowerCase();
-                boolean isMultiPart = contentType.contains("multipart/form-data");
 
-                boolean shouldReadSynchronously = (request.getMethod() == HttpMethod.POST || request.getMethod() == HttpMethod.PUT) &&
-                        !isMultiPart;
-                HttpRequest finalRequest = request;
-                if (shouldReadSynchronously) {
-                    byte[] bodyData = readTextBodyFromInputStream(request.getRawBodyInputStream(), request.getHeaders());
-                    finalRequest = new HttpRequest.Builder()
-                            .method(request.getMethod())
-                            .uri(request.getUri())
-                            .httpVersion(request.getHttpVersion())
-                            .headers(request.getHeaders())
-                            .queryParams(request.getQueryParams())
-                            .body(bodyData)
-                            .rawBodyInputStream(null)
-                            .build();
-                }
-
-                finalRequest.setAttribute("clientIp", client.getInetAddress().getHostAddress());
-                finalRequest.setAttribute("isSsl", isSsl);
-
-                Map<String, String> corsHeaders = CorsManager.handleCors(finalRequest);
-                boolean isPreflightTerminated = corsHeaders != null && "true".equals(corsHeaders.get("__IS_PREFLIGHT__"));
-                if (isPreflightTerminated) {
-                    log.info("CORS preflight request (OPTIONS) handled and terminated");
-                    HttpResponse response = new HttpResponse.Builder()
-                            .httpVersion(finalRequest.getHttpVersion())
-                            .httpStatus(HttpStatus.NO_CONTENT)
-                            .headers(corsHeaders)
-                            .body(new byte[0])
-                            .build();
-                    response.write(finalRequest, output, false);
-                    break;
-                }
-                if (corsHeaders != null && !corsHeaders.isEmpty()) {
-                    corsHeaders.remove("__IS_PREFLIGHT__");
-                    finalRequest.setAttribute("CorsResponseHeaders", corsHeaders);
-                }
-
-                boolean shouldKeepAlive = shouldKeepAlive(finalRequest);
+                boolean shouldKeepAlive = shouldKeepAlive(currentRequest);
                 if (!shouldKeepAlive) {
-                    handleRequest(finalRequest, output, false);
+                    handleRequest(currentRequest, output, false);
                     break;
                 }
 
-                handleRequest(finalRequest, output, true);
+                handleRequest(currentRequest, output, true);
                 connectionManager.recordRequest(client);
                 if (!connectionManager.shouldKeepAlive(client)) {
                     break;
@@ -190,6 +146,10 @@ public class ClientHandler implements Runnable {
                 log.warn("Error closing client connection: {}", e.getMessage());
             }
         }
+    }
+
+    private void initFiterChain() {
+        // chain.addMiddleWare(new AuthMiddleware());
     }
 
     private void performHandshakeCleanup(Socket client) {
@@ -213,6 +173,30 @@ public class ClientHandler implements Runnable {
         // 限流器做限流判断
         if (!rateLimiterChecker.check(request)) {
             new TooManyRequestsHandler().handle(request, output, keepAlive);
+            return;
+        }
+
+        // 进行中间件链路鉴权
+        boolean shouldContinue = chain.process(request);
+        HttpResponse middlewareResponse = (HttpResponse) request.getAttribute("MiddlewareResponse");
+        Exception middlewareException = (Exception) request.getAttribute("MiddlewareException");
+
+        if (middlewareResponse != null) {
+            middlewareResponse.write(request, output, keepAlive);
+            output.flush();
+            return;
+        } else if (middlewareException != null) {
+            new InternalErrorHandler().handle(request, output, keepAlive);
+            return;
+        } else if (!shouldContinue) {
+            HttpResponse breakResponse = new HttpResponse.Builder()
+                    .httpVersion(request.getHttpVersion())
+                    .httpStatus(HttpStatus.UNAUTHORIZED)
+                    .contentType("text/plain; chatset=utf-8")
+                    .body("Your request is blocked by Ocean. Please try again later.".getBytes())
+                    .build();
+            breakResponse.write(request, output, keepAlive);
+            output.flush();
             return;
         }
 
