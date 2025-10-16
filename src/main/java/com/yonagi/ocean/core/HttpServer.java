@@ -4,7 +4,7 @@ import com.alibaba.nacos.api.config.ConfigService;
 import com.yonagi.ocean.cache.StaticFileCacheFactory;
 import com.yonagi.ocean.core.configuration.KeepAliveConfig;
 import com.yonagi.ocean.core.configuration.source.router.*;
-import com.yonagi.ocean.core.framework.ControllerRegistry;
+import com.yonagi.ocean.framework.ControllerRegistry;
 import com.yonagi.ocean.core.gzip.GzipEncoderManager;
 import com.yonagi.ocean.core.ratelimiter.RateLimiterChecker;
 import com.yonagi.ocean.core.ratelimiter.RateLimiterManager;
