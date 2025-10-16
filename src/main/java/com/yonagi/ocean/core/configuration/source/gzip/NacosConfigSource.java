@@ -4,7 +4,7 @@ import com.alibaba.nacos.api.config.ConfigService;
 import com.alibaba.nacos.api.config.listener.Listener;
 import com.yonagi.ocean.core.configuration.GzipConfig;
 import com.yonagi.ocean.utils.LocalConfigLoader;
-import com.yonagi.ocean.utils.NacosBackupScheduler;
+import com.yonagi.ocean.backup.NacosBackupScheduler;
 import com.yonagi.ocean.utils.NacosConfigLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

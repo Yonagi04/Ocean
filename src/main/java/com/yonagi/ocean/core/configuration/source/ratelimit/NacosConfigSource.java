@@ -7,7 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.yonagi.ocean.core.configuration.RateLimitConfig;
 import com.yonagi.ocean.utils.LocalConfigLoader;
-import com.yonagi.ocean.utils.NacosBackupScheduler;
+import com.yonagi.ocean.backup.NacosBackupScheduler;
 import com.yonagi.ocean.utils.NacosConfigLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

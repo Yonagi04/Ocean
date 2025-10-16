@@ -10,7 +10,7 @@ import com.yonagi.ocean.core.router.RouteType;
 import com.yonagi.ocean.handler.impl.RedirectHandler;
 import com.yonagi.ocean.handler.impl.StaticFileHandler;
 import com.yonagi.ocean.utils.LocalConfigLoader;
-import com.yonagi.ocean.utils.NacosBackupScheduler;
+import com.yonagi.ocean.backup.NacosBackupScheduler;
 import com.yonagi.ocean.utils.NacosConfigLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
