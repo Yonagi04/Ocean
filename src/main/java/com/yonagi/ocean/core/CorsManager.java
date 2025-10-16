@@ -112,9 +112,12 @@ public class CorsManager {
             return null;
         }
 
-        String origin = request.getHeaders().get("Origin");
+        String origin = request.getHeaders().get("origin");
         if (origin == null) {
-            return null;
+            origin = request.getHeaders().get("Origin");
+            if (origin == null) {
+                return null;
+            }
         }
         String allowOrigin = config.getAllowOrigin();
         // TODO: origin白名单机制
