@@ -16,10 +16,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -111,7 +108,7 @@ public class ApiHandler implements RequestHandler {
         String acceptEncoding = request.getHeaders().getOrDefault("accept-encoding", "");
         byte[] finalBody = encoder.encode(responseBody.getBytes(charset), acceptEncoding);
 
-        if (finalBody != responseBody.getBytes(charset)) {
+        if (!Arrays.equals(finalBody, responseBody.getBytes(charset))) {
             headers.put("Content-Encoding", "gzip");
         }
 

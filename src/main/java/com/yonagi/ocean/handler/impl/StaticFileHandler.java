@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -129,7 +130,7 @@ public class StaticFileHandler implements RequestHandler {
             GzipEncoder encoder = GzipEncoderManager.getEncoderInstance();
             String acceptEncoding = request.getHeaders().get("accept-encoding");
             byte[] finalBody = encoder.encode(cf.getContent(), acceptEncoding);
-            if (finalBody != cf.getContent()) {
+            if (!Arrays.equals(finalBody, cf.getContent())) {
                 headers.put("Content-Encoding", "gzip");
             }
             HttpResponse httpResponse = new HttpResponse.Builder()
