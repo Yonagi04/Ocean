@@ -8,6 +8,7 @@ import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.core.ratelimiter.RateLimiterChecker;
 import com.yonagi.ocean.core.router.Router;
 import com.yonagi.ocean.handler.impl.*;
+import com.yonagi.ocean.utils.LocalConfigLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,13 +42,15 @@ public class ClientHandler implements Runnable {
     private final Router router;
     private final RateLimiterChecker rateLimiterChecker;
     private final boolean isSsl;
+    private final boolean sslEnabled;
     private final boolean redirectSslEnabled;
     private final int sslPort;
 
-    public ClientHandler(Socket client, String webRoot, boolean isSsl, int sslPort, boolean redirectSslEnabled,
+    public ClientHandler(Socket client, String webRoot, boolean sslEnabled, boolean isSsl, int sslPort, boolean redirectSslEnabled,
                          ConnectionManager connectionManager, Router router, RateLimiterChecker rateLimiterChecker) {
         this.client = client;
         this.webRoot = webRoot;
+        this.sslEnabled = sslEnabled;
         this.isSsl = isSsl;
         this.sslPort = sslPort;
         this.redirectSslEnabled = redirectSslEnabled;
@@ -92,11 +95,17 @@ public class ClientHandler implements Runnable {
                 if (request == null) {
                     break;
                 }
-                if (!isSsl && redirectSslEnabled) {
-                    String host = client.getLocalAddress().getHostAddress();
-                    if (host.equals("0.0.0.0") || host.equals("127.0.0.1")) {
-                        String hostHeader = request.getHeaders().getOrDefault("Host", "localhost");
-                        host = hostHeader.split(":")[0];
+                if (!isSsl && sslEnabled && redirectSslEnabled) {
+//                    String host = client.getLocalAddress().getHostAddress();
+//                    if (host.equals("0.0.0.0") || host.equals("127.0.0.1")) {
+//                        String hostHeader = request.getHeaders().getOrDefault("Host", "localhost");
+//                        host = hostHeader.split(":")[0];
+//                    }
+                    String host = request.getHeaders().get("Host");
+                    if (host == null) {
+                        host = LocalConfigLoader.getProperty("server.url");
+                    } else {
+                        host = host.split(":")[0];
                     }
                     String originalUri = request.getUri();
                     String redirectLocation = "https://" + host + ":" + sslPort + originalUri;

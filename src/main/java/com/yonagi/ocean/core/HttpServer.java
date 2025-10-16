@@ -136,7 +136,7 @@ public class HttpServer {
         isRunning = true;
         try {
             httpServerSocket = new ServerSocket(httpPort);
-            listenerPool.execute(new ListenerThread(httpServerSocket, httpPort, false));
+            listenerPool.execute(new ListenerThread(httpServerSocket, httpPort, false, sslEnabled));
             log.info("Ocean HTTP listener is running at http://{}:{}", InetAddress.getLocalHost().getHostAddress(), httpPort);
         } catch (Exception e) {
             log.error("Failed to start HTTP listener on port {}: {}", httpPort, e.getMessage(), e);
@@ -159,7 +159,7 @@ public class HttpServer {
                 } else {
                     log.warn("HTTPS ServerSocket is not an instance of SSLServerSocket. Cannot disable client auth");
                 }
-                listenerPool.execute(new ListenerThread(httpsServerSocket, sslPort, true));
+                listenerPool.execute(new ListenerThread(httpsServerSocket, sslPort, true, sslEnabled));
                 log.info("Ocean HTTPS listener is running at https://{}:{}", InetAddress.getLocalHost().getHostAddress(), sslPort);
             } catch (Exception e) {
                 log.error("Failed to start HTTPS listener on port {}: {}", sslPort, e.getMessage(), e);
@@ -285,11 +285,13 @@ public class HttpServer {
         private final ServerSocket serverSocket;
         private final int port;
         private final boolean isSsl;
+        private final boolean sslEnabled;
 
-        public ListenerThread(ServerSocket serverSocket, int port, boolean isSsl) {
+        public ListenerThread(ServerSocket serverSocket, int port, boolean isSsl, boolean sslEnabled) {
             this.serverSocket = serverSocket;
             this.port = port;
             this.isSsl = isSsl;
+            this.sslEnabled = sslEnabled;
         }
 
         @Override
@@ -299,7 +301,7 @@ public class HttpServer {
             while (isRunning) {
                 try {
                     Socket client = serverSocket.accept();
-                    threadPool.execute(new ClientHandler(client, webRoot, isSsl, sslPort,
+                    threadPool.execute(new ClientHandler(client, webRoot, sslEnabled, isSsl, sslPort,
                             redirectSslEnabled, connectionManager, router, rateLimiterChecker));
                 } catch (Exception e) {
                     if (isRunning) {
