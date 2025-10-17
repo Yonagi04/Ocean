@@ -2,9 +2,9 @@ package com.yonagi.ocean.framework;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
-import com.yonagi.ocean.annotation.PathVariable;
-import com.yonagi.ocean.annotation.RequestBody;
-import com.yonagi.ocean.annotation.RequestParam;
+import com.yonagi.ocean.framework.annotation.PathVariable;
+import com.yonagi.ocean.framework.annotation.RequestBody;
+import com.yonagi.ocean.framework.annotation.RequestParam;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;

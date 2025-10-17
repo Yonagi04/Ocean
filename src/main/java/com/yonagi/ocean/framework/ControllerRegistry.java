@@ -1,7 +1,7 @@
 package com.yonagi.ocean.framework;
 
-import com.yonagi.ocean.annotation.Controller;
-import com.yonagi.ocean.annotation.RequestMapping;
+import com.yonagi.ocean.framework.annotation.Controller;
+import com.yonagi.ocean.framework.annotation.RequestMapping;
 import com.yonagi.ocean.core.configuration.RouteConfig;
 import com.yonagi.ocean.core.protocol.enums.HttpMethod;
 import com.yonagi.ocean.core.router.RouteType;

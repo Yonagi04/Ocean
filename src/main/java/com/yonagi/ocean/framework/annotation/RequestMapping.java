@@ -1,4 +1,4 @@
-package com.yonagi.ocean.annotation;
+package com.yonagi.ocean.framework.annotation;
 
 import com.yonagi.ocean.core.protocol.enums.HttpMethod;
 
