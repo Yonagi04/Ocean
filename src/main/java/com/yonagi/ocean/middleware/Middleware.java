@@ -1,7 +1,6 @@
 package com.yonagi.ocean.middleware;
 
 import com.yonagi.ocean.core.protocol.HttpRequest;
-import com.yonagi.ocean.core.protocol.HttpResponse;
 
 /**
  * @author Yonagi
@@ -12,5 +11,5 @@ import com.yonagi.ocean.core.protocol.HttpResponse;
  */
 public interface Middleware {
 
-    boolean handle(HttpRequest request) throws Exception;
+    boolean handle(HttpRequest request, MiddlewareChain chain) throws Exception;
 }

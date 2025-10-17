@@ -2,12 +2,16 @@ package com.yonagi.ocean.core.protocol;
 
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.core.protocol.enums.HttpVersion;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * @author Yonagi
@@ -17,6 +21,9 @@ import java.util.Map;
  * @date 2025/10/05 16:24
  */
 public class HttpResponse {
+
+    private static final Logger log = LoggerFactory.getLogger(HttpResponse.class);
+
     private HttpVersion httpVersion;
     private HttpStatus httpStatus;
     private String contentType;
@@ -24,6 +31,25 @@ public class HttpResponse {
 
     // Additional headers, e.g., for CORS, caching, etc.
     private Map<String, String> headers;
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(httpVersion, httpStatus, contentType, body, headers);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
+        HttpResponse that = (HttpResponse) obj;
+        return Objects.equals(httpVersion, that.httpVersion) && Objects.equals(httpStatus, that.httpStatus)
+                && Objects.equals(contentType, that.contentType) && Arrays.equals(body, that.body)
+                && Objects.equals(headers, that.headers);
+    }
 
     private HttpResponse() {
 
@@ -226,8 +252,12 @@ public class HttpResponse {
         }
 
         public HttpResponse build() {
-            if (httpStatus == null || contentType == null) {
-                throw new IllegalStateException("Status code, status text, and content type must be set");
+            if (httpStatus == null) {
+                throw new IllegalStateException("Status code, status text must be set");
+            }
+            if (contentType == null) {
+                log.warn("Content-Type is empty, using default value 'text/plain; charset=utf-8'");
+                contentType = "text/plain; charset=utf-8";
             }
             HttpResponse httpResponse = new HttpResponse();
             httpResponse.httpVersion = this.httpVersion != null ? this.httpVersion : HttpVersion.HTTP_1_1;

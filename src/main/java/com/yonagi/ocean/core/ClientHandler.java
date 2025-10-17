@@ -10,7 +10,9 @@ import com.yonagi.ocean.core.protocol.handler.HttpProtocolHandler;
 import com.yonagi.ocean.core.ratelimiter.RateLimiterChecker;
 import com.yonagi.ocean.core.router.Router;
 import com.yonagi.ocean.handler.impl.*;
-import com.yonagi.ocean.middleware.FilterChain;
+import com.yonagi.ocean.middleware.Middleware;
+import com.yonagi.ocean.middleware.MiddlewareChain;
+import com.yonagi.ocean.middleware.MiddlewareLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,8 +50,15 @@ public class ClientHandler implements Runnable {
     private final boolean redirectSslEnabled;
     private final int sslPort;
 
-    private final FilterChain chain = new FilterChain();
+    private static final MiddlewareChain chain = new MiddlewareChain();
     private final List<HttpProtocolHandler> protocolHandlers;
+
+    static {
+        for (Middleware middleware : MiddlewareLoader.loadMiddlewares()) {
+            chain.addMiddleWare(middleware);
+            log.info("Registered middleware: {}", middleware.getClass().getSimpleName());
+        }
+    }
 
     public ClientHandler(Socket client, String webRoot, boolean sslEnabled, boolean isSsl, int sslPort, boolean redirectSslEnabled,
                          ConnectionManager connectionManager, Router router, RateLimiterChecker rateLimiterChecker) {
@@ -65,7 +74,7 @@ public class ClientHandler implements Runnable {
 
         this.protocolHandlers = new DefaultProtocolHandlerFactory().createHandlers(isSsl, sslEnabled, redirectSslEnabled, sslPort);
 
-        initFiterChain();
+        // initFiterChain();
     }
 
     @Override
@@ -148,9 +157,9 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    private void initFiterChain() {
-        // chain.addMiddleWare(new AuthMiddleware());
-    }
+//    private void initFiterChain() {
+//
+//    }
 
     private void performHandshakeCleanup(Socket client) {
         connectionManager.removeConnection(client);
@@ -177,25 +186,34 @@ public class ClientHandler implements Runnable {
         }
 
         // 进行中间件链路鉴权
-        boolean shouldContinue = chain.process(request);
-        HttpResponse middlewareResponse = (HttpResponse) request.getAttribute("MiddlewareResponse");
-        Exception middlewareException = (Exception) request.getAttribute("MiddlewareException");
-
-        if (middlewareResponse != null) {
-            middlewareResponse.write(request, output, keepAlive);
-            output.flush();
-            return;
-        } else if (middlewareException != null) {
-            new InternalErrorHandler().handle(request, output, keepAlive);
-            return;
-        } else if (!shouldContinue) {
-            HttpResponse breakResponse = new HttpResponse.Builder()
-                    .httpVersion(request.getHttpVersion())
-                    .httpStatus(HttpStatus.UNAUTHORIZED)
-                    .contentType("text/plain; chatset=utf-8")
-                    .body("Your request is blocked by Ocean. Please try again later.".getBytes())
-                    .build();
-            breakResponse.write(request, output, keepAlive);
+//        boolean shouldContinue = chain.process(request);
+//        HttpResponse middlewareResponse = (HttpResponse) request.getAttribute("MiddlewareResponse");
+//        Exception middlewareException = (Exception) request.getAttribute("MiddlewareException");
+//
+//        if (middlewareResponse != null) {
+//            middlewareResponse.write(request, output, keepAlive);
+//            output.flush();
+//            return;
+//        } else if (middlewareException != null) {
+//            new InternalErrorHandler().handle(request, output, keepAlive);
+//            return;
+//        } else if (!shouldContinue) {
+//            HttpResponse breakResponse = new HttpResponse.Builder()
+//                    .httpVersion(request.getHttpVersion())
+//                    .httpStatus(HttpStatus.UNAUTHORIZED)
+//                    .contentType("text/plain; chatset=utf-8")
+//                    .body("Your request is blocked by Ocean. Please try again later.".getBytes())
+//                    .build();
+//            breakResponse.write(request, output, keepAlive);
+//            output.flush();
+//            return;
+//        }
+        HttpResponse initialResponse = new HttpResponse.Builder()
+                .httpStatus(HttpStatus.OK)
+                .build();
+        HttpResponse chainResponse = chain.execute(request, initialResponse);
+        if (!chainResponse.equals(initialResponse)) {
+            chainResponse.write(request, output, keepAlive);
             output.flush();
             return;
         }
