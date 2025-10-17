@@ -4,6 +4,8 @@ import com.alibaba.nacos.api.config.ConfigService;
 import com.yonagi.ocean.cache.StaticFileCacheFactory;
 import com.yonagi.ocean.core.configuration.KeepAliveConfig;
 import com.yonagi.ocean.core.configuration.source.router.*;
+import com.yonagi.ocean.core.context.ConnectionContext;
+import com.yonagi.ocean.core.context.ServerContext;
 import com.yonagi.ocean.framework.ControllerRegistry;
 import com.yonagi.ocean.core.gzip.GzipEncoderManager;
 import com.yonagi.ocean.core.ratelimiter.RateLimiterChecker;
@@ -11,6 +13,7 @@ import com.yonagi.ocean.core.ratelimiter.RateLimiterManager;
 import com.yonagi.ocean.core.router.RouteManager;
 import com.yonagi.ocean.core.configuration.ServerStartupConfig;
 import com.yonagi.ocean.core.router.Router;
+import com.yonagi.ocean.middleware.MiddlewareChain;
 import com.yonagi.ocean.utils.LocalConfigLoader;
 import com.yonagi.ocean.utils.NacosConfigLoader;
 import org.slf4j.Logger;
@@ -55,6 +58,7 @@ public class HttpServer {
     private RateLimiterChecker rateLimiterChecker;
     private RateLimiterManager rateLimiterManager;
     private com.yonagi.ocean.core.configuration.source.ratelimit.ConfigSource rateLimitConfigSource;
+    private ServerContext serverContext;
 
     private int sslPort;
     private boolean sslEnabled;
@@ -99,27 +103,11 @@ public class HttpServer {
 
         // Initialize core components
         initializeComponents(startupConfig);
+        this.serverContext = new ServerContext(new MiddlewareChain(), this.rateLimiterChecker, this.router, this.connectionManager);
 
-        // Register route configuration change listener
-        this.routeConfigSource.onChange(() -> routeConfigManager.refreshRoutes(routeConfigSource));
-
-        // Register rate limit configuration change listener
-        this.rateLimitConfigSource.onChange(() -> rateLimiterManager.refreshRateLimiter(rateLimitConfigSource));
-
-        // Initialize routes if enabled
-        if (Boolean.parseBoolean(LocalConfigLoader.getProperty("server.router.enabled", "true"))) {
-            this.routeConfigManager.refreshRoutes(routeConfigSource);
-        }
-
-        // Initialize rate limit if enabled
-        if (Boolean.parseBoolean(LocalConfigLoader.getProperty("server.rate_limit.enabled", "true"))) {
-            this.rateLimiterManager.refreshRateLimiter(rateLimitConfigSource);
-            this.rateLimiterManager.preloadGlobalLimiter();
-        }
-        
-        log.info("HTTP Keep-Alive enabled: {}, timeout: {}s, max requests: {}", 
-                keepAliveConfig.isEnabled(), 
-                keepAliveConfig.getTimeoutSeconds(), 
+        log.info("HTTP Keep-Alive enabled: {}, timeout: {}s, max requests: {}",
+                keepAliveConfig.isEnabled(),
+                keepAliveConfig.getTimeoutSeconds(),
                 keepAliveConfig.getMaxRequests());
 
         if (this.sslEnabled) {
@@ -262,6 +250,23 @@ public class HttpServer {
         NacosConfigLoader.registerRecoveryAction(rateLimiterConfigRecoveryAction);
 
         this.rateLimiterChecker = new RateLimiterChecker(rateLimiterManager);
+
+        // Register route configuration change listener
+        this.routeConfigSource.onChange(() -> routeConfigManager.refreshRoutes(routeConfigSource));
+
+        // Register rate limit configuration change listener
+        this.rateLimitConfigSource.onChange(() -> rateLimiterManager.refreshRateLimiter(rateLimitConfigSource));
+
+        // Initialize routes if enabled
+        if (Boolean.parseBoolean(LocalConfigLoader.getProperty("server.router.enabled", "true"))) {
+            this.routeConfigManager.refreshRoutes(routeConfigSource);
+        }
+
+        // Initialize rate limit if enabled
+        if (Boolean.parseBoolean(LocalConfigLoader.getProperty("server.rate_limit.enabled", "true"))) {
+            this.rateLimiterManager.refreshRateLimiter(rateLimitConfigSource);
+            this.rateLimiterManager.preloadGlobalLimiter();
+        }
     }
 
     private void initSSL(ServerStartupConfig startupConfig) throws Exception {
@@ -301,8 +306,8 @@ public class HttpServer {
             while (isRunning) {
                 try {
                     Socket client = serverSocket.accept();
-                    threadPool.execute(new ClientHandler(client, webRoot, sslEnabled, isSsl, sslPort,
-                            redirectSslEnabled, connectionManager, router, rateLimiterChecker));
+                    ConnectionContext connectContext = new ConnectionContext(isSsl, sslEnabled, redirectSslEnabled, sslPort, serverContext);
+                    threadPool.execute(new ClientHandler(client, connectContext));
                 } catch (Exception e) {
                     if (isRunning) {
                         log.error("{} listener error on port {}: {}", isSsl ? "HTTPS" : "HTTP", port, e.getMessage());

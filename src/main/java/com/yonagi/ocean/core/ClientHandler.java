@@ -1,5 +1,6 @@
 package com.yonagi.ocean.core;
 
+import com.yonagi.ocean.core.context.ConnectionContext;
 import com.yonagi.ocean.core.protocol.DefaultProtocolHandlerFactory;
 import com.yonagi.ocean.core.protocol.HttpResponse;
 import com.yonagi.ocean.core.protocol.enums.HttpMethod;
@@ -10,9 +11,7 @@ import com.yonagi.ocean.core.protocol.handler.HttpProtocolHandler;
 import com.yonagi.ocean.core.ratelimiter.RateLimiterChecker;
 import com.yonagi.ocean.core.router.Router;
 import com.yonagi.ocean.handler.impl.*;
-import com.yonagi.ocean.middleware.Middleware;
 import com.yonagi.ocean.middleware.MiddlewareChain;
-import com.yonagi.ocean.middleware.MiddlewareLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,40 +40,27 @@ public class ClientHandler implements Runnable {
     private static final Pattern ABORT_PATTERN = Pattern.compile("connection (reset|abort)|主机中的软件中止|socket closed", Pattern.CASE_INSENSITIVE);
 
     private final Socket client;
-    private final String webRoot;
     private final ConnectionManager connectionManager;
+    private final ConnectionContext connectionContext;
     private final Router router;
     private final RateLimiterChecker rateLimiterChecker;
-    private final boolean isSsl;
-    private final boolean sslEnabled;
-    private final boolean redirectSslEnabled;
-    private final int sslPort;
+    private final MiddlewareChain chain;
 
-    private static final MiddlewareChain chain = new MiddlewareChain();
     private final List<HttpProtocolHandler> protocolHandlers;
 
-    static {
-        for (Middleware middleware : MiddlewareLoader.loadMiddlewares()) {
-            chain.addMiddleWare(middleware);
-            log.info("Registered middleware: {}", middleware.getClass().getSimpleName());
-        }
-    }
-
-    public ClientHandler(Socket client, String webRoot, boolean sslEnabled, boolean isSsl, int sslPort, boolean redirectSslEnabled,
-                         ConnectionManager connectionManager, Router router, RateLimiterChecker rateLimiterChecker) {
+    public ClientHandler(Socket client, ConnectionContext connectionContext) {
         this.client = client;
-        this.webRoot = webRoot;
-        this.sslEnabled = sslEnabled;
-        this.isSsl = isSsl;
-        this.sslPort = sslPort;
-        this.redirectSslEnabled = redirectSslEnabled;
-        this.connectionManager = connectionManager;
-        this.router = router;
-        this.rateLimiterChecker = rateLimiterChecker;
+        this.connectionContext = connectionContext;
 
-        this.protocolHandlers = new DefaultProtocolHandlerFactory().createHandlers(isSsl, sslEnabled, redirectSslEnabled, sslPort);
+        this.connectionManager = connectionContext.getServerContext().getConnectionManager();
+        this.router = connectionContext.getServerContext().getRouter();
+        this.rateLimiterChecker = connectionContext.getServerContext().getRateLimiterChecker();
+        this.chain = connectionContext.getServerContext().getMiddlewareChain();
 
-        // initFiterChain();
+        this.protocolHandlers = new DefaultProtocolHandlerFactory().createHandlers(
+                connectionContext.isSsl(),
+                connectionContext.isSslEnabled(),
+                connectionContext.isRedirectSslEnabled(), connectionContext.getSslPort());
     }
 
     @Override
@@ -82,7 +68,7 @@ public class ClientHandler implements Runnable {
         // Register this connection for Keep-Alive management
         connectionManager.registerConnection(client);
 
-        if (isSsl && client instanceof SSLSocket) {
+        if (connectionContext.isSsl() && client instanceof SSLSocket) {
             try {
                 ((SSLSocket) client).startHandshake();
             } catch (SSLException e) {
@@ -125,7 +111,7 @@ public class ClientHandler implements Runnable {
                     break;
                 }
                 currentRequest.setAttribute("clientIp", client.getInetAddress().getHostAddress());
-                currentRequest.setAttribute("isSsl", isSsl);
+                currentRequest.setAttribute("isSsl", connectionContext.isSsl());
 
 
                 boolean shouldKeepAlive = shouldKeepAlive(currentRequest);
@@ -157,10 +143,6 @@ public class ClientHandler implements Runnable {
         }
     }
 
-//    private void initFiterChain() {
-//
-//    }
-
     private void performHandshakeCleanup(Socket client) {
         connectionManager.removeConnection(client);
         try {
@@ -186,28 +168,6 @@ public class ClientHandler implements Runnable {
         }
 
         // 进行中间件链路鉴权
-//        boolean shouldContinue = chain.process(request);
-//        HttpResponse middlewareResponse = (HttpResponse) request.getAttribute("MiddlewareResponse");
-//        Exception middlewareException = (Exception) request.getAttribute("MiddlewareException");
-//
-//        if (middlewareResponse != null) {
-//            middlewareResponse.write(request, output, keepAlive);
-//            output.flush();
-//            return;
-//        } else if (middlewareException != null) {
-//            new InternalErrorHandler().handle(request, output, keepAlive);
-//            return;
-//        } else if (!shouldContinue) {
-//            HttpResponse breakResponse = new HttpResponse.Builder()
-//                    .httpVersion(request.getHttpVersion())
-//                    .httpStatus(HttpStatus.UNAUTHORIZED)
-//                    .contentType("text/plain; chatset=utf-8")
-//                    .body("Your request is blocked by Ocean. Please try again later.".getBytes())
-//                    .build();
-//            breakResponse.write(request, output, keepAlive);
-//            output.flush();
-//            return;
-//        }
         HttpResponse initialResponse = new HttpResponse.Builder()
                 .httpStatus(HttpStatus.OK)
                 .build();
