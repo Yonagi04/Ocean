@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+        <html lang="zh-CN">
+        <head>
+            <meta charset="UTF-8">
+            <title>错误</title>
+            <style>
+                body { font-family: "Segoe UI", "Helvetica Neue", sans-serif; background-color: #f6f7fb; display: flex;
+                       justify-content: center; align-items: center; height: 100vh; margin: 0; }
+                .container { background: #fff; padding: 40px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                             width: 650px; text-align: center; animation: fadeIn 0.4s ease-in-out; }
+                h1 { color: #e74c3c; font-size: 28px; margin-bottom: 15px; }
+                p.message { color: #555; font-size: 15px; margin-bottom: 10px; }
+                table { width: 100%; border-collapse: collapse; margin-bottom: 25px; }
+                th, td { border-bottom: 1px solid #eee; padding: 10px 12px; text-align: left; font-size: 14px; color: #333; }
+                th { background-color: #fafafa; width: 160px; color: #555; }
+                tr:last-child td { border-bottom: none; }
+                .footer { color: #888; font-size: 13px; margin-top: 15px; }
+                @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>发生了一个错误</h1>
+                <p class="message">请求处理过程中出现问题，请稍后再试。</p>
+                <p class="message">如果您是用户 / QA，请将问题反馈给服务负责人。</p>
+                <p class="message">如果您是服务负责人，请查看服务器日志以排查问题。</p>
+                <table>
+                    <tr><th>Trace ID</th><td>{{ traceId }}</td></tr>
+                    <tr><th>状态码</th><td>{{ status }}</td></tr>
+                    <tr><th>请求路径</th><td>{{ uri }}</td></tr>
+                    <tr><th>请求方法</th><td>{{ method }}</td></tr>
+                    <tr><th>客户端 IP</th><td>{{ clientIp }}</td></tr>
+                    <tr><th>User-Agent</th><td>{{ userAgent }}</td></tr>
+                    <tr><th>时间</th><td>{{ timestamp }}</td></tr>
+                </table>
+                <div class="footer">Ocean © 2025</div>
+            </div>
+        </body>
+        </html>

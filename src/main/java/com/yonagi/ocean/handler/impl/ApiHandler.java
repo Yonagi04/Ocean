@@ -2,6 +2,8 @@ package com.yonagi.ocean.handler.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
+import com.yonagi.ocean.core.ErrorPageRender;
+import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.gzip.GzipEncoder;
 import com.yonagi.ocean.core.gzip.GzipEncoderManager;
 import com.yonagi.ocean.core.protocol.HttpRequest;
@@ -34,19 +36,14 @@ public class ApiHandler implements RequestHandler {
 
     private static final Logger log = LoggerFactory.getLogger(ApiHandler.class);
 
-    private final String webRoot;
 
-    public ApiHandler(String webRoot) {
-        this.webRoot = webRoot;
+    public ApiHandler() {
+
     }
 
     @Override
-    public void handle(HttpRequest request, OutputStream output) throws IOException {
-        handle(request, output, true); // Default to keep-alive
-    }
-    
-    @Override
-    public void handle(HttpRequest request, OutputStream output, boolean keepAlive) throws IOException {
+    public void handle(HttpContext httpContext) throws IOException {
+        HttpRequest request = httpContext.getRequest();
         String contentType = request.getHeaders().getOrDefault("content-type", "");
         Map<String, Object> responseData = new HashMap<>();
         String charset = "UTF-8";
@@ -59,15 +56,15 @@ public class ApiHandler implements RequestHandler {
         // 使用策略映射替代 if-else
         ContentProcessor processor = processors.get(mimeType);
         if (processor == null) {
-            HttpResponse response = new HttpResponse.Builder()
+            HttpResponse response = httpContext.getResponse().toBuilder()
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
                     .contentType("text/plain; charset=utf-8")
                     .headers(headers)
                     .body("Unsupported Media Type".getBytes())
                     .build();
-            response.write(request, output, keepAlive);
-            output.flush();
+            httpContext.setResponse(response);
+            ErrorPageRender.render(httpContext);
             log.warn("Client sent unsupported Content-Type: {}", contentType);
             return;
         }
@@ -77,15 +74,15 @@ public class ApiHandler implements RequestHandler {
         } catch (Exception e) {
             String msgPrefix = "application/xml".equals(mimeType) ? "XML parsing error: " : "Multipart form data parsing error: ";
             log.error("{}{}", msgPrefix, e.getMessage(), e);
-            HttpResponse errorResponse = new HttpResponse.Builder()
+            HttpResponse errorResponse = httpContext.getResponse().toBuilder()
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.BAD_REQUEST)
                     .contentType("text/plain; charset=utf-8")
                     .headers(headers)
                     .body((msgPrefix + e.getMessage()).getBytes())
                     .build();
-            errorResponse.write(request, output, keepAlive);
-            output.flush();
+            ErrorPageRender.render(httpContext);
+            httpContext.setResponse(errorResponse);
             return;
         }
 
@@ -98,15 +95,14 @@ public class ApiHandler implements RequestHandler {
             headers.put("Content-Encoding", "gzip");
         }
 
-        HttpResponse response = new HttpResponse.Builder()
+        HttpResponse response = httpContext.getResponse().toBuilder()
                 .httpVersion(request.getHttpVersion())
                 .httpStatus(HttpStatus.CREATED)
                 .contentType("application/json")
                 .headers(headers)
                 .body(finalBody)
                 .build();
-        response.write(request, output, keepAlive);
-        output.flush();
+        httpContext.setResponse(response);
     }
 
     @FunctionalInterface

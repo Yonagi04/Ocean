@@ -1,6 +1,7 @@
 package com.yonagi.ocean.core;
 
 import com.yonagi.ocean.core.context.ConnectionContext;
+import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.DefaultProtocolHandlerFactory;
 import com.yonagi.ocean.core.protocol.HttpResponse;
 import com.yonagi.ocean.core.protocol.enums.HttpMethod;
@@ -11,6 +12,7 @@ import com.yonagi.ocean.core.protocol.handler.HttpProtocolHandler;
 import com.yonagi.ocean.core.ratelimiter.RateLimiterChecker;
 import com.yonagi.ocean.core.router.Router;
 import com.yonagi.ocean.handler.impl.*;
+import com.yonagi.ocean.middleware.ChainExecutor;
 import com.yonagi.ocean.middleware.MiddlewareChain;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,7 +45,6 @@ public class ClientHandler implements Runnable {
     private final ConnectionManager connectionManager;
     private final ConnectionContext connectionContext;
     private final Router router;
-    private final RateLimiterChecker rateLimiterChecker;
     private final MiddlewareChain chain;
 
     private final List<HttpProtocolHandler> protocolHandlers;
@@ -54,7 +55,6 @@ public class ClientHandler implements Runnable {
 
         this.connectionManager = connectionContext.getServerContext().getConnectionManager();
         this.router = connectionContext.getServerContext().getRouter();
-        this.rateLimiterChecker = connectionContext.getServerContext().getRateLimiterChecker();
         this.chain = connectionContext.getServerContext().getMiddlewareChain();
 
         this.protocolHandlers = new DefaultProtocolHandlerFactory().createHandlers(
@@ -113,7 +113,6 @@ public class ClientHandler implements Runnable {
                 currentRequest.setAttribute("clientIp", client.getInetAddress().getHostAddress());
                 currentRequest.setAttribute("isSsl", connectionContext.isSsl());
 
-
                 boolean shouldKeepAlive = shouldKeepAlive(currentRequest);
                 if (!shouldKeepAlive) {
                     handleRequest(currentRequest, output, false);
@@ -153,33 +152,27 @@ public class ClientHandler implements Runnable {
     }
 
     private void handleRequest(HttpRequest request, OutputStream output, boolean keepAlive) throws IOException {
-        HttpMethod method = request.getMethod();
-        String path = request.getUri();
-        
-        if (method == null) {
-            new MethodNotAllowHandler().handle(request, output, keepAlive);
-            return;
-        }
-
-        // 限流器做限流判断
-        if (!rateLimiterChecker.check(request)) {
-            new TooManyRequestsHandler().handle(request, output, keepAlive);
-            return;
-        }
-
-        // 进行中间件链路鉴权
         HttpResponse initialResponse = new HttpResponse.Builder()
                 .httpStatus(HttpStatus.OK)
+                .contentType("text/plain; charset=utf-8")
                 .build();
-        HttpResponse chainResponse = chain.execute(request, initialResponse);
-        if (!chainResponse.equals(initialResponse)) {
-            chainResponse.write(request, output, keepAlive);
-            output.flush();
-            return;
-        }
+        HttpContext httpContext = new HttpContext(request, initialResponse, output, keepAlive, connectionContext);
 
-        // 使用Router进行路由转发
-        router.route(method, path, request, output, keepAlive);
+        Runnable routeHandler = () -> {
+            try {
+                router.route(httpContext);
+            } catch (Exception e) {
+                throw new RuntimeException("Routing failed", e);
+            }
+        };
+
+        ChainExecutor chainExecutor = chain.newExecutor(routeHandler);
+        try {
+            chainExecutor.execute(httpContext);
+        } catch (Exception e) {
+            log.error("FATAL: Unhandled exception escaped the middleware chain: {}", e.getMessage(), e);
+            sendFatalErrorResponse(httpContext);
+        }
     }
 
     /**
@@ -208,50 +201,20 @@ public class ClientHandler implements Runnable {
         return !connectionHeader.equalsIgnoreCase("close");
     }
 
-    private byte[] readTextBodyFromInputStream(InputStream rawInputStream, Map<String, String> headers) throws IOException {
-        if (rawInputStream == null) {
-            return new byte[0];
+    private void sendFatalErrorResponse(HttpContext httpContext) {
+        try {
+            HttpResponse errorResponse = httpContext.getResponse().toBuilder()
+                    .httpVersion(httpContext.getResponse().getHttpVersion())
+                    .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .contentType("text/plain; charset=utf-8")
+                    .body("FATAL SERVER ERROR".getBytes())
+                    .build();
+            httpContext.setResponse(errorResponse);
+            ErrorPageRender.render(httpContext);
+            httpContext.getResponse().write(httpContext.getRequest(), httpContext.getOutput(), httpContext.isKeepalive());
+            httpContext.getOutput().flush();
+        } catch (IOException e) {
+            log.error("Failed to write fatal error response to client: {}", e.getMessage(), e);
         }
-        String contentLengthStr = headers.get("content-length");
-        int contentLength = contentLengthStr == null ? 0 : Integer.parseInt(contentLengthStr);
-
-        if (contentLength <= 0) {
-            return new byte[0];
-        }
-
-        Charset charset = StandardCharsets.UTF_8;
-        String contentType = headers.get("content-type");
-        if (contentType != null) {
-            try {
-                String[] parts = contentType.split(";");
-                for (String part : parts) {
-                    String trimmedPart = part.trim().toLowerCase();
-                    if (trimmedPart.startsWith("charset=")) {
-                        String charsetName = trimmedPart.substring("charset=".length()).trim();
-                        charset = Charset.forName(charsetName);
-                        break;
-                    }
-                }
-            } catch (IllegalCharsetNameException | UnsupportedCharsetException e) {
-                log.warn("Unsupported charset in Content-Type: {}, defaulting to UTF-8.", contentType);
-            }
-        }
-
-        InputStreamReader isr = new InputStreamReader(rawInputStream, charset);
-        BufferedReader reader = new BufferedReader(isr);
-
-        CharArrayWriter writer = new CharArrayWriter(contentLength);
-        char[] buffer = new char[1024];
-        int remaining = contentLength;
-
-        while (remaining > 0) {
-            int read = reader.read(buffer, 0, Math.min(buffer.length, remaining));
-            if (read == -1) {
-                throw new IOException("Stream ended prematurely. Excepted " + contentLength + " bytes.");
-            }
-            writer.write(buffer, 0, read);
-            remaining -= read;
-        }
-        return writer.toString().getBytes(charset);
     }
 }

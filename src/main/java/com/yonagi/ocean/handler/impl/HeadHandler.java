@@ -1,5 +1,6 @@
 package com.yonagi.ocean.handler.impl;
 
+import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
@@ -32,14 +33,10 @@ public class HeadHandler implements RequestHandler {
     public HeadHandler(String webRoot) {
         this.webRoot = webRoot;
     }
-
-    @Override
-    public void handle(HttpRequest request, OutputStream output) throws IOException {
-        handle(request, output, true); // Default to keep-alive
-    }
     
     @Override
-    public void handle(HttpRequest request, OutputStream output, boolean keepAlive) throws IOException {
+    public void handle(HttpContext httpContext) throws IOException {
+        HttpRequest request = httpContext.getRequest();
         Map<String, String> headers = (Map<String, String>) request.getAttribute("HstsHeaders");
 
         String uri = request.getUri();
@@ -51,11 +48,11 @@ public class HeadHandler implements RequestHandler {
         }
         File file = new File(webRoot, uri);
         if (!file.exists() || file.isDirectory()) {
-            writeNotFound(request, output, keepAlive, headers);
+            writeNotFound(httpContext);
             return;
         }
         if (!file.getCanonicalPath().startsWith(new File(webRoot).getCanonicalPath())) {
-            writeNotFound(request, output, keepAlive, headers);
+            writeNotFound(httpContext);
             log.warn("Attempted directory traversal attack: {}", uri);
             return;
         }
@@ -63,25 +60,23 @@ public class HeadHandler implements RequestHandler {
         if (contentType == null) {
             contentType = "application/octet-stream";
         }
-        HttpResponse response = new HttpResponse.Builder()
+        HttpResponse response = httpContext.getResponse().toBuilder()
                 .httpVersion(request.getHttpVersion())
                 .httpStatus(HttpStatus.OK)
                 .contentType(contentType)
                 .headers(headers)
                 .build();
-        response.write(request, output, keepAlive);
-        output.flush();
+        httpContext.setResponse(response);
     }
     
-    private void writeNotFound(HttpRequest request, OutputStream output,
-                               boolean keepAlive, Map<String, String> headers) throws IOException {
-        HttpResponse response = new HttpResponse.Builder()
+    private void writeNotFound(HttpContext httpContext) throws IOException {
+        Map<String, String> headers = (Map<String, String>) httpContext.getRequest().getAttribute("HstsHeaders");
+        HttpResponse response = httpContext.getResponse().toBuilder()
                 .httpVersion(HttpVersion.HTTP_1_1)
                 .httpStatus(HttpStatus.NOT_FOUND)
-                .contentType("text/html")
+                .contentType("text/plain; charset=utf/8")
                 .headers(headers)
                 .build();
-        response.write(request, output, keepAlive);
-        output.flush();
+        httpContext.setResponse(response);
     }
 }

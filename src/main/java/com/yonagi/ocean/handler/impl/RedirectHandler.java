@@ -1,6 +1,7 @@
 package com.yonagi.ocean.handler.impl;
 
 import com.yonagi.ocean.core.configuration.RedirectConfig;
+import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
@@ -41,12 +42,8 @@ public class RedirectHandler implements RequestHandler {
     }
 
     @Override
-    public void handle(HttpRequest request, OutputStream output) throws IOException {
-        handle(request, output);
-    }
-
-    @Override
-    public void handle(HttpRequest request, OutputStream output, boolean keepAlive) throws IOException {
+    public void handle(HttpContext httpContext) throws IOException {
+        HttpRequest request = httpContext.getRequest();
         String targetUrl = (String) request.getAttribute("targetUrl");
         Integer statusCode = (Integer) request.getAttribute("statusCode");
         if (targetUrl == null) {
@@ -116,17 +113,17 @@ public class RedirectHandler implements RequestHandler {
             log.warn("Invalid statusCode for redirect: {}, using default 302", statusCode);
             statusCode = 302;
         }
-        HttpResponse.Builder builder = new HttpResponse.Builder()
+        HttpResponse.Builder builder = httpContext.getResponse().toBuilder()
                 .httpVersion(request.getHttpVersion())
                 .httpStatus(HttpStatus.fromCode(statusCode))
-                .contentType(request.getAttribute("contentType") != null ? (String) request.getAttribute("contentType") : "text/html");
+                .contentType(request.getAttribute("contentType") != null ? (String) request.getAttribute("contentType") : "text/html; charset=utf-8");
         Map<String, String> responseHeaders = (Map<String, String>) request.getAttribute("HstsHeaders");
         responseHeaders.put("Location", finalLocation);
         builder.headers(responseHeaders);
 
         HttpResponse response = builder.build();
-        response.write(request, output, false);
-        output.flush();
+        httpContext.setResponse(response);
+        httpContext.setKeepalive(false);
         log.info("Request path: {}, redirect to: {}, status code: {}", request.getUri(), finalLocation, statusCode);
     }
 

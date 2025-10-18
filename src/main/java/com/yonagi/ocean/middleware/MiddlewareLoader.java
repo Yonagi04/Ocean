@@ -36,6 +36,7 @@ public class MiddlewareLoader {
             }
         }
         middlewares.sort(Comparator.comparingInt(MiddlewareLoader::getPriority));
+        log.info("Loaded {} middleware(s)", middlewares.size());
         return middlewares;
     }
 

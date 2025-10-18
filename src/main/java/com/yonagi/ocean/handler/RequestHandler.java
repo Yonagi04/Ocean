@@ -1,6 +1,7 @@
 package com.yonagi.ocean.handler;
 
 import com.alibaba.nacos.shaded.com.google.protobuf.ByteString;
+import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 
 import java.io.IOException;
@@ -15,9 +16,5 @@ import java.io.OutputStream;
  */
 public interface RequestHandler {
 
-    void handle(HttpRequest request, OutputStream output) throws IOException;
-
-    default void handle(HttpRequest request, OutputStream output, boolean keepAlive) throws IOException {
-        handle(request, output);
-    }
+    void handle(HttpContext httpContext) throws IOException;
 }

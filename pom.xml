@@ -22,6 +22,7 @@
         <javax-servlet-api.version>3.1.0</javax-servlet-api.version>
         <classgraph.version>4.8.147</classgraph.version>
         <reflections.version>0.9.11</reflections.version>
+        <pebble.version>3.2.2</pebble.version>
     </properties>
 
     <dependencies>
@@ -96,6 +97,12 @@
             <groupId>org.reflections</groupId>
             <artifactId>reflections</artifactId>
             <version>${reflections.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>io.pebbletemplates</groupId>
+            <artifactId>pebble</artifactId>
+            <version>${pebble.version}</version>
         </dependency>
     </dependencies>
 </project>
