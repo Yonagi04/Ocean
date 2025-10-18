@@ -1,6 +1,7 @@
 package com.yonagi.ocean.handler.impl;
 
 import com.yonagi.ocean.cache.*;
+import com.yonagi.ocean.core.ErrorPageRender;
 import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.gzip.GzipEncoder;
 import com.yonagi.ocean.core.gzip.GzipEncoderManager;
@@ -29,29 +30,10 @@ public class StaticFileHandler implements RequestHandler {
 
     private static final Logger log = LoggerFactory.getLogger(StaticFileHandler.class);
 
-    private static final String DEFAULT_404_HTML = "<html>\n" +
-            "<head>\n" +
-            "    <title>404 Not Found</title>\n" +
-            "    <style>\n" +
-            "        body {\n" +
-            "            width: 35em;\n" +
-            "            margin: 0 auto;\n" +
-            "            font-family: Tahoma, Verdana, Arial, sans-serif;\n" +
-            "        }\n" +
-            "    </style>\n" +
-            "</head>\n" +
-            "<body>\n" +
-            "<h1>404 Not Found</h1>\n" +
-            "<p>The requested resource was not found on this server.</p>\n" +
-            "</body>\n" +
-            "</html>";
-
     private final String webRoot;
-    private final String errorPagePath;
 
     public StaticFileHandler(String webRoot) {
         this.webRoot = webRoot;
-        this.errorPagePath = LocalConfigLoader.getProperty("server.not_found_page");
     }
     
     @Override
@@ -126,41 +108,25 @@ public class StaticFileHandler implements RequestHandler {
             log.info("Served from {}{}", isInCache ? "cache: " : "disk: ", uri);
         } catch (Exception e) {
             log.error("Error serving file: {}", uri, e);
-            new InternalErrorHandler().handle(httpContext);
+            HttpResponse errorResponse = httpContext.getResponse().toBuilder()
+                    .httpVersion(request.getHttpVersion())
+                    .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .contentType("text/html; charset=utf-8")
+                    .build();
+            httpContext.setResponse(errorResponse);
+            ErrorPageRender.render(httpContext);
         }
     }
     
-    private void writeNotFound(HttpContext httpContext, Map<String, String> headers) throws IOException {
-        StaticFileCache fileCache = StaticFileCacheFactory.getInstance();
-        File errorPage = new File(errorPagePath);
-        if (errorPage.exists()) {
-            try {
-                String contentType = MimeTypeUtil.getMimeType(errorPage.getName());
-                if (contentType == null) {
-                    contentType = "text/html";
-                }
-                CachedFile cf = fileCache.get(errorPage);
-                HttpResponse httpResponse = httpContext.getResponse().toBuilder()
-                        .httpVersion(HttpVersion.HTTP_1_1)
-                        .httpStatus(HttpStatus.NOT_FOUND)
-                        .contentType(contentType)
-                        .headers(headers)
-                        .body(cf.getContent())
-                        .build();
-                httpContext.setResponse(httpResponse);
-                return;
-            } catch (Exception ignore) {
-                // fallback to default 404
-            }
-        }
+    private void writeNotFound(HttpContext httpContext, Map<String, String> headers) {
         HttpResponse httpResponse = httpContext.getResponse().toBuilder()
                 .httpVersion(HttpVersion.HTTP_1_1)
                 .httpStatus(HttpStatus.NOT_FOUND)
                 .contentType("text/html")
                 .headers(headers)
-                .body(DEFAULT_404_HTML.getBytes())
                 .build();
         httpContext.setResponse(httpResponse);
+        ErrorPageRender.render(httpContext);
     }
 
     private String generateETag(CachedFile cf) {

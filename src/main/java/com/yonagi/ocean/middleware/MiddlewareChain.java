@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -24,7 +25,7 @@ public class MiddlewareChain {
     private final List<Middleware> middlewares;
 
     public MiddlewareChain(List<Middleware> globalMiddlewares) {
-        this.middlewares = List.copyOf(globalMiddlewares);
+        this.middlewares = Collections.unmodifiableList(new ArrayList<>(globalMiddlewares));
     }
 
     public List<Middleware> getMiddlewares() {

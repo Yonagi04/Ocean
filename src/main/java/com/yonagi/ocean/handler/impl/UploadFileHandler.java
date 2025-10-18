@@ -1,11 +1,13 @@
 package com.yonagi.ocean.handler.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yonagi.ocean.core.ErrorPageRender;
 import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
 import com.yonagi.ocean.core.protocol.enums.HttpMethod;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
+import com.yonagi.ocean.core.protocol.enums.HttpVersion;
 import com.yonagi.ocean.handler.RequestHandler;
 import com.yonagi.ocean.utils.LocalConfigLoader;
 import com.yonagi.ocean.utils.UUIDUtil;
@@ -43,23 +45,31 @@ public class UploadFileHandler implements RequestHandler {
 
     @Override
     public void handle(HttpContext httpContext) throws IOException {
-        if (httpContext.getRequest().getMethod() != HttpMethod.POST) {
-            new MethodNotAllowHandler().handle(httpContext);
-            return;
-        }
         HttpRequest request = httpContext.getRequest();
         Map<String, String> headers = (Map<String, String>) request.getAttribute("HstsHeaders");
 
+        if (request.getMethod() != HttpMethod.POST) {
+            HttpResponse response = httpContext.getResponse().toBuilder()
+                    .httpVersion(HttpVersion.HTTP_1_1)
+                    .httpStatus(HttpStatus.METHOD_NOT_ALLOWED)
+                    .contentType("text/html")
+                    .headers(headers)
+                    .build();
+            httpContext.setResponse(response);
+            ErrorPageRender.render(httpContext);
+            return;
+        }
         final InputStream bodyStream = request.getRawBodyInputStream();
         if (bodyStream == null) {
+            log.error("[{}] BodyStream is null", request.getAttribute("traceId") == null ? "UNKNOWN" : request.getAttribute("traceId"));
             HttpResponse response = httpContext.getResponse().toBuilder()
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.BAD_REQUEST)
                     .headers(headers)
-                    .body("Request body stream is missing".getBytes())
-                    .contentType("text/plain; charset=utf-8")
+                    .contentType("text/html; charset=utf-8")
                     .build();
             httpContext.setResponse(response);
+            ErrorPageRender.render(httpContext);
             return;
         }
 
@@ -97,14 +107,15 @@ public class UploadFileHandler implements RequestHandler {
             }
         };
         if (!ServletFileUpload.isMultipartContent(requestContext)) {
+            log.error("[{}] Invalid request body", request.getAttribute("traceId") == null ? "UNKNOWN" : request.getAttribute("traceId"));
             HttpResponse response = httpContext.getResponse().toBuilder()
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.BAD_REQUEST)
-                    .contentType("text/plain; charset=utf-8")
+                    .contentType("text/html; charset=utf-8")
                     .headers(headers)
-                    .body("Invalid request body".getBytes())
                     .build();
             httpContext.setResponse(response);
+            ErrorPageRender.render(httpContext);
             return;
         }
         DiskFileItemFactory factory = new DiskFileItemFactory();
@@ -116,14 +127,15 @@ public class UploadFileHandler implements RequestHandler {
         try {
             List<FileItem> items = upload.parseRequest(requestContext);
             if (items == null || items.isEmpty()) {
+                log.error("[{}] Invalid request body", request.getAttribute("traceId") == null ? "UNKNOWN" : request.getAttribute("traceId"));
                 HttpResponse response = httpContext.getResponse().toBuilder()
                         .httpVersion(request.getHttpVersion())
                         .httpStatus(HttpStatus.BAD_REQUEST)
-                        .contentType("text/plain; charset=utf-8")
+                        .contentType("text/html; charset=utf-8")
                         .headers(headers)
-                        .body("Invalid request body".getBytes())
                         .build();
                 httpContext.setResponse(response);
+                ErrorPageRender.render(httpContext);
                 return;
             }
 
@@ -137,7 +149,13 @@ public class UploadFileHandler implements RequestHandler {
                         candidate = UUIDUtil.getTimeBasedShortUUIDWithPrefix("file_");
                         fileName = candidate + extension;
                         if (Paths.get(UPLOAD_DIR, fileName).toFile().exists()) {
-                            new InternalErrorHandler().handle(httpContext);
+                            HttpResponse errorResponse = httpContext.getResponse().toBuilder()
+                                    .httpVersion(request.getHttpVersion())
+                                    .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+                                    .contentType("text/html; charset=utf-8")
+                                    .build();
+                            httpContext.setResponse(errorResponse);
+                            ErrorPageRender.render(httpContext);
                         }
                     }
                     File storeFile = Paths.get(UPLOAD_DIR, fileName).toFile();
@@ -172,8 +190,14 @@ public class UploadFileHandler implements RequestHandler {
             httpContext.setResponse(response);
             items.forEach(FileItem::delete);
         } catch (Exception e) {
-            log.error("File upload failed: {}", e.getMessage(), e);
-            new InternalErrorHandler().handle(httpContext);
+            log.error("[{}] File upload failed: {}", request.getAttribute("traceId") == null ? "UNKNOWN" : request.getAttribute("traceId"), e.getMessage(), e);
+            HttpResponse errorResponse = httpContext.getResponse().toBuilder()
+                    .httpVersion(request.getHttpVersion())
+                    .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .contentType("text/html; charset=utf-8")
+                    .build();
+            httpContext.setResponse(errorResponse);
+            ErrorPageRender.render(httpContext);
         }
     }
 

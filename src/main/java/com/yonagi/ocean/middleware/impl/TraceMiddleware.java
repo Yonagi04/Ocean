@@ -14,7 +14,7 @@ import com.yonagi.ocean.utils.UUIDUtil;
  * @description
  * @date 2025/10/18 10:37
  */
-@MiddlewarePriority(value = 1)
+@MiddlewarePriority(value = 0)
 public class TraceMiddleware implements Middleware {
 
     @Override

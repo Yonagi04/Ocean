@@ -1,5 +1,6 @@
 package com.yonagi.ocean.middleware.impl;
 
+import com.yonagi.ocean.core.ErrorPageRender;
 import com.yonagi.ocean.core.context.ConnectionContext;
 import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.HttpRequest;
@@ -17,7 +18,7 @@ import com.yonagi.ocean.middleware.annotation.MiddlewarePriority;
  * @description
  * @date 2025/10/18 11:12
  */
-@MiddlewarePriority(value = 3)
+@MiddlewarePriority(value = 5)
 public class RateLimitMiddleware implements Middleware {
 
     @Override
@@ -26,7 +27,6 @@ public class RateLimitMiddleware implements Middleware {
         RateLimiterChecker rateLimiterChecker = connectionContext.getServerContext().getRateLimiterChecker();
         HttpRequest request = httpContext.getRequest();
 
-        // todo: 限流页面增加traceid, ua, uri, method等信息
         if (!rateLimiterChecker.check(request)) {
             HttpResponse errorResponse = httpContext.getResponse().toBuilder()
                     .httpVersion(request.getHttpVersion())
@@ -35,6 +35,7 @@ public class RateLimitMiddleware implements Middleware {
                     .body("Rate limit exceeded. Try again later.".getBytes())
                     .build();
             httpContext.setResponse(errorResponse);
+            ErrorPageRender.render(httpContext);
             return;
         }
 

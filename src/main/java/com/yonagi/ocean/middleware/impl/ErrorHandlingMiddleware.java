@@ -14,7 +14,7 @@ import com.yonagi.ocean.middleware.annotation.MiddlewarePriority;
  * @description
  * @date 2025/10/18 10:59
  */
-@MiddlewarePriority(value = 1)
+@MiddlewarePriority(value = 2)
 public class ErrorHandlingMiddleware implements Middleware {
 
     @Override

@@ -81,6 +81,13 @@ public class HttpRequest {
         return attributes.get(key);
     }
 
+    public Object getAttributeOrDefault(String key, Object defaultValue) {
+        if (attributes.containsKey(key)) {
+            return attributes.get(key);
+        }
+        return defaultValue;
+    }
+
     public static class Builder {
         private HttpMethod method;
         private String uri;

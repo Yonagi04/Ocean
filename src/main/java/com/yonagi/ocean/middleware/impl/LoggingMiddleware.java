@@ -17,7 +17,7 @@ import org.slf4j.LoggerFactory;
  * @description
  * @date 2025/10/18 10:04
  */
-@MiddlewarePriority(value = 2)
+@MiddlewarePriority(value = 3)
 public class LoggingMiddleware implements Middleware {
 
     private static final Logger log = LoggerFactory.getLogger(LoggingMiddleware.class);

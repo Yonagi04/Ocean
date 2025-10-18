@@ -2,6 +2,7 @@ package com.yonagi.ocean.handler.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
+import com.yonagi.ocean.core.ErrorPageRender;
 import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.gzip.GzipEncoder;
 import com.yonagi.ocean.core.gzip.GzipEncoderManager;
@@ -35,10 +36,9 @@ public class ApiHandler implements RequestHandler {
 
     private static final Logger log = LoggerFactory.getLogger(ApiHandler.class);
 
-    private final String webRoot;
 
-    public ApiHandler(String webRoot) {
-        this.webRoot = webRoot;
+    public ApiHandler() {
+
     }
 
     @Override
@@ -64,6 +64,7 @@ public class ApiHandler implements RequestHandler {
                     .body("Unsupported Media Type".getBytes())
                     .build();
             httpContext.setResponse(response);
+            ErrorPageRender.render(httpContext);
             log.warn("Client sent unsupported Content-Type: {}", contentType);
             return;
         }
@@ -80,6 +81,7 @@ public class ApiHandler implements RequestHandler {
                     .headers(headers)
                     .body((msgPrefix + e.getMessage()).getBytes())
                     .build();
+            ErrorPageRender.render(httpContext);
             httpContext.setResponse(errorResponse);
             return;
         }

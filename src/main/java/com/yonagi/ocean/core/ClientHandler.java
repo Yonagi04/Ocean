@@ -201,63 +201,17 @@ public class ClientHandler implements Runnable {
         return !connectionHeader.equalsIgnoreCase("close");
     }
 
-    private byte[] readTextBodyFromInputStream(InputStream rawInputStream, Map<String, String> headers) throws IOException {
-        if (rawInputStream == null) {
-            return new byte[0];
-        }
-        String contentLengthStr = headers.get("content-length");
-        int contentLength = contentLengthStr == null ? 0 : Integer.parseInt(contentLengthStr);
-
-        if (contentLength <= 0) {
-            return new byte[0];
-        }
-
-        Charset charset = StandardCharsets.UTF_8;
-        String contentType = headers.get("content-type");
-        if (contentType != null) {
-            try {
-                String[] parts = contentType.split(";");
-                for (String part : parts) {
-                    String trimmedPart = part.trim().toLowerCase();
-                    if (trimmedPart.startsWith("charset=")) {
-                        String charsetName = trimmedPart.substring("charset=".length()).trim();
-                        charset = Charset.forName(charsetName);
-                        break;
-                    }
-                }
-            } catch (IllegalCharsetNameException | UnsupportedCharsetException e) {
-                log.warn("Unsupported charset in Content-Type: {}, defaulting to UTF-8.", contentType);
-            }
-        }
-
-        InputStreamReader isr = new InputStreamReader(rawInputStream, charset);
-        BufferedReader reader = new BufferedReader(isr);
-
-        CharArrayWriter writer = new CharArrayWriter(contentLength);
-        char[] buffer = new char[1024];
-        int remaining = contentLength;
-
-        while (remaining > 0) {
-            int read = reader.read(buffer, 0, Math.min(buffer.length, remaining));
-            if (read == -1) {
-                throw new IOException("Stream ended prematurely. Excepted " + contentLength + " bytes.");
-            }
-            writer.write(buffer, 0, read);
-            remaining -= read;
-        }
-        return writer.toString().getBytes(charset);
-    }
-
     private void sendFatalErrorResponse(HttpContext httpContext) {
-        // todo: body记录traceid, ua, uri, method等信息
         try {
-            HttpResponse finalResponse = httpContext.getResponse().toBuilder()
+            HttpResponse errorResponse = httpContext.getResponse().toBuilder()
                     .httpVersion(httpContext.getResponse().getHttpVersion())
                     .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
                     .contentType("text/plain; charset=utf-8")
                     .body("FATAL SERVER ERROR".getBytes())
                     .build();
-            finalResponse.write(httpContext.getRequest(), httpContext.getOutput(), httpContext.isKeepalive());
+            httpContext.setResponse(errorResponse);
+            ErrorPageRender.render(httpContext);
+            httpContext.getResponse().write(httpContext.getRequest(), httpContext.getOutput(), httpContext.isKeepalive());
             httpContext.getOutput().flush();
         } catch (IOException e) {
             log.error("Failed to write fatal error response to client: {}", e.getMessage(), e);

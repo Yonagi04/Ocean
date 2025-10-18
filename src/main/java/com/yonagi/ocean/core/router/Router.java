@@ -1,6 +1,7 @@
 package com.yonagi.ocean.core.router;
 
 import com.alibaba.nacos.api.naming.pojo.healthcheck.impl.Http;
+import com.yonagi.ocean.core.ErrorPageRender;
 import com.yonagi.ocean.core.configuration.RouteConfig;
 import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.HttpResponse;
@@ -168,7 +169,7 @@ public class Router {
      */
     private void initDefaultHandlers() {
         defaultHandlers.put(HttpMethod.GET, new StaticFileHandler(webRoot));
-        defaultHandlers.put(HttpMethod.POST, new ApiHandler(webRoot));
+        defaultHandlers.put(HttpMethod.POST, new ApiHandler());
         defaultHandlers.put(HttpMethod.HEAD, new HeadHandler(webRoot));
     }
     
@@ -301,6 +302,7 @@ public class Router {
                     .body("HTTP Method not specified or supported.".getBytes())
                     .build();
             httpContext.setResponse(errorResponse);
+            ErrorPageRender.render(httpContext);
         }
     }
 

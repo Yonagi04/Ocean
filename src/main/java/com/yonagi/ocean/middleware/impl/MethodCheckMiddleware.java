@@ -18,7 +18,7 @@ import com.yonagi.ocean.middleware.annotation.MiddlewarePriority;
  * @description
  * @date 2025/10/18 10:04
  */
-@MiddlewarePriority(value = 3)
+@MiddlewarePriority(value = 4)
 public class MethodCheckMiddleware implements Middleware {
 
     @Override

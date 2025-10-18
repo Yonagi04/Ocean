@@ -13,7 +13,7 @@ import com.yonagi.ocean.middleware.annotation.MiddlewarePriority;
  * @description
  * @date 2025/10/18 10:12
  */
-@MiddlewarePriority(value = 0)
+@MiddlewarePriority(value = 1)
 public class ResponseSenderMiddleware implements Middleware {
 
     @Override
