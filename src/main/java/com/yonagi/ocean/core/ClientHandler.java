@@ -1,6 +1,7 @@
 package com.yonagi.ocean.core;
 
 import com.yonagi.ocean.core.context.ConnectionContext;
+import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.DefaultProtocolHandlerFactory;
 import com.yonagi.ocean.core.protocol.HttpResponse;
 import com.yonagi.ocean.core.protocol.enums.HttpMethod;
@@ -11,6 +12,7 @@ import com.yonagi.ocean.core.protocol.handler.HttpProtocolHandler;
 import com.yonagi.ocean.core.ratelimiter.RateLimiterChecker;
 import com.yonagi.ocean.core.router.Router;
 import com.yonagi.ocean.handler.impl.*;
+import com.yonagi.ocean.middleware.ChainExecutor;
 import com.yonagi.ocean.middleware.MiddlewareChain;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,7 +45,6 @@ public class ClientHandler implements Runnable {
     private final ConnectionManager connectionManager;
     private final ConnectionContext connectionContext;
     private final Router router;
-    private final RateLimiterChecker rateLimiterChecker;
     private final MiddlewareChain chain;
 
     private final List<HttpProtocolHandler> protocolHandlers;
@@ -54,7 +55,6 @@ public class ClientHandler implements Runnable {
 
         this.connectionManager = connectionContext.getServerContext().getConnectionManager();
         this.router = connectionContext.getServerContext().getRouter();
-        this.rateLimiterChecker = connectionContext.getServerContext().getRateLimiterChecker();
         this.chain = connectionContext.getServerContext().getMiddlewareChain();
 
         this.protocolHandlers = new DefaultProtocolHandlerFactory().createHandlers(
@@ -113,7 +113,6 @@ public class ClientHandler implements Runnable {
                 currentRequest.setAttribute("clientIp", client.getInetAddress().getHostAddress());
                 currentRequest.setAttribute("isSsl", connectionContext.isSsl());
 
-
                 boolean shouldKeepAlive = shouldKeepAlive(currentRequest);
                 if (!shouldKeepAlive) {
                     handleRequest(currentRequest, output, false);
@@ -153,33 +152,25 @@ public class ClientHandler implements Runnable {
     }
 
     private void handleRequest(HttpRequest request, OutputStream output, boolean keepAlive) throws IOException {
-        HttpMethod method = request.getMethod();
-        String path = request.getUri();
-        
-        if (method == null) {
-            new MethodNotAllowHandler().handle(request, output, keepAlive);
-            return;
-        }
-
-        // 限流器做限流判断
-        if (!rateLimiterChecker.check(request)) {
-            new TooManyRequestsHandler().handle(request, output, keepAlive);
-            return;
-        }
-
-        HttpResponse response = new HttpResponse.Builder()
+        HttpResponse initialResponse = new HttpResponse.Builder()
                 .httpStatus(HttpStatus.OK)
                 .build();
+        HttpContext httpContext = new HttpContext(request, initialResponse, output, keepAlive, connectionContext);
+
+        Runnable routeHandler = () -> {
+            try {
+                router.route(httpContext);
+            } catch (Exception e) {
+                throw new RuntimeException("Routing failed", e);
+            }
+        };
+
+        ChainExecutor chainExecutor = chain.newExecutor(routeHandler);
         try {
-            chain.execute(request, response, () -> {
-                try {
-                    router.route(method, path, request, output, keepAlive);
-                } catch (IOException e) {
-                    new InternalErrorHandler().handle(request, output, keepAlive);
-                }
-            });
+            chainExecutor.execute(httpContext);
         } catch (Exception e) {
-            new InternalErrorHandler().handle(request, output, keepAlive);
+            log.error("FATAL: Unhandled exception escaped the middleware chain: {}", e.getMessage(), e);
+            sendFatalErrorResponse(httpContext);
         }
     }
 
@@ -254,5 +245,21 @@ public class ClientHandler implements Runnable {
             remaining -= read;
         }
         return writer.toString().getBytes(charset);
+    }
+
+    private void sendFatalErrorResponse(HttpContext httpContext) {
+        // todo: body记录traceid, ua, uri, method等信息
+        try {
+            HttpResponse finalResponse = httpContext.getResponse().toBuilder()
+                    .httpVersion(httpContext.getResponse().getHttpVersion())
+                    .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .contentType("text/plain; charset=utf-8")
+                    .body("FATAL SERVER ERROR".getBytes())
+                    .build();
+            finalResponse.write(httpContext.getRequest(), httpContext.getOutput(), httpContext.isKeepalive());
+            httpContext.getOutput().flush();
+        } catch (IOException e) {
+            log.error("Failed to write fatal error response to client: {}", e.getMessage(), e);
+        }
     }
 }

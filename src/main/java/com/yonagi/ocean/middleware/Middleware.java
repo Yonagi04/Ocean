@@ -1,5 +1,6 @@
 package com.yonagi.ocean.middleware;
 
+import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
 
@@ -12,5 +13,5 @@ import com.yonagi.ocean.core.protocol.HttpResponse;
  */
 public interface Middleware {
 
-    void handle(HttpRequest request, HttpResponse response, MiddlewareChain chain) throws Exception;
+    void handle(HttpContext httpContext, ChainExecutor executor) throws Exception;
 }

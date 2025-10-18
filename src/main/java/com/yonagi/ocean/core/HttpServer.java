@@ -14,6 +14,7 @@ import com.yonagi.ocean.core.router.RouteManager;
 import com.yonagi.ocean.core.configuration.ServerStartupConfig;
 import com.yonagi.ocean.core.router.Router;
 import com.yonagi.ocean.middleware.MiddlewareChain;
+import com.yonagi.ocean.middleware.MiddlewareLoader;
 import com.yonagi.ocean.utils.LocalConfigLoader;
 import com.yonagi.ocean.utils.NacosConfigLoader;
 import org.slf4j.Logger;
@@ -103,7 +104,12 @@ public class HttpServer {
 
         // Initialize core components
         initializeComponents(startupConfig);
-        this.serverContext = new ServerContext(new MiddlewareChain(), this.rateLimiterChecker, this.router, this.connectionManager);
+        this.serverContext = new ServerContext(
+                new MiddlewareChain(MiddlewareLoader.loadMiddlewares()),
+                this.rateLimiterChecker,
+                this.router,
+                this.connectionManager
+        );
 
         log.info("HTTP Keep-Alive enabled: {}, timeout: {}s, max requests: {}",
                 keepAliveConfig.isEnabled(),

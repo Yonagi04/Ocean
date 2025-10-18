@@ -34,11 +34,6 @@ public class ServerContext {
         this.rateLimiterChecker = rateLimiterChecker;
         this.router = router;
         this.connectionManager = connectionManager;
-
-        for (Middleware middleware : MiddlewareLoader.loadMiddlewares()) {
-            middlewareChain.addMiddleWare(middleware);
-            log.info("Registered middleware: {}", middleware.getClass().getSimpleName());
-        }
     }
 
     public ConnectionManager getConnectionManager() {

@@ -1,5 +1,6 @@
 package com.yonagi.ocean.middleware;
 
+import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
@@ -20,28 +21,17 @@ public class MiddlewareChain {
 
     private static final Logger log = LoggerFactory.getLogger(MiddlewareChain.class);
 
-    private final List<Middleware> middlewares = new ArrayList<>();
-    private int currentIndex = 0;
+    private final List<Middleware> middlewares;
 
-    public void addMiddleWare(Middleware middleware) {
-        this.middlewares.add(middleware);
+    public MiddlewareChain(List<Middleware> globalMiddlewares) {
+        this.middlewares = List.copyOf(globalMiddlewares);
     }
 
-    public void execute(HttpRequest request, HttpResponse response, Runnable finalHandler) throws Exception {
-        this.currentIndex = 0;
-        invokeNext(request, response, finalHandler);
+    public List<Middleware> getMiddlewares() {
+        return middlewares;
     }
 
-    private void invokeNext(HttpRequest request, HttpResponse response, Runnable finalHandler) throws Exception {
-        if (currentIndex < middlewares.size()) {
-            Middleware current = middlewares.get(currentIndex++);
-            current.handle(request, response, this);
-        } else {
-            finalHandler.run();
-        }
-    }
-
-    public void next(HttpRequest request, HttpResponse response, Runnable finalHandler) throws Exception {
-        invokeNext(request, response, finalHandler);
+    public ChainExecutor newExecutor(Runnable finalHandler) {
+        return new ChainExecutor(this.middlewares, finalHandler);
     }
 }
