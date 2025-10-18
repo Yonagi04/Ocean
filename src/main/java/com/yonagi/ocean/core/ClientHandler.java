@@ -167,19 +167,20 @@ public class ClientHandler implements Runnable {
             return;
         }
 
-        // 进行中间件链路鉴权
-        HttpResponse initialResponse = new HttpResponse.Builder()
+        HttpResponse response = new HttpResponse.Builder()
                 .httpStatus(HttpStatus.OK)
                 .build();
-        HttpResponse chainResponse = chain.execute(request, initialResponse);
-        if (!chainResponse.equals(initialResponse)) {
-            chainResponse.write(request, output, keepAlive);
-            output.flush();
-            return;
+        try {
+            chain.execute(request, response, () -> {
+                try {
+                    router.route(method, path, request, output, keepAlive);
+                } catch (IOException e) {
+                    new InternalErrorHandler().handle(request, output, keepAlive);
+                }
+            });
+        } catch (Exception e) {
+            new InternalErrorHandler().handle(request, output, keepAlive);
         }
-
-        // 使用Router进行路由转发
-        router.route(method, path, request, output, keepAlive);
     }
 
     /**

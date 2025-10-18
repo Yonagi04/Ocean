@@ -22,48 +22,26 @@ public class MiddlewareChain {
 
     private final List<Middleware> middlewares = new ArrayList<>();
     private int currentIndex = 0;
-    private HttpResponse latestResponse;
 
     public void addMiddleWare(Middleware middleware) {
         this.middlewares.add(middleware);
     }
 
-    public void setResponse(HttpResponse response) {
-        this.latestResponse = response;
+    public void execute(HttpRequest request, HttpResponse response, Runnable finalHandler) throws Exception {
+        this.currentIndex = 0;
+        invokeNext(request, response, finalHandler);
     }
 
-    public HttpResponse getResponse() {
-        return this.latestResponse;
-    }
-
-    public HttpResponse execute(HttpRequest request, HttpResponse response) {
-        this.latestResponse = response;
-        try {
-            while (currentIndex < middlewares.size()) {
-                Middleware current = middlewares.get(currentIndex++);
-                boolean shouldContinue = current.handle(request, this);
-                if (!shouldContinue) {
-                    if (latestResponse == response) {
-                        log.warn("Middleware {} interrupted but did not set response.", current.getClass().getSimpleName());
-                        latestResponse = new HttpResponse.Builder()
-                                .httpVersion(request.getHttpVersion())
-                                .httpStatus(HttpStatus.BAD_REQUEST)
-                                .contentType("text/plain; charset=utf-8")
-                                .body("Middleware interrupted request".getBytes())
-                                .build();
-                    }
-                    return latestResponse;
-                }
-            }
-        } catch (Exception e) {
-            log.error("Unhandled exception in middleware: {}", e.getMessage(), e);
-            return new HttpResponse.Builder()
-                    .httpVersion(request.getHttpVersion())
-                    .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .contentType("text/plain; charset=utf-8")
-                    .body("Internal Server Error".getBytes())
-                    .build();
+    private void invokeNext(HttpRequest request, HttpResponse response, Runnable finalHandler) throws Exception {
+        if (currentIndex < middlewares.size()) {
+            Middleware current = middlewares.get(currentIndex++);
+            current.handle(request, response, this);
+        } else {
+            finalHandler.run();
         }
-        return latestResponse;
+    }
+
+    public void next(HttpRequest request, HttpResponse response, Runnable finalHandler) throws Exception {
+        invokeNext(request, response, finalHandler);
     }
 }
