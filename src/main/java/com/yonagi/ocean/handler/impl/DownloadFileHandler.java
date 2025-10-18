@@ -3,6 +3,7 @@ package com.yonagi.ocean.handler.impl;
 import com.yonagi.ocean.cache.CachedFile;
 import com.yonagi.ocean.cache.StaticFileCache;
 import com.yonagi.ocean.cache.StaticFileCacheFactory;
+import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
@@ -52,14 +53,16 @@ public class DownloadFileHandler implements RequestHandler {
             "</html>";
 
     @Override
-    public void handle(HttpRequest request, OutputStream output, boolean keepAlive) throws IOException {
+    public void handle(HttpContext httpContext) throws IOException {
+        HttpRequest request = httpContext.getRequest();
+        OutputStream output = httpContext.getOutput();
         String requestUri = request.getUri();
         String fileName = extractFileNameSafely(requestUri);
 
         File file = Paths.get(DOWNLOAD_PATH, fileName).toFile();
         if (!file.exists() || file.isDirectory()) {
             log.warn("File {} is not exists or is a directory", fileName);
-            writeNotFound(request, output, keepAlive);
+            writeNotFound(httpContext);
             return;
         }
 
@@ -68,13 +71,13 @@ public class DownloadFileHandler implements RequestHandler {
             headers.put("Content-Length", String.valueOf(file.length()));
             headers.put("Content-Disposition", "attachment; filename=\"" + file.getName() + "\"");
 
-            HttpResponse response = new HttpResponse.Builder()
+            HttpResponse response = httpContext.getResponse().toBuilder()
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.OK)
                     .headers(headers)
                     .contentType(MimeTypeUtil.getMimeType(fileName))
                     .build();
-            response.writeStreaming(request, output, keepAlive, file.length());
+            response.writeStreaming(request, output, httpContext.isKeepalive(), file.length());
             output.flush();
 
             try (FileInputStream fileInput = new FileInputStream(file)) {
@@ -86,10 +89,12 @@ public class DownloadFileHandler implements RequestHandler {
                 output.flush();
             } catch (Exception e) {
                 throw new IOException("Failed to stream file data", e);
+            } finally {
+                httpContext.commitResponse();
             }
         } catch (IOException e) {
             log.error("Failed to stream file data: {}", e.getMessage(), e);
-            new InternalErrorHandler().handle(request, output, keepAlive);
+            new InternalErrorHandler().handle(httpContext);
         }
     }
 
@@ -108,7 +113,9 @@ public class DownloadFileHandler implements RequestHandler {
         return uri.substring(lastSlashIndex + 1);
     }
 
-    private void writeNotFound(HttpRequest request, OutputStream outputStream, boolean keepAlive) throws IOException {
+    private void writeNotFound(HttpContext httpContext) throws IOException {
+        HttpRequest request = httpContext.getRequest();
+
         StaticFileCache fileCache = StaticFileCacheFactory.getInstance();
         File errorPage = new File(errorPagePath);
         Map<String, String> headers = new HashMap<>();
@@ -133,33 +140,26 @@ public class DownloadFileHandler implements RequestHandler {
                     contentType = "text/html";
                 }
                 CachedFile cf = fileCache.get(errorPage);
-                HttpResponse httpResponse = new HttpResponse.Builder()
+                HttpResponse httpResponse = httpContext.getResponse().toBuilder()
                         .httpVersion(HttpVersion.HTTP_1_1)
                         .httpStatus(HttpStatus.NOT_FOUND)
                         .contentType(contentType)
                         .headers(headers)
                         .body(cf.getContent())
                         .build();
-                httpResponse.write(request, outputStream, keepAlive);
-                outputStream.flush();
+                httpContext.setResponse(httpResponse);
                 return;
             } catch (Exception ignore) {
                 // fallback to default 404
             }
         }
-        HttpResponse httpResponse = new HttpResponse.Builder()
+        HttpResponse httpResponse = httpContext.getResponse().toBuilder()
                 .httpVersion(HttpVersion.HTTP_1_1)
                 .httpStatus(HttpStatus.NOT_FOUND)
                 .contentType("text/html")
                 .headers(headers)
                 .body(DEFAULT_404_HTML.getBytes())
                 .build();
-        httpResponse.write(request, outputStream, keepAlive);
-        outputStream.flush();
-    }
-
-    @Override
-    public void handle(HttpRequest request, OutputStream output) throws IOException {
-        handle(request, output, true);
+        httpContext.setResponse(httpResponse);
     }
 }

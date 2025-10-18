@@ -1,6 +1,7 @@
 package com.yonagi.ocean.handler.impl;
 
 import com.yonagi.ocean.cache.*;
+import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.gzip.GzipEncoder;
 import com.yonagi.ocean.core.gzip.GzipEncoderManager;
 import com.yonagi.ocean.core.protocol.*;
@@ -52,14 +53,10 @@ public class StaticFileHandler implements RequestHandler {
         this.webRoot = webRoot;
         this.errorPagePath = LocalConfigLoader.getProperty("server.not_found_page");
     }
-
-    @Override
-    public void handle(HttpRequest request, OutputStream outputStream) throws IOException {
-        handle(request, outputStream, true); // Default to keep-alive
-    }
     
     @Override
-    public void handle(HttpRequest request, OutputStream outputStream, boolean keepAlive) throws IOException {
+    public void handle(HttpContext httpContext) throws IOException {
+        HttpRequest request = httpContext.getRequest();
         StaticFileCache fileCache = StaticFileCacheFactory.getInstance();
         String uri = request.getUri();
         if ("/".equals(uri)) {
@@ -72,11 +69,11 @@ public class StaticFileHandler implements RequestHandler {
 
         File file = new File(webRoot, uri);
         if (!file.exists() || file.isDirectory()) {
-            writeNotFound(request, outputStream, keepAlive, headers);
+            writeNotFound(httpContext, headers);
             return;
         }
         if (!file.getCanonicalPath().startsWith(new File(webRoot).getCanonicalPath())) {
-            writeNotFound(request, outputStream, keepAlive, headers);
+            writeNotFound(httpContext, headers);
             log.warn("Attempted directory traversal attack: {}", uri);
             return;
         }
@@ -101,14 +98,13 @@ public class StaticFileHandler implements RequestHandler {
 
             String ifNoneMatch = request.getHeaders() != null ? request.getHeaders().get("if-none-match") : null;
             if (ifNoneMatch != null && matchesEtag(ifNoneMatch, etag)) {
-                HttpResponse notModified = new HttpResponse.Builder()
+                HttpResponse notModified = httpContext.getResponse().toBuilder()
                         .httpVersion(request.getHttpVersion())
                         .httpStatus(HttpStatus.NOT_MODIFIED)
                         .contentType(contentType)
                         .headers(headers)
                         .build();
-                notModified.write(request, outputStream, keepAlive);
-                outputStream.flush();
+                httpContext.setResponse(notModified);
                 log.info("Respond 304 Not Modified for {}", uri);
                 return;
             }
@@ -119,24 +115,22 @@ public class StaticFileHandler implements RequestHandler {
             if (!Arrays.equals(finalBody, cf.getContent())) {
                 headers.put("Content-Encoding", "gzip");
             }
-            HttpResponse httpResponse = new HttpResponse.Builder()
+            HttpResponse httpResponse = httpContext.getResponse().toBuilder()
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.OK)
                     .contentType(contentType)
                     .headers(headers)
                     .body(finalBody)
                     .build();
-            httpResponse.write(request, outputStream, keepAlive);
-            outputStream.flush();
+            httpContext.setResponse(httpResponse);
             log.info("Served from {}{}", isInCache ? "cache: " : "disk: ", uri);
         } catch (Exception e) {
             log.error("Error serving file: {}", uri, e);
-            new InternalErrorHandler().handle(request, outputStream, keepAlive);
+            new InternalErrorHandler().handle(httpContext);
         }
     }
     
-    private void writeNotFound(HttpRequest request, OutputStream outputStream,
-                               boolean keepAlive, Map<String, String> headers) throws IOException {
+    private void writeNotFound(HttpContext httpContext, Map<String, String> headers) throws IOException {
         StaticFileCache fileCache = StaticFileCacheFactory.getInstance();
         File errorPage = new File(errorPagePath);
         if (errorPage.exists()) {
@@ -146,29 +140,27 @@ public class StaticFileHandler implements RequestHandler {
                     contentType = "text/html";
                 }
                 CachedFile cf = fileCache.get(errorPage);
-                HttpResponse httpResponse = new HttpResponse.Builder()
+                HttpResponse httpResponse = httpContext.getResponse().toBuilder()
                         .httpVersion(HttpVersion.HTTP_1_1)
                         .httpStatus(HttpStatus.NOT_FOUND)
                         .contentType(contentType)
                         .headers(headers)
                         .body(cf.getContent())
                         .build();
-                httpResponse.write(request, outputStream, keepAlive);
-                outputStream.flush();
+                httpContext.setResponse(httpResponse);
                 return;
             } catch (Exception ignore) {
                 // fallback to default 404
             }
         }
-        HttpResponse httpResponse = new HttpResponse.Builder()
+        HttpResponse httpResponse = httpContext.getResponse().toBuilder()
                 .httpVersion(HttpVersion.HTTP_1_1)
                 .httpStatus(HttpStatus.NOT_FOUND)
                 .contentType("text/html")
                 .headers(headers)
                 .body(DEFAULT_404_HTML.getBytes())
                 .build();
-        httpResponse.write(request, outputStream, keepAlive);
-        outputStream.flush();
+        httpContext.setResponse(httpResponse);
     }
 
     private String generateETag(CachedFile cf) {

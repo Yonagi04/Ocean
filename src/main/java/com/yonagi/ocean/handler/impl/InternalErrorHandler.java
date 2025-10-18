@@ -3,6 +3,7 @@ package com.yonagi.ocean.handler.impl;
 import com.yonagi.ocean.cache.CachedFile;
 import com.yonagi.ocean.cache.StaticFileCache;
 import com.yonagi.ocean.cache.StaticFileCacheFactory;
+import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
@@ -102,14 +103,10 @@ public class InternalErrorHandler implements RequestHandler {
     public InternalErrorHandler() {
         this.errorPagePath = LocalConfigLoader.getProperty("server.internal_error_page");
     }
-
-    @Override
-    public void handle(HttpRequest request, OutputStream outputStream) {
-        handle(request, outputStream, true);
-    }
     
     @Override
-    public void handle(HttpRequest request, OutputStream outputStream, boolean keepAlive) {
+    public void handle(HttpContext httpContext) {
+        HttpRequest request = httpContext.getRequest();
         Map<String, String> headers = (Map<String, String>) request.getAttribute("HstsHeaders");
 
         StaticFileCache fileCache = StaticFileCacheFactory.getInstance();
@@ -121,36 +118,34 @@ public class InternalErrorHandler implements RequestHandler {
                     contentType = "text/html";
                 }
                 CachedFile cf = fileCache.get(errorPage);
-                HttpResponse httpResponse = new HttpResponse.Builder()
+                HttpResponse httpResponse = httpContext.getResponse().toBuilder()
                         .httpVersion(request.getHttpVersion())
                         .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
                         .contentType(contentType)
                         .headers(headers)
                         .body(cf.getContent())
                         .build();
-                httpResponse.write(request, outputStream, keepAlive);
-                outputStream.flush();
+                httpContext.setResponse(httpResponse);
             } catch (Exception ex) {
                 log.error("Error serving internal error page: {}", ex.getMessage(), ex);
-                writeDefaultErrorResponse(request, outputStream, keepAlive, headers);
+                writeDefaultErrorResponse(httpContext, headers);
             }
         } else {
             log.info("Error page not found, using default error response");
-            writeDefaultErrorResponse(request, outputStream, keepAlive, headers);
+            writeDefaultErrorResponse(httpContext, headers);
         }
     }
     
-    private void writeDefaultErrorResponse(HttpRequest request, OutputStream outputStream, boolean keepAlive, Map<String, String> headers) {
+    private void writeDefaultErrorResponse(HttpContext httpContext, Map<String, String> headers) {
         try {
-            HttpResponse httpResponse = new HttpResponse.Builder()
+            HttpResponse httpResponse = httpContext.getResponse().toBuilder()
                     .httpVersion(HttpVersion.HTTP_1_1)
                     .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .contentType("text/html")
+                    .contentType("text/html; charset=utf-8")
                     .headers(headers)
                     .body(DEFAULT_500_HTML.getBytes())
                     .build();
-            httpResponse.write(request, outputStream, keepAlive);
-            outputStream.flush();
+            httpContext.setResponse(httpResponse);
         } catch (Exception ex) {
             ex.printStackTrace();
         }

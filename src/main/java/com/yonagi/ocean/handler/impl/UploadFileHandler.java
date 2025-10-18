@@ -1,6 +1,7 @@
 package com.yonagi.ocean.handler.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
 import com.yonagi.ocean.core.protocol.enums.HttpMethod;
@@ -18,7 +19,6 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -42,29 +42,24 @@ public class UploadFileHandler implements RequestHandler {
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
-    public void handle(HttpRequest request, OutputStream output) throws IOException {
-        handle(request, output, true);
-    }
-
-    @Override
-    public void handle(HttpRequest request, OutputStream output, boolean keepAlive) throws IOException {
-        if (request.getMethod() != HttpMethod.POST) {
-            new MethodNotAllowHandler().handle(request, output, keepAlive);
+    public void handle(HttpContext httpContext) throws IOException {
+        if (httpContext.getRequest().getMethod() != HttpMethod.POST) {
+            new MethodNotAllowHandler().handle(httpContext);
             return;
         }
+        HttpRequest request = httpContext.getRequest();
         Map<String, String> headers = (Map<String, String>) request.getAttribute("HstsHeaders");
 
         final InputStream bodyStream = request.getRawBodyInputStream();
         if (bodyStream == null) {
-            HttpResponse response = new HttpResponse.Builder()
+            HttpResponse response = httpContext.getResponse().toBuilder()
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.BAD_REQUEST)
                     .headers(headers)
                     .body("Request body stream is missing".getBytes())
                     .contentType("text/plain; charset=utf-8")
                     .build();
-            response.write(request, output, keepAlive);
-            output.flush();
+            httpContext.setResponse(response);
             return;
         }
 
@@ -102,15 +97,14 @@ public class UploadFileHandler implements RequestHandler {
             }
         };
         if (!ServletFileUpload.isMultipartContent(requestContext)) {
-            HttpResponse response = new HttpResponse.Builder()
+            HttpResponse response = httpContext.getResponse().toBuilder()
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.BAD_REQUEST)
                     .contentType("text/plain; charset=utf-8")
                     .headers(headers)
                     .body("Invalid request body".getBytes())
                     .build();
-            response.write(request, output, keepAlive);
-            output.flush();
+            httpContext.setResponse(response);
             return;
         }
         DiskFileItemFactory factory = new DiskFileItemFactory();
@@ -122,15 +116,14 @@ public class UploadFileHandler implements RequestHandler {
         try {
             List<FileItem> items = upload.parseRequest(requestContext);
             if (items == null || items.isEmpty()) {
-                HttpResponse response = new HttpResponse.Builder()
+                HttpResponse response = httpContext.getResponse().toBuilder()
                         .httpVersion(request.getHttpVersion())
                         .httpStatus(HttpStatus.BAD_REQUEST)
                         .contentType("text/plain; charset=utf-8")
                         .headers(headers)
                         .body("Invalid request body".getBytes())
                         .build();
-                response.write(request, output, keepAlive);
-                output.flush();
+                httpContext.setResponse(response);
                 return;
             }
 
@@ -144,7 +137,7 @@ public class UploadFileHandler implements RequestHandler {
                         candidate = UUIDUtil.getTimeBasedShortUUIDWithPrefix("file_");
                         fileName = candidate + extension;
                         if (Paths.get(UPLOAD_DIR, fileName).toFile().exists()) {
-                            new InternalErrorHandler().handle(request, output, keepAlive);
+                            new InternalErrorHandler().handle(httpContext);
                         }
                     }
                     File storeFile = Paths.get(UPLOAD_DIR, fileName).toFile();
@@ -169,27 +162,19 @@ public class UploadFileHandler implements RequestHandler {
                     "files", uploadedFiles
             ));
 
-            HttpResponse response = new HttpResponse.Builder()
+            HttpResponse response = httpContext.getResponse().toBuilder()
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.CREATED)
                     .headers(headers)
                     .contentType("application/json")
                     .body(responseBody.getBytes(StandardCharsets.UTF_8))
                     .build();
-            response.write(request, output, keepAlive);
-            output.flush();
+            httpContext.setResponse(response);
             items.forEach(FileItem::delete);
         } catch (Exception e) {
             log.error("File upload failed: {}", e.getMessage(), e);
-            new InternalErrorHandler().handle(request, output, keepAlive);
+            new InternalErrorHandler().handle(httpContext);
         }
-    }
-
-    private String sanitizeFilename(String fileName) {
-        if (fileName == null || fileName.isEmpty()) {
-            return "unknown_file";
-        }
-        return Paths.get(fileName).getFileName().toString();
     }
 
     private static String extractExtension(String originalFilename) {

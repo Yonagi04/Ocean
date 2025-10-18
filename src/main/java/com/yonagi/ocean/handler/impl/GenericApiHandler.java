@@ -1,6 +1,7 @@
 package com.yonagi.ocean.handler.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
@@ -33,12 +34,9 @@ public class GenericApiHandler implements RequestHandler {
     }
 
     @Override
-    public void handle(HttpRequest request, OutputStream output) throws IOException {
-        handle(request, output, true);
-    }
+    public void handle(HttpContext httpContext) throws IOException {
+        HttpRequest request = httpContext.getRequest();
 
-    @Override
-    public void handle(HttpRequest request, OutputStream output, boolean keepAlive) throws IOException {
         log.info("GenericApiHandler handling {} request to {}", request.getMethod(), request.getUri());
 
         Map<String, Object> responseData = new HashMap<>();
@@ -66,7 +64,7 @@ public class GenericApiHandler implements RequestHandler {
         Map<String, String> headers = (Map<String, String>) request.getAttribute("HstsHeaders");
 
         String responseBody = objectMapper.writeValueAsString(responseData);
-        HttpResponse response = new HttpResponse.Builder()
+        HttpResponse response = httpContext.getResponse().toBuilder()
                 .httpVersion(request.getHttpVersion())
                 .httpStatus(HttpStatus.OK)
                 .contentType("application/json")
@@ -74,8 +72,7 @@ public class GenericApiHandler implements RequestHandler {
                 .body(responseBody.getBytes())
                 .build();
 
-        response.write(request, output, keepAlive);
-        output.flush();
+        httpContext.setResponse(response);
     }
 
     private void handleGetRequest(HttpRequest request, Map<String, Object> responseData) {

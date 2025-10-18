@@ -19,7 +19,7 @@ public class HttpContext {
     private HttpRequest request;
     private final AtomicReference<HttpResponse> responseRef;
     private final OutputStream output;
-    private final boolean keepalive;
+    private final AtomicBoolean keepaliveRef;
     private final ConnectionContext connectionContext;
     private final AtomicBoolean commited = new AtomicBoolean(false);
 
@@ -28,7 +28,7 @@ public class HttpContext {
         this.request = request;
         this.responseRef = new AtomicReference<>(response);
         this.output = output;
-        this.keepalive = keepalive;
+        this.keepaliveRef = new AtomicBoolean(keepalive);
         this.connectionContext = connectionContext;
     }
 
@@ -53,7 +53,11 @@ public class HttpContext {
     }
 
     public boolean isKeepalive() {
-        return keepalive;
+        return keepaliveRef.get();
+    }
+
+    public void setKeepalive(boolean keepalive) {
+        this.keepaliveRef.set(keepalive);
     }
 
     public ConnectionContext getConnectionContext() {

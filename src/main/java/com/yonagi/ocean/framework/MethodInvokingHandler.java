@@ -2,6 +2,7 @@ package com.yonagi.ocean.framework;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
+import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.framework.annotation.PathVariable;
 import com.yonagi.ocean.framework.annotation.RequestBody;
 import com.yonagi.ocean.framework.annotation.RequestParam;
@@ -14,7 +15,6 @@ import com.yonagi.ocean.exception.DeserializationException;
 import com.yonagi.ocean.exception.MissingRequiredParameterException;
 import com.yonagi.ocean.exception.UnsupportedMediaTypeException;
 import com.yonagi.ocean.handler.RequestHandler;
-import com.yonagi.ocean.handler.impl.InternalErrorHandler;
 import com.yonagi.ocean.framework.utils.FormBinder;
 import com.yonagi.ocean.framework.utils.JsonDeserializer;
 import com.yonagi.ocean.framework.utils.JsonSerializer;
@@ -22,7 +22,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -66,7 +65,7 @@ public class MethodInvokingHandler implements RequestHandler {
         map.put("application/xml", (request, contentType, charSet, paramType) -> {
             byte[] body = request.getBody();
             String xmlContent = new String(body, charSet);
-            if (xmlContent == null || xmlContent.length() == 0) {
+            if (xmlContent == null || xmlContent.isEmpty()) {
                 throw new BadRequestException("XML body is missing for required @RequestBody parameter: " + paramType.getSimpleName());
             }
             return xmlMapper.readValue(xmlContent, paramType);
@@ -108,73 +107,75 @@ public class MethodInvokingHandler implements RequestHandler {
     }
 
     @Override
-    public void handle(HttpRequest request, OutputStream output) throws IOException {
-        handle(request, output, true);
-    }
-
-    @Override
-    public void handle(HttpRequest request, OutputStream output, boolean keepAlive) throws IOException {
+    public void handle(HttpContext httpContext) throws IOException {
         try {
-            Object[] args = resolveMethodArguments(request);
+            Object[] args = resolveMethodArguments(httpContext.getRequest());
             Object result = handlerMethod.invoke(controllerInstance, args);
-            handleReturnValue(request, result, output, keepAlive);
+            handleReturnValue(httpContext, result);
         } catch (MissingRequiredParameterException e) {
             log.warn("Missing required parameter for method {}: {}", handlerMethod.getName(), e.getMessage());
-            HttpResponse response = new HttpResponse.Builder()
-                    .httpVersion(request.getHttpVersion())
+            HttpResponse response = httpContext.getResponse().toBuilder()
+                    .httpVersion(httpContext.getRequest().getHttpVersion())
                     .httpStatus(HttpStatus.BAD_REQUEST)
-                    .contentType("text/plain")
+                    .contentType("text/plain; charset=utf-8")
                     .body(("Missing required parameter: " + e.getMessage()).getBytes())
                     .build();
-            response.write(request, output, keepAlive);
-            output.flush();
+            httpContext.setResponse(response);
         } catch (JsonProcessingException e) {
             log.warn("Json processing error: {}", e.getMessage(), e);
-            HttpResponse response = new HttpResponse.Builder()
-                    .httpVersion(request.getHttpVersion())
+            HttpResponse response = httpContext.getResponse().toBuilder()
+                    .httpVersion(httpContext.getRequest().getHttpVersion())
                     .httpStatus(HttpStatus.BAD_REQUEST)
-                    .contentType("text/plain")
-                    .body(("Fail to deserialize body: " + e.getMessage()).getBytes())
+                    .contentType("text/plain; charset=utf-8")
+                    .body(("Fail to deserialize body").getBytes())
                     .build();
-            response.write(request, output, keepAlive);
-            output.flush();
+            httpContext.setResponse(response);
         } catch (DeserializationException e) {
             log.warn("Deserialization error: {}", e.getMessage(), e);
-            HttpResponse response = new HttpResponse.Builder()
-                    .httpVersion(request.getHttpVersion())
+            HttpResponse response = httpContext.getResponse().toBuilder()
+                    .httpVersion(httpContext.getRequest().getHttpVersion())
                     .httpStatus(HttpStatus.BAD_REQUEST)
-                    .contentType("text/plain")
-                    .body(("Fail to deserialize body: " + e.getMessage()).getBytes())
+                    .contentType("text/plain; charset=utf-8")
+                    .body(("Fail to deserialize body").getBytes())
                     .build();
-            response.write(request, output, keepAlive);
-            output.flush();
+            httpContext.setResponse(response);
         } catch (BadRequestException e) {
-            log.warn("Bad Request (400) for {}: {}", request.getUri(), e.getMessage());
-            HttpResponse response = new HttpResponse.Builder()
-                    .httpVersion(request.getHttpVersion())
+            log.warn("Bad Request (400) for {}: {}", httpContext.getRequest().getUri(), e.getMessage());
+            HttpResponse response = httpContext.getResponse().toBuilder()
+                    .httpVersion(httpContext.getRequest().getHttpVersion())
                     .httpStatus(HttpStatus.BAD_REQUEST)
-                    .contentType("text/plain")
-                    .body(("Bad Request: " + e.getMessage()).getBytes())
+                    .contentType("text/plain; charset=utf-8")
+                    .body(("Bad Request").getBytes())
                     .build();
-            response.write(request, output, keepAlive);
-            output.flush();
+            httpContext.setResponse(response);
         } catch (UnsupportedMediaTypeException e) {
-            log.warn("Unsupported media type for {}: {}", request.getUri(), e.getMessage());
-            HttpResponse response = new HttpResponse.Builder()
-                    .httpVersion(request.getHttpVersion())
-                    .httpStatus(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
-                    .contentType("text/plain")
-                    .body(("Unsupport Media Type: " + e.getMessage()).getBytes())
+            log.warn("Unsupported media type for {}: {}", httpContext.getRequest().getUri(), e.getMessage());
+            HttpResponse response = httpContext.getResponse().toBuilder()
+                    .httpVersion(httpContext.getRequest().getHttpVersion())
+                    .httpStatus(HttpStatus.BAD_REQUEST)
+                    .contentType("text/plain; charset=utf-8")
+                    .body(("Unsupport Media Type").getBytes())
                     .build();
-            response.write(request, output, keepAlive);
-            output.flush();
+            httpContext.setResponse(response);
         }catch (IllegalAccessException | IllegalArgumentException e) {
             log.error("Illegal Access or Illegal Argument on Controller method {}: {}", handlerMethod.getName(), e.getMessage(), e);
-            new InternalErrorHandler().handle(request, output, keepAlive);
+            HttpResponse response = httpContext.getResponse().toBuilder()
+                    .httpVersion(httpContext.getRequest().getHttpVersion())
+                    .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .contentType("text/plain; charset=utf-8")
+                    .body(("Internal Server Error: Illegal Access or Illegal Argument on Controller method").getBytes())
+                    .build();
+            httpContext.setResponse(response);
         } catch (InvocationTargetException e) {
             log.error("Controller method {}.{} threw an exception: {}",
                     controllerInstance.getClass().getSimpleName(), handlerMethod.getName(), e.getTargetException().getMessage(), e.getTargetException());
-            new InternalErrorHandler().handle(request, output, keepAlive);
+            HttpResponse response = httpContext.getResponse().toBuilder()
+                    .httpVersion(httpContext.getRequest().getHttpVersion())
+                    .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .contentType("text/plain; charset=utf-8")
+                    .body(("Internal Server Error").getBytes())
+                    .build();
+            httpContext.setResponse(response);
         }
     }
 
@@ -250,7 +251,7 @@ public class MethodInvokingHandler implements RequestHandler {
 
     private Object resolveRequestParam(Parameter parameter, Class<?> paramType, Map<String, String> queryParameters) throws BadRequestException {
         RequestParam annotation = parameter.getAnnotation(RequestParam.class);
-        String name = annotation.value().isEmpty() ? parameter.getName() : annotation.value();
+        String name = annotation.value() == null || annotation.value().isEmpty() ? parameter.getName() : annotation.value();
         String defaultValue = annotation.defaultValue().equals(RequestParam.NO_DEFAULT_VALUE) ? null : annotation.defaultValue();
         boolean required = annotation.required();
 
@@ -332,20 +333,19 @@ public class MethodInvokingHandler implements RequestHandler {
         return null;
     }
 
-    private void handleReturnValue(HttpRequest request,Object returnValue, OutputStream output, boolean keepAlive) throws IOException {
+    private void handleReturnValue(HttpContext httpContext,Object returnValue) throws IOException {
         if (handlerMethod.getReturnType() == void.class || returnValue == null) {
             log.debug("Controller method returned void or null, assuming response was handled manually.");
         } else {
             String jsonResponse = JsonSerializer.serialize(returnValue);
 
-            HttpResponse response = new HttpResponse.Builder()
+            HttpResponse response = httpContext.getResponse().toBuilder()
                     .httpVersion(HttpVersion.HTTP_1_1)
                     .httpStatus(HttpStatus.OK)
                     .contentType("application/json; charset=utf-8")
                     .body(jsonResponse.getBytes())
                     .build();
-            response.write(request, output, keepAlive);
-            output.flush();
+            httpContext.setResponse(response);
             log.debug("Successfully wrote JSON response for return value: {}", handlerMethod.getReturnType().getSimpleName());
         }
     }

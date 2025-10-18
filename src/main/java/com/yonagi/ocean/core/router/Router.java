@@ -1,8 +1,12 @@
 package com.yonagi.ocean.core.router;
 
+import com.alibaba.nacos.api.naming.pojo.healthcheck.impl.Http;
 import com.yonagi.ocean.core.configuration.RouteConfig;
+import com.yonagi.ocean.core.context.HttpContext;
+import com.yonagi.ocean.core.protocol.HttpResponse;
 import com.yonagi.ocean.core.protocol.enums.HttpMethod;
 import com.yonagi.ocean.core.protocol.HttpRequest;
+import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.handler.RequestHandler;
 import com.yonagi.ocean.handler.impl.*;
 import com.yonagi.ocean.utils.LocalConfigLoader;
@@ -258,8 +262,13 @@ public class Router {
     /**
      * 路由匹配和请求处理
      */
-    public void route(HttpMethod method, String path, HttpRequest request,
-                     OutputStream output, boolean keepAlive) throws IOException {
+    public void route(HttpContext httpContext) throws IOException {
+        HttpMethod method = httpContext.getRequest().getMethod();
+        String path = httpContext.getRequest().getUri();
+        HttpRequest request = httpContext.getRequest();
+        OutputStream output = httpContext.getOutput();
+        boolean keepAlive = httpContext.isKeepalive();
+
         RouteEntry entry = null;
 
         // 查找稳定路由（Controller），支持通配符
@@ -276,16 +285,22 @@ public class Router {
         }
 
         if (entry != null) {
-            if (handleRouteEntry(entry, request, output, keepAlive)) {
+            if (handleRouteEntry(entry, httpContext)) {
                 return;
             }
             log.warn("Custom router failed, falling back to default handler for {} {}", method, path);
         }
         RequestHandler defaultHandler = defaultHandlers.get(method);
         if (defaultHandler != null) {
-            defaultHandler.handle(request, output, keepAlive);
+            defaultHandler.handle(httpContext);
         } else {
-            new MethodNotAllowHandler().handle(request, output, keepAlive);
+            HttpResponse errorResponse = httpContext.getResponse().toBuilder()
+                    .httpVersion(request.getHttpVersion())
+                    .httpStatus(HttpStatus.METHOD_NOT_ALLOWED)
+                    .contentType("text/plain; charset=utf-8")
+                    .body("HTTP Method not specified or supported.".getBytes())
+                    .build();
+            httpContext.setResponse(errorResponse);
         }
     }
 
@@ -378,16 +393,16 @@ public class Router {
      * 处理自定义路由
      * @return true 如果处理成功，false 如果处理失败需要回退到默认处理器
      */
-    private boolean handleRouteEntry(RouteEntry entry, HttpRequest request,
-                                     OutputStream output, boolean keepAlive) throws IOException {
+    private boolean handleRouteEntry(RouteEntry entry, HttpContext httpContext) throws IOException {
         RouteConfig routeConfig = entry.config;
         RouteType routeType = routeConfig.getRouteType();
 
         // 优先处理稳定路由
         if (routeType == RouteType.CONTROLLER && entry.handler != null) {
             log.debug("Handling request with Controller instance: {} -> {}",
-                    request.getUri(), routeConfig.getHandlerClassName());
-            entry.handler.handle(request, output, keepAlive);
+                    httpContext.getRequest().getUri(), routeConfig.getHandlerClassName());
+            // entry.handler.handle(request, output, keepAlive);
+            entry.handler.handle(httpContext);
             return true;
         }
 
@@ -406,14 +421,16 @@ public class Router {
         }
 
         if (handler != null) {
+            HttpRequest request = httpContext.getRequest();
             log.debug("Handling request with dynamic router: {} -> {}", request.getUri(), handlerClassName);
             if (routeType == RouteType.REDIRECT) {
                 // 对于重定向，传递目标URL和状态码
                 request.setAttribute("targetUrl", routeConfig.getTargetUrl());
                 request.setAttribute("statusCode", routeConfig.getStatusCode() == null ? 302 : routeConfig.getStatusCode());
                 request.setAttribute("contentType", routeConfig.getContentType());
+                httpContext.setRequest(request);
             }
-            handler.handle(request, output, keepAlive);
+            handler.handle(httpContext);
             return true;
         } else {
             log.warn("Failed to create handler for router: {} - handler class not found or invalid", routeConfig);

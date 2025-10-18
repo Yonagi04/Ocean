@@ -154,6 +154,7 @@ public class ClientHandler implements Runnable {
     private void handleRequest(HttpRequest request, OutputStream output, boolean keepAlive) throws IOException {
         HttpResponse initialResponse = new HttpResponse.Builder()
                 .httpStatus(HttpStatus.OK)
+                .contentType("text/plain; charset=utf-8")
                 .build();
         HttpContext httpContext = new HttpContext(request, initialResponse, output, keepAlive, connectionContext);
 
