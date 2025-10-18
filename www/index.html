@@ -3,39 +3,128 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>欢迎使用Ocean！</title>
-    <link rel="stylesheet" href="styles.css">
+    <title id="title">欢迎使用Ocean</title>
+    <style>
+        body {
+            font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f8f9fa;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        h1 {
+            font-size: 3em;
+            color: #007bff;
+            margin-bottom: 0.2em;
+        }
+        p {
+            font-size: 1.2em;
+            color: #555;
+        }
+        .footer {
+            position: absolute;
+            bottom: 20px;
+            font-size: 0.9em;
+            color: #999;
+        }
+        .lang-selector {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+        }
+        select {
+            padding: 6px 10px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            font-size: 1em;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            padding: 2em 3em;
+            text-align: center;
+        }
+        a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <h1>欢迎使用Ocean！ <span class="status-indicator" title="服务器状态"></span></h1>
-        
-        <p>Ocean是一款基于Java语言开发的HTTP高性能服务器</p>
-        
-        <div class="features">
-            <h3>🌊 Ocean特性</h3>
-            <ul>
-                <li>高性能HTTP服务器，可承载超高并发</li>
-                <li>支持静态文件服务</li>
-                <li>内置缓存机制，支持LRU、Caffeine等端侧缓存机制</li>
-                <li>多配置源支持，支持配置中心热更新配置</li>
-                <li>现代化架构设计</li>
-            </ul>
-        </div>
-        
-        <p>如果需要自定义此页面，请替换位于项目 <code>/www/</code> 目录中的 <code>index.html</code> 文件。</p>
+<div class="lang-selector">
+    <label for="langSelect"></label><select id="langSelect">
+        <option value="zh">中文</option>
+        <option value="en">English</option>
+        <option value="ja">日本語</option>
+    </select>
+</div>
 
-        <p><em>非常感谢您使用Ocean</em></p>
+<div class="card">
+    <h1 id="welcome">欢迎使用Ocean</h1>
+    <p id="status">服务器运行正常</p>
+    <p id="desc">如果你看到这个页面，说明服务已经启动。</p>
+    <p><a href="/api/status" id="linkText">查看服务状态</a></p>
+</div>
 
-        <div class="info-box">
-            <strong>💡 提示:</strong> 您可以通过页面上的按钮来测试服务器功能。
-        </div>
+<div class="footer">
+    Ocean © 2025
+</div>
 
-        <div class="footer">
-            <p>🌊 Ocean - 让Web服务更简单</p>
-        </div>
-    </div>
-    
-    <script src="script.js"></script>
+<script>
+    const translations = {
+        zh: {
+            title: "欢迎使用Ocean",
+            welcome: "欢迎使用Ocean",
+            status: "服务器运行正常",
+            desc: "如果你看到这个页面，说明服务已经启动。",
+            linkText: "查看服务状态",
+        },
+        en: {
+            title: "Welcome to Ocean",
+            welcome: "Welcome to Ocean",
+            status: "Server is running properly",
+            desc: "If you see this page, your service is working.",
+            linkText: "Check Service Status",
+        },
+        ja: {
+            title: "Ocean サーバー",
+            welcome: "Oceanへようこそ",
+            status: "サーバーは正常に稼働しています",
+            desc: "このページが表示されていれば、サービスは正常に動作しています",
+            linkText: "ステータスを確認",
+        }
+    };
+
+    const langSelect = document.getElementById("langSelect");
+
+    function updateLanguage(lang) {
+        const t = translations[lang];
+        if (!t) return;
+        document.title = t.title;
+        document.getElementById("welcome").textContent = t.welcome;
+        document.getElementById("status").textContent = t.status;
+        document.getElementById("desc").textContent = t.desc;
+        document.getElementById("linkText").textContent = t.linkText;
+    }
+
+    langSelect.addEventListener("change", (e) => {
+        const lang = e.target.value;
+        localStorage.setItem("lang", lang);
+        updateLanguage(lang);
+    });
+
+    const savedLang = localStorage.getItem("lang") || "zh";
+    langSelect.value = savedLang;
+    updateLanguage(savedLang);
+</script>
 </body>
 </html>
+
