@@ -61,7 +61,7 @@ public class UploadFileHandler implements RequestHandler {
         }
         final InputStream bodyStream = request.getRawBodyInputStream();
         if (bodyStream == null) {
-            log.error("[{}] BodyStream is null", request.getAttribute("traceId") == null ? "UNKNOWN" : request.getAttribute("traceId"));
+            log.error("[{}] BodyStream is null", httpContext.getTraceId());
             HttpResponse response = httpContext.getResponse().toBuilder()
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.BAD_REQUEST)
@@ -107,7 +107,7 @@ public class UploadFileHandler implements RequestHandler {
             }
         };
         if (!ServletFileUpload.isMultipartContent(requestContext)) {
-            log.error("[{}] Invalid request body", request.getAttribute("traceId") == null ? "UNKNOWN" : request.getAttribute("traceId"));
+            log.error("[{}] Invalid request body", httpContext.getTraceId());
             HttpResponse response = httpContext.getResponse().toBuilder()
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.BAD_REQUEST)
@@ -127,7 +127,7 @@ public class UploadFileHandler implements RequestHandler {
         try {
             List<FileItem> items = upload.parseRequest(requestContext);
             if (items == null || items.isEmpty()) {
-                log.error("[{}] Invalid request body", request.getAttribute("traceId") == null ? "UNKNOWN" : request.getAttribute("traceId"));
+                log.error("[{}] Invalid request body", httpContext.getTraceId());
                 HttpResponse response = httpContext.getResponse().toBuilder()
                         .httpVersion(request.getHttpVersion())
                         .httpStatus(HttpStatus.BAD_REQUEST)
@@ -190,7 +190,7 @@ public class UploadFileHandler implements RequestHandler {
             httpContext.setResponse(response);
             items.forEach(FileItem::delete);
         } catch (Exception e) {
-            log.error("[{}] File upload failed: {}", request.getAttribute("traceId") == null ? "UNKNOWN" : request.getAttribute("traceId"), e.getMessage(), e);
+            log.error("[{}] File upload failed: {}", httpContext.getTraceId(), e.getMessage(), e);
             HttpResponse errorResponse = httpContext.getResponse().toBuilder()
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)

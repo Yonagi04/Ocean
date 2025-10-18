@@ -17,7 +17,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Paths;
-import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -41,7 +40,7 @@ public class DownloadFileHandler implements RequestHandler {
 
         File file = Paths.get(DOWNLOAD_PATH, fileName).toFile();
         if (!file.exists() || file.isDirectory()) {
-            log.warn("File {} is not exists or is a directory", fileName);
+            log.warn("[{}] File {} is not exists or is a directory", httpContext.getTraceId(), fileName);
             writeNotFound(httpContext);
             return;
         }
@@ -73,7 +72,7 @@ public class DownloadFileHandler implements RequestHandler {
                 httpContext.commitResponse();
             }
         } catch (IOException e) {
-            log.error("Failed to stream file data: {}", e.getMessage(), e);
+            log.error("[{}] Failed to stream file data: {}", httpContext.getTraceId(), e.getMessage(), e);
             HttpResponse errorResponse = httpContext.getResponse().toBuilder()
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)

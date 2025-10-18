@@ -1,6 +1,7 @@
 package com.yonagi.ocean.middleware.impl;
 
 import com.alibaba.nacos.api.naming.pojo.healthcheck.impl.Http;
+import com.yonagi.ocean.core.ErrorPageRender;
 import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
@@ -34,6 +35,7 @@ public class MethodCheckMiddleware implements Middleware {
                     .body("HTTP Method not specified or supported.".getBytes())
                     .build();
             httpContext.setResponse(errorResponse);
+            ErrorPageRender.render(httpContext);
             return;
         }
 

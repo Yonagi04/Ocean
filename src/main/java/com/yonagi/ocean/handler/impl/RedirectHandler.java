@@ -11,7 +11,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.*;
@@ -47,11 +46,11 @@ public class RedirectHandler implements RequestHandler {
         String targetUrl = (String) request.getAttribute("targetUrl");
         Integer statusCode = (Integer) request.getAttribute("statusCode");
         if (targetUrl == null) {
-            log.error("Missing targetUrl attribute");
+            log.error("[{}] Missing targetUrl attribute", httpContext.getTraceId());
             return;
         }
         if (statusCode == null) {
-            log.warn("Missing statusCode attribute, using default 302");
+            log.warn("[{}] Missing statusCode attribute, using default 302", httpContext.getTraceId());
             statusCode = 302;
         }
 
@@ -80,18 +79,18 @@ public class RedirectHandler implements RequestHandler {
                 if (!whitelist.isEmpty() && whitelist.contains(hostName)) {
                     finalLocation = targetUrl;
                 } else {
-                    log.warn("Host '{}' is not in the whitelist, redirect blocked", hostName);
+                    log.warn("[{}] Host '{}' is not in the whitelist, redirect blocked", httpContext.getTraceId(), hostName);
                     finalLocation = fallbackUrl;
                 }
             } catch (MalformedURLException e) {
-                log.error("Malformed URL, redirect to fallback url", e);
+                log.error("[{}] Malformed URL, redirect to fallback url", httpContext.getTraceId(), e);
                 finalLocation = fallbackUrl;
             }
         } else if (targetUrl.startsWith("/")) {
             String baseUrl = protocol + "://" + host;
             finalLocation = baseUrl + targetUrl;
         } else {
-            log.warn("Target URL '{}' is missing protocol. Assuming external redirect with 'https://' for safety", targetUrl);
+            log.warn("[{}] Target URL '{}' is missing protocol. Assuming external redirect with 'https://' for safety", httpContext.getTraceId(), targetUrl);
             String assumedUrl = "https://" + targetUrl;
             try {
                 URL url = new URL(assumedUrl);
@@ -100,17 +99,17 @@ public class RedirectHandler implements RequestHandler {
                 if (!whitelist.isEmpty() && whitelist.contains(hostName)) {
                     finalLocation = assumedUrl;
                 } else {
-                    log.warn("Host '{}' is not in the whitelist, redirect blocked", hostName);
+                    log.warn("[{}] Host '{}' is not in the whitelist, redirect blocked", httpContext.getTraceId(), hostName);
                     finalLocation = fallbackUrl;
                 }
             } catch (MalformedURLException e) {
-                log.error("Malformed URL, redirect to fallback url", e);
+                log.error("[{}] Malformed URL, redirect to fallback url", httpContext.getTraceId(), e);
                 finalLocation = fallbackUrl;
             }
         }
 
         if (statusCode != 301 && statusCode != 302 && statusCode != 303 && statusCode != 307 && statusCode != 308) {
-            log.warn("Invalid statusCode for redirect: {}, using default 302", statusCode);
+            log.warn("[{}] Invalid statusCode for redirect: {}, using default 302", httpContext.getTraceId(), statusCode);
             statusCode = 302;
         }
         HttpResponse.Builder builder = httpContext.getResponse().toBuilder()
@@ -124,7 +123,7 @@ public class RedirectHandler implements RequestHandler {
         HttpResponse response = builder.build();
         httpContext.setResponse(response);
         httpContext.setKeepalive(false);
-        log.info("Request path: {}, redirect to: {}, status code: {}", request.getUri(), finalLocation, statusCode);
+        log.info("[{}] Request path: {}, redirect to: {}, status code: {}", httpContext.getTraceId(), request.getUri(), finalLocation, statusCode);
     }
 
     private String normalizeHost(String hostName) {

@@ -16,7 +16,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -56,7 +55,7 @@ public class StaticFileHandler implements RequestHandler {
         }
         if (!file.getCanonicalPath().startsWith(new File(webRoot).getCanonicalPath())) {
             writeNotFound(httpContext, headers);
-            log.warn("Attempted directory traversal attack: {}", uri);
+            log.warn("[{}] Attempted directory traversal attack: {}", httpContext.getTraceId(), uri);
             return;
         }
 
@@ -87,7 +86,7 @@ public class StaticFileHandler implements RequestHandler {
                         .headers(headers)
                         .build();
                 httpContext.setResponse(notModified);
-                log.info("Respond 304 Not Modified for {}", uri);
+                log.info("[{}] Respond 304 Not Modified for {}", httpContext.getTraceId(), uri);
                 return;
             }
 
@@ -105,9 +104,9 @@ public class StaticFileHandler implements RequestHandler {
                     .body(finalBody)
                     .build();
             httpContext.setResponse(httpResponse);
-            log.info("Served from {}{}", isInCache ? "cache: " : "disk: ", uri);
+            log.info("[{}] Served from {}{}", httpContext.getTraceId(), isInCache ? "cache: " : "disk: ", uri);
         } catch (Exception e) {
-            log.error("Error serving file: {}", uri, e);
+            log.error("[{}] Error serving file: {}", httpContext.getTraceId(), uri, e);
             HttpResponse errorResponse = httpContext.getResponse().toBuilder()
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)

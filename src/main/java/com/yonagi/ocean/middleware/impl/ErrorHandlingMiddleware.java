@@ -1,11 +1,14 @@
 package com.yonagi.ocean.middleware.impl;
 
+import com.yonagi.ocean.core.ErrorPageRender;
 import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.HttpResponse;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.middleware.ChainExecutor;
 import com.yonagi.ocean.middleware.Middleware;
 import com.yonagi.ocean.middleware.annotation.MiddlewarePriority;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * @author Yonagi
@@ -17,12 +20,14 @@ import com.yonagi.ocean.middleware.annotation.MiddlewarePriority;
 @MiddlewarePriority(value = 2)
 public class ErrorHandlingMiddleware implements Middleware {
 
+    private static final Logger log = LoggerFactory.getLogger(ErrorHandlingMiddleware.class);
+
     @Override
     public void handle(HttpContext httpContext, ChainExecutor executor) throws Exception {
         try {
             executor.proceed(httpContext);
         } catch (Exception e) {
-            // todo: 错误信息body返回traceId, ua, 路径, method等信息
+            log.error("[{}] {}", httpContext.getTraceId(), e.getMessage(), e);
             HttpResponse httpResponse = httpContext.getResponse().toBuilder()
                     .httpVersion(httpContext.getRequest().getHttpVersion())
                     .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -30,6 +35,7 @@ public class ErrorHandlingMiddleware implements Middleware {
                     .body("Internal server error".getBytes())
                     .build();
             httpContext.setResponse(httpResponse);
+            ErrorPageRender.render(httpContext);
         }
     }
 }

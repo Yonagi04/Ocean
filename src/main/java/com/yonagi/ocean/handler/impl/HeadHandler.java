@@ -6,15 +6,12 @@ import com.yonagi.ocean.core.protocol.HttpResponse;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.core.protocol.enums.HttpVersion;
 import com.yonagi.ocean.handler.RequestHandler;
-import com.yonagi.ocean.utils.LocalConfigLoader;
 import com.yonagi.ocean.utils.MimeTypeUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -53,7 +50,7 @@ public class HeadHandler implements RequestHandler {
         }
         if (!file.getCanonicalPath().startsWith(new File(webRoot).getCanonicalPath())) {
             writeNotFound(httpContext);
-            log.warn("Attempted directory traversal attack: {}", uri);
+            log.warn("[{}] Attempted directory traversal attack: {}", httpContext.getTraceId(), uri);
             return;
         }
         String contentType = MimeTypeUtil.getMimeType(file.getName());

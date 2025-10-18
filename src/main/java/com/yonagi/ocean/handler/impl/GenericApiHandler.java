@@ -6,12 +6,10 @@ import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.handler.RequestHandler;
-import com.yonagi.ocean.utils.LocalConfigLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -37,7 +35,7 @@ public class GenericApiHandler implements RequestHandler {
     public void handle(HttpContext httpContext) throws IOException {
         HttpRequest request = httpContext.getRequest();
 
-        log.info("GenericApiHandler handling {} request to {}", request.getMethod(), request.getUri());
+        log.info("[{}] GenericApiHandler handling {} request to {}", httpContext.getTraceId(), request.getMethod(), request.getUri());
 
         Map<String, Object> responseData = new HashMap<>();
         responseData.put("method", request.getMethod().toString());

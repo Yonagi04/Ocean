@@ -24,6 +24,7 @@ public class TraceMiddleware implements Middleware {
         if (request.getAttribute("traceId") == null || ((String) request.getAttribute("traceId")).isEmpty()) {
             request.setAttribute("traceId", traceId);
         }
+        httpContext.setTraceId(traceId);
         httpContext.setRequest(request);
 
         executor.proceed(httpContext);

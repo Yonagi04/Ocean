@@ -22,6 +22,7 @@ public class HttpContext {
     private final AtomicBoolean keepaliveRef;
     private final ConnectionContext connectionContext;
     private final AtomicBoolean commited = new AtomicBoolean(false);
+    private String traceId;
 
     public HttpContext(HttpRequest request, HttpResponse response, OutputStream output,
                        boolean keepalive, ConnectionContext connectionContext) {
@@ -70,5 +71,13 @@ public class HttpContext {
 
     public void commitResponse() {
         commited.set(true);
+    }
+
+    public void setTraceId(String traceId) {
+        this.traceId = traceId;
+    }
+
+    public String getTraceId() {
+        return traceId;
     }
 }

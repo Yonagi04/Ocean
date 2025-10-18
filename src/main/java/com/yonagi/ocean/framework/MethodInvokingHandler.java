@@ -109,11 +109,11 @@ public class MethodInvokingHandler implements RequestHandler {
     @Override
     public void handle(HttpContext httpContext) throws IOException {
         try {
-            Object[] args = resolveMethodArguments(httpContext.getRequest());
+            Object[] args = resolveMethodArguments(httpContext);
             Object result = handlerMethod.invoke(controllerInstance, args);
             handleReturnValue(httpContext, result);
         } catch (MissingRequiredParameterException e) {
-            log.warn("Missing required parameter for method {}: {}", handlerMethod.getName(), e.getMessage());
+            log.warn("[{}] Missing required parameter for method {}: {}", httpContext.getTraceId(), handlerMethod.getName(), e.getMessage());
             HttpResponse response = httpContext.getResponse().toBuilder()
                     .httpVersion(httpContext.getRequest().getHttpVersion())
                     .httpStatus(HttpStatus.BAD_REQUEST)
@@ -122,7 +122,7 @@ public class MethodInvokingHandler implements RequestHandler {
                     .build();
             httpContext.setResponse(response);
         } catch (JsonProcessingException e) {
-            log.warn("Json processing error: {}", e.getMessage(), e);
+            log.warn("[{}] Json processing error: {}", httpContext.getTraceId(), e.getMessage(), e);
             HttpResponse response = httpContext.getResponse().toBuilder()
                     .httpVersion(httpContext.getRequest().getHttpVersion())
                     .httpStatus(HttpStatus.BAD_REQUEST)
@@ -131,7 +131,7 @@ public class MethodInvokingHandler implements RequestHandler {
                     .build();
             httpContext.setResponse(response);
         } catch (DeserializationException e) {
-            log.warn("Deserialization error: {}", e.getMessage(), e);
+            log.warn("[{}] Deserialization error: {}", httpContext.getTraceId(), e.getMessage(), e);
             HttpResponse response = httpContext.getResponse().toBuilder()
                     .httpVersion(httpContext.getRequest().getHttpVersion())
                     .httpStatus(HttpStatus.BAD_REQUEST)
@@ -140,7 +140,7 @@ public class MethodInvokingHandler implements RequestHandler {
                     .build();
             httpContext.setResponse(response);
         } catch (BadRequestException e) {
-            log.warn("Bad Request (400) for {}: {}", httpContext.getRequest().getUri(), e.getMessage());
+            log.warn("[{}] Bad Request (400) for {}: {}", httpContext.getTraceId(), httpContext.getRequest().getUri(), e.getMessage());
             HttpResponse response = httpContext.getResponse().toBuilder()
                     .httpVersion(httpContext.getRequest().getHttpVersion())
                     .httpStatus(HttpStatus.BAD_REQUEST)
@@ -149,7 +149,7 @@ public class MethodInvokingHandler implements RequestHandler {
                     .build();
             httpContext.setResponse(response);
         } catch (UnsupportedMediaTypeException e) {
-            log.warn("Unsupported media type for {}: {}", httpContext.getRequest().getUri(), e.getMessage());
+            log.warn("[{}] Unsupported media type for {}: {}", httpContext.getTraceId(), httpContext.getRequest().getUri(), e.getMessage());
             HttpResponse response = httpContext.getResponse().toBuilder()
                     .httpVersion(httpContext.getRequest().getHttpVersion())
                     .httpStatus(HttpStatus.BAD_REQUEST)
@@ -158,7 +158,7 @@ public class MethodInvokingHandler implements RequestHandler {
                     .build();
             httpContext.setResponse(response);
         }catch (IllegalAccessException | IllegalArgumentException e) {
-            log.error("Illegal Access or Illegal Argument on Controller method {}: {}", handlerMethod.getName(), e.getMessage(), e);
+            log.error("[{}] Illegal Access or Illegal Argument on Controller method {}: {}", httpContext.getTraceId(), handlerMethod.getName(), e.getMessage(), e);
             HttpResponse response = httpContext.getResponse().toBuilder()
                     .httpVersion(httpContext.getRequest().getHttpVersion())
                     .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -167,8 +167,8 @@ public class MethodInvokingHandler implements RequestHandler {
                     .build();
             httpContext.setResponse(response);
         } catch (InvocationTargetException e) {
-            log.error("Controller method {}.{} threw an exception: {}",
-                    controllerInstance.getClass().getSimpleName(), handlerMethod.getName(), e.getTargetException().getMessage(), e.getTargetException());
+            log.error("[{}] Controller method {}.{} threw an exception: {}",
+                    httpContext.getTraceId(), controllerInstance.getClass().getSimpleName(), handlerMethod.getName(), e.getTargetException().getMessage(), e.getTargetException());
             HttpResponse response = httpContext.getResponse().toBuilder()
                     .httpVersion(httpContext.getRequest().getHttpVersion())
                     .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -179,7 +179,8 @@ public class MethodInvokingHandler implements RequestHandler {
         }
     }
 
-    private Object[] resolveMethodArguments(HttpRequest request) throws MissingRequiredParameterException, JsonProcessingException, BadRequestException, UnsupportedEncodingException {
+    private Object[] resolveMethodArguments(HttpContext httpContext) throws MissingRequiredParameterException, JsonProcessingException, BadRequestException, UnsupportedEncodingException {
+        HttpRequest request = httpContext.getRequest();
         Parameter[] parameters = handlerMethod.getParameters();
         Object[] args = new Object[parameters.length];
 
@@ -216,8 +217,8 @@ public class MethodInvokingHandler implements RequestHandler {
                 continue;
             }
 
-            log.warn("Unresolved parameter: {} {} for method {}. Using default value.",
-                    paramType.getSimpleName(), paramName, handlerMethod.getName());
+            log.warn("[{}] Unresolved parameter: {} {} for method {}. Using default value.",
+                    httpContext.getTraceId(), paramType.getSimpleName(), paramName, handlerMethod.getName());
             args[i] = getDefaultValueForType(paramType);
         }
         return args;

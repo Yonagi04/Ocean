@@ -289,7 +289,7 @@ public class Router {
             if (handleRouteEntry(entry, httpContext)) {
                 return;
             }
-            log.warn("Custom router failed, falling back to default handler for {} {}", method, path);
+            log.warn("[{}] Custom router failed, falling back to default handler for {} {}", httpContext.getTraceId(), method, path);
         }
         RequestHandler defaultHandler = defaultHandlers.get(method);
         if (defaultHandler != null) {
@@ -403,7 +403,6 @@ public class Router {
         if (routeType == RouteType.CONTROLLER && entry.handler != null) {
             log.debug("Handling request with Controller instance: {} -> {}",
                     httpContext.getRequest().getUri(), routeConfig.getHandlerClassName());
-            // entry.handler.handle(request, output, keepAlive);
             entry.handler.handle(httpContext);
             return true;
         }
@@ -435,7 +434,7 @@ public class Router {
             handler.handle(httpContext);
             return true;
         } else {
-            log.warn("Failed to create handler for router: {} - handler class not found or invalid", routeConfig);
+            log.warn("[{}] Failed to create handler for router: {} - handler class not found or invalid", httpContext.getTraceId(), routeConfig);
             return false;
         }
     }

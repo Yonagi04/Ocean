@@ -10,17 +10,13 @@ import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.handler.RequestHandler;
-import com.yonagi.ocean.utils.LocalConfigLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * @author Yonagi
@@ -65,7 +61,7 @@ public class ApiHandler implements RequestHandler {
                     .build();
             httpContext.setResponse(response);
             ErrorPageRender.render(httpContext);
-            log.warn("Client sent unsupported Content-Type: {}", contentType);
+            log.warn("[{}] Client sent unsupported Content-Type: {}", httpContext.getTraceId(), contentType);
             return;
         }
 
@@ -73,7 +69,7 @@ public class ApiHandler implements RequestHandler {
             processor.process(request, contentType, charset, responseData);
         } catch (Exception e) {
             String msgPrefix = "application/xml".equals(mimeType) ? "XML parsing error: " : "Multipart form data parsing error: ";
-            log.error("{}{}", msgPrefix, e.getMessage(), e);
+            log.error("[{}] {}{}", httpContext.getTraceId(), msgPrefix, e.getMessage(), e);
             HttpResponse errorResponse = httpContext.getResponse().toBuilder()
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.BAD_REQUEST)

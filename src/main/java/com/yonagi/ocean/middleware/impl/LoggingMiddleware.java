@@ -33,11 +33,11 @@ public class LoggingMiddleware implements Middleware {
         HttpRequest request = httpContext.getRequest();
         HttpResponse response = httpContext.getResponse();
 
-        String traceId = request.getAttribute("traceId") == null ? "" : (String) request.getAttribute("traceId");
+        String traceId = httpContext.getTraceId();
         HttpMethod method = request.getMethod();
         String uri = request.getUri();
         int statusCode = response.getHttpStatus().getCode();
 
-        log.info("[traceId={} {} {} -> {} ({} ms)]", traceId, method, uri, statusCode, duration);
+        log.info("[{}] {} {} -> {} (Duration: {} ms)", traceId, method, uri, statusCode, duration);
     }
 }
