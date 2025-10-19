@@ -9,6 +9,7 @@ import com.yonagi.ocean.core.protocol.*;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.core.protocol.enums.HttpVersion;
 import com.yonagi.ocean.handler.RequestHandler;
+import com.yonagi.ocean.metrics.MetricsRegistry;
 import com.yonagi.ocean.utils.LocalConfigLoader;
 import com.yonagi.ocean.utils.MimeTypeUtil;
 import org.slf4j.Logger;
@@ -104,6 +105,10 @@ public class StaticFileHandler implements RequestHandler {
                     .body(finalBody)
                     .build();
             httpContext.setResponse(httpResponse);
+            if (isInCache) {
+                MetricsRegistry metricsRegistry = httpContext.getConnectionContext().getServerContext().getMetricsRegistry();
+                metricsRegistry.getCacheHitCounter().increment();
+            }
             log.info("[{}] Served from {}{}", httpContext.getTraceId(), isInCache ? "cache: " : "disk: ", uri);
         } catch (Exception e) {
             log.error("[{}] Error serving file: {}", httpContext.getTraceId(), uri, e);
@@ -118,6 +123,8 @@ public class StaticFileHandler implements RequestHandler {
     }
     
     private void writeNotFound(HttpContext httpContext, Map<String, String> headers) {
+        MetricsRegistry metricsRegistry = httpContext.getConnectionContext().getServerContext().getMetricsRegistry();
+        metricsRegistry.getNotFoundCounter().increment();
         HttpResponse httpResponse = httpContext.getResponse().toBuilder()
                 .httpVersion(HttpVersion.HTTP_1_1)
                 .httpStatus(HttpStatus.NOT_FOUND)

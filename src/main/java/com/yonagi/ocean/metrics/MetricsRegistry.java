@@ -23,6 +23,7 @@ public class MetricsRegistry {
     private final Counter notFoundCounter;
     private final Counter routeFallbackCounter;
     private final Counter rateLimitRejectedCounter;
+    private final Counter cacheHitCounter;
 
     public MetricsRegistry(ThreadPoolExecutor threadPoolExecutor) {
         this.registry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
@@ -35,6 +36,9 @@ public class MetricsRegistry {
                 .register(registry);
         this.rateLimitRejectedCounter = Counter.builder("ratelimit.rejected.total")
                 .description("Counts requests rejected by rate limiter (429s)")
+                .register(registry);
+        this.cacheHitCounter = Counter.builder("cache.hit.total")
+                .description("Counts cache hits")
                 .register(registry);
 
         gauge("app.threadpool.active",
@@ -66,6 +70,10 @@ public class MetricsRegistry {
 
     public Counter getRouteFallbackCounter() {
         return routeFallbackCounter;
+    }
+
+    public Counter getCacheHitCounter() {
+        return cacheHitCounter;
     }
 
     public <T> void gauge(String name, T obj, java.util.function.ToDoubleFunction<T> f) {
