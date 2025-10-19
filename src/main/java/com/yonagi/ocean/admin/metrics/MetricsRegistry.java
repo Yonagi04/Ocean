@@ -1,11 +1,10 @@
-package com.yonagi.ocean.metrics;
+package com.yonagi.ocean.admin.metrics;
 
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.prometheusmetrics.PrometheusConfig;
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
-import io.prometheus.client.CollectorRegistry;
 
 import java.util.concurrent.ThreadPoolExecutor;
 

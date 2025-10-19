@@ -1,4 +1,4 @@
-package com.yonagi.ocean.metrics.utils;
+package com.yonagi.ocean.admin.utils;
 
 import com.yonagi.ocean.utils.LocalConfigLoader;
 
@@ -14,9 +14,9 @@ import java.util.stream.Collectors;
  * @description
  * @date 2025/10/19 16:15
  */
-public class MetricsUtil {
+public class AdminUtil {
 
-    private static final String whiteListString = LocalConfigLoader.getProperty("server.metrics.whitelist", "");
+    private static final String whiteListString = LocalConfigLoader.getProperty("server.admin.whitelist", "");
 
     private static Set<String> whiteList;
 
@@ -33,6 +33,10 @@ public class MetricsUtil {
     }
 
     public static String getMetricUri() {
-        return LocalConfigLoader.getProperty("server.metrics.uri", "/metrics");
+        return LocalConfigLoader.getProperty("server.admin.metrics.uri", "/metrics");
+    }
+
+    public static String getHealthUri() {
+        return LocalConfigLoader.getProperty("server.admin.health.uri", "/health");
     }
 }

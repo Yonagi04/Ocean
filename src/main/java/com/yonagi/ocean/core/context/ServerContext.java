@@ -1,13 +1,13 @@
 package com.yonagi.ocean.core.context;
 
+import com.yonagi.ocean.admin.health.HealthCheckHandler;
+import com.yonagi.ocean.admin.health.HealthCheckService;
 import com.yonagi.ocean.core.ConnectionManager;
 import com.yonagi.ocean.core.ratelimiter.RateLimiterChecker;
 import com.yonagi.ocean.core.router.Router;
-import com.yonagi.ocean.metrics.MetricsHandler;
-import com.yonagi.ocean.metrics.MetricsRegistry;
+import com.yonagi.ocean.admin.metrics.MetricsHandler;
+import com.yonagi.ocean.admin.metrics.MetricsRegistry;
 import com.yonagi.ocean.middleware.MiddlewareChain;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * @author Yonagi
@@ -24,15 +24,19 @@ public class ServerContext {
     private final MiddlewareChain middlewareChain;
     private final MetricsRegistry metricsRegistry;
     private final MetricsHandler metricsHandler;
+    private final HealthCheckService healthCheckService;
+    private final HealthCheckHandler healthCheckHandler;
 
     public ServerContext(MiddlewareChain middlewareChain, RateLimiterChecker rateLimiterChecker, Router router,
-                         ConnectionManager connectionManager, MetricsRegistry metricsRegistry) {
+                         ConnectionManager connectionManager, MetricsRegistry metricsRegistry, HealthCheckService healthCheckService) {
         this.middlewareChain = middlewareChain;
         this.rateLimiterChecker = rateLimiterChecker;
         this.router = router;
         this.connectionManager = connectionManager;
         this.metricsRegistry = metricsRegistry;
         this.metricsHandler = new MetricsHandler(metricsRegistry);
+        this.healthCheckService = healthCheckService;
+        this.healthCheckHandler = new HealthCheckHandler(healthCheckService);
     }
 
     public ConnectionManager getConnectionManager() {
@@ -57,5 +61,13 @@ public class ServerContext {
 
     public MetricsHandler getMetricsHandler() {
         return metricsHandler;
+    }
+
+    public HealthCheckHandler getHealthCheckHandler() {
+        return healthCheckHandler;
+    }
+
+    public HealthCheckService getHealthCheckService() {
+        return healthCheckService;
     }
 }

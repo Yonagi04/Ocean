@@ -6,6 +6,9 @@ import com.yonagi.ocean.middleware.ChainExecutor;
 import com.yonagi.ocean.middleware.Middleware;
 import com.yonagi.ocean.middleware.annotation.MiddlewarePriority;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * @author Yonagi
  * @version 1.0
@@ -22,7 +25,14 @@ public class ResponseSenderMiddleware implements Middleware {
             executor.proceed(httpContext);
         } finally {
             if (!httpContext.isCommited()) {
-                HttpResponse finalResponse = httpContext.getResponse();
+                HttpResponse response = httpContext.getResponse();
+                String traceId = httpContext.getTraceId();
+                Map<String, String> headers = response.getHeaders() == null ? new HashMap<String, String>() : response.getHeaders();
+                headers.put("X-Trace-Id", traceId);
+
+                HttpResponse finalResponse = response.toBuilder()
+                        .headers(headers)
+                        .build();
                 finalResponse.write(httpContext.getRequest(), httpContext.getOutput(), httpContext.isKeepalive());
                 httpContext.getOutput().flush();
             }

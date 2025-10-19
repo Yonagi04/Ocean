@@ -1,7 +1,8 @@
-package com.yonagi.ocean.metrics;
+package com.yonagi.ocean.admin.metrics;
 
 import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
+import com.yonagi.ocean.handler.RequestHandler;
 
 /**
  * @author Yonagi
@@ -10,7 +11,7 @@ import com.yonagi.ocean.core.protocol.enums.HttpStatus;
  * @description
  * @date 2025/10/19 16:00
  */
-public class MetricsHandler {
+public class MetricsHandler implements RequestHandler {
 
     private final MetricsRegistry metricsRegistry;
 
@@ -18,6 +19,7 @@ public class MetricsHandler {
         this.metricsRegistry = metricsRegistry;
     }
 
+    @Override
     public void handle(HttpContext httpContext) {
         String metricsData = metricsRegistry.getPrometheusFormattedData();
 

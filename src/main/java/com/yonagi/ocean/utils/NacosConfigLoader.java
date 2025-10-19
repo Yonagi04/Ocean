@@ -118,7 +118,7 @@ public class NacosConfigLoader {
         return false;
     }
 
-    private static boolean checkNacosConnectivity(String serverAddr) {
+    public static boolean checkNacosConnectivity(String serverAddr) {
         String[] parts = serverAddr.split(":");
         String host = parts[0];
         int port = parts.length > 1 ? Integer.parseInt(parts[1]) : 8848;

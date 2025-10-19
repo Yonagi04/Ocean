@@ -1,6 +1,9 @@
 package com.yonagi.ocean.core;
 
 import com.alibaba.nacos.api.config.ConfigService;
+import com.yonagi.ocean.admin.health.HealthCheckService;
+import com.yonagi.ocean.admin.health.impl.NacosHealthIndicator;
+import com.yonagi.ocean.admin.health.impl.ThreadPoolHealthIndicator;
 import com.yonagi.ocean.cache.StaticFileCacheFactory;
 import com.yonagi.ocean.core.configuration.KeepAliveConfig;
 import com.yonagi.ocean.core.configuration.source.router.*;
@@ -13,11 +16,12 @@ import com.yonagi.ocean.core.ratelimiter.RateLimiterManager;
 import com.yonagi.ocean.core.router.RouteManager;
 import com.yonagi.ocean.core.configuration.ServerStartupConfig;
 import com.yonagi.ocean.core.router.Router;
-import com.yonagi.ocean.metrics.MetricsRegistry;
+import com.yonagi.ocean.admin.metrics.MetricsRegistry;
 import com.yonagi.ocean.middleware.MiddlewareChain;
 import com.yonagi.ocean.middleware.MiddlewareLoader;
 import com.yonagi.ocean.utils.LocalConfigLoader;
 import com.yonagi.ocean.utils.NacosConfigLoader;
+import org.checkerframework.checker.units.qual.N;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,6 +34,8 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.security.KeyStore;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ThreadPoolExecutor;
 
 /**
@@ -110,7 +116,8 @@ public class HttpServer {
                 this.rateLimiterChecker,
                 this.router,
                 this.connectionManager,
-                new MetricsRegistry(threadPool)
+                new MetricsRegistry(threadPool),
+                new HealthCheckService(List.of(new NacosHealthIndicator(), new ThreadPoolHealthIndicator(threadPool)))
         );
 
         log.info("HTTP Keep-Alive enabled: {}, timeout: {}s, max requests: {}",

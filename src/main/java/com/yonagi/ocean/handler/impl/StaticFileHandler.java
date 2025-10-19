@@ -9,7 +9,7 @@ import com.yonagi.ocean.core.protocol.*;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.core.protocol.enums.HttpVersion;
 import com.yonagi.ocean.handler.RequestHandler;
-import com.yonagi.ocean.metrics.MetricsRegistry;
+import com.yonagi.ocean.admin.metrics.MetricsRegistry;
 import com.yonagi.ocean.utils.LocalConfigLoader;
 import com.yonagi.ocean.utils.MimeTypeUtil;
 import org.slf4j.Logger;

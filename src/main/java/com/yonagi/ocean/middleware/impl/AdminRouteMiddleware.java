@@ -1,21 +1,18 @@
 package com.yonagi.ocean.middleware.impl;
 
+import com.yonagi.ocean.admin.health.HealthCheckHandler;
 import com.yonagi.ocean.core.ErrorPageRender;
 import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
-import com.yonagi.ocean.metrics.MetricsHandler;
-import com.yonagi.ocean.metrics.utils.MetricsUtil;
+import com.yonagi.ocean.admin.metrics.MetricsHandler;
+import com.yonagi.ocean.admin.utils.AdminUtil;
 import com.yonagi.ocean.middleware.ChainExecutor;
 import com.yonagi.ocean.middleware.Middleware;
 import com.yonagi.ocean.middleware.annotation.MiddlewarePriority;
-import com.yonagi.ocean.utils.LocalConfigLoader;
 
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * @author Yonagi
@@ -25,18 +22,20 @@ import java.util.stream.Collectors;
  * @date 2025/10/19 16:05
  */
 @MiddlewarePriority(value = 4)
-public class MetricsRouteMiddleware implements Middleware {
+public class AdminRouteMiddleware implements Middleware {
 
     @Override
     public void handle(HttpContext httpContext, ChainExecutor executor) throws Exception {
         MetricsHandler metricsHandler = httpContext.getConnectionContext().getServerContext().getMetricsHandler();
-        Set<String> allowIps = MetricsUtil.getWhiteList();
-        String metricsUri = MetricsUtil.getMetricUri();
+        HealthCheckHandler healthCheckHandler = httpContext.getConnectionContext().getServerContext().getHealthCheckHandler();
+        Set<String> allowIps = AdminUtil.getWhiteList();
+        String metricsUri = AdminUtil.getMetricUri();
+        String healthUri = AdminUtil.getHealthUri();
 
         HttpRequest request = httpContext.getRequest();
-        if (metricsUri.equalsIgnoreCase(request.getUri())) {
+        if (metricsUri.equalsIgnoreCase(request.getUri()) || healthUri.equalsIgnoreCase(request.getUri())) {
             String clientIp = (String) request.getAttribute("clientIp");
-            if (!allowIps.isEmpty() && !allowIps.contains(clientIp)) {
+            if (!allowIps.contains(clientIp)) {
                 HttpResponse errorResponse = httpContext.getResponse().toBuilder()
                         .httpVersion(request.getHttpVersion())
                         .httpStatus(HttpStatus.FORBIDDEN)
@@ -47,8 +46,11 @@ public class MetricsRouteMiddleware implements Middleware {
                 ErrorPageRender.render(httpContext);
                 return;
             }
-
-            metricsHandler.handle(httpContext);
+            if (metricsUri.equalsIgnoreCase(request.getUri())) {
+                metricsHandler.handle(httpContext);
+            } else if (healthUri.equalsIgnoreCase(request.getUri())) {
+                healthCheckHandler.handle(httpContext);
+            }
             return;
         }
         executor.proceed(httpContext);
