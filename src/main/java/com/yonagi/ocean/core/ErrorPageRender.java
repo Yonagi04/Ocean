@@ -48,7 +48,7 @@ public class ErrorPageRender {
         }
 
         HttpResponse errorResponse = response.toBuilder()
-                .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+                .httpStatus(response.getHttpStatus())
                 .contentType("text/html; charset=utf-8")
                 .body(html.getBytes(StandardCharsets.UTF_8))
                 .build();
