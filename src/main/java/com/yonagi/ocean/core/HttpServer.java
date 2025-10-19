@@ -13,6 +13,7 @@ import com.yonagi.ocean.core.ratelimiter.RateLimiterManager;
 import com.yonagi.ocean.core.router.RouteManager;
 import com.yonagi.ocean.core.configuration.ServerStartupConfig;
 import com.yonagi.ocean.core.router.Router;
+import com.yonagi.ocean.metrics.MetricsRegistry;
 import com.yonagi.ocean.middleware.MiddlewareChain;
 import com.yonagi.ocean.middleware.MiddlewareLoader;
 import com.yonagi.ocean.utils.LocalConfigLoader;
@@ -108,7 +109,8 @@ public class HttpServer {
                 new MiddlewareChain(MiddlewareLoader.loadMiddlewares()),
                 this.rateLimiterChecker,
                 this.router,
-                this.connectionManager
+                this.connectionManager,
+                new MetricsRegistry(threadPool)
         );
 
         log.info("HTTP Keep-Alive enabled: {}, timeout: {}s, max requests: {}",

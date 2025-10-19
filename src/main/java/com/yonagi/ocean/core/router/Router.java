@@ -1,6 +1,5 @@
 package com.yonagi.ocean.core.router;
 
-import com.alibaba.nacos.api.naming.pojo.healthcheck.impl.Http;
 import com.yonagi.ocean.core.ErrorPageRender;
 import com.yonagi.ocean.core.configuration.RouteConfig;
 import com.yonagi.ocean.core.context.HttpContext;
@@ -10,6 +9,7 @@ import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.handler.RequestHandler;
 import com.yonagi.ocean.handler.impl.*;
+import com.yonagi.ocean.metrics.MetricsRegistry;
 import com.yonagi.ocean.utils.LocalConfigLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -138,7 +138,7 @@ public class Router {
                 cleanupIntervalSeconds, cleanupIntervalSeconds, TimeUnit.SECONDS);
         
         initDefaultHandlers();
-        
+
         log.info("Router initialized with LRU cache: size={}, ttl={}s, cleanup_interval={}s", 
                 cacheSize, cacheTtlSeconds, cleanupIntervalSeconds);
     }
@@ -289,6 +289,8 @@ public class Router {
             if (handleRouteEntry(entry, httpContext)) {
                 return;
             }
+            MetricsRegistry metricsRegistry = httpContext.getConnectionContext().getServerContext().getMetricsRegistry();
+            metricsRegistry.getRouteFallbackCounter().increment();
             log.warn("[{}] Custom router failed, falling back to default handler for {} {}", httpContext.getTraceId(), method, path);
         }
         RequestHandler defaultHandler = defaultHandlers.get(method);

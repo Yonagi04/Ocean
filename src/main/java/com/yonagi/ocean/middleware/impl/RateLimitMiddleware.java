@@ -7,6 +7,7 @@ import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.core.ratelimiter.RateLimiterChecker;
+import com.yonagi.ocean.metrics.MetricsRegistry;
 import com.yonagi.ocean.middleware.ChainExecutor;
 import com.yonagi.ocean.middleware.Middleware;
 import com.yonagi.ocean.middleware.annotation.MiddlewarePriority;
@@ -36,6 +37,10 @@ public class RateLimitMiddleware implements Middleware {
                     .build();
             httpContext.setResponse(errorResponse);
             ErrorPageRender.render(httpContext);
+
+            MetricsRegistry metricsRegistry = httpContext.getConnectionContext().getServerContext().getMetricsRegistry();
+            metricsRegistry.getRateLimitRejectedCounter().increment();
+
             return;
         }
 

@@ -1,17 +1,13 @@
 package com.yonagi.ocean.core.context;
 
 import com.yonagi.ocean.core.ConnectionManager;
-import com.yonagi.ocean.core.protocol.DefaultProtocolHandlerFactory;
-import com.yonagi.ocean.core.protocol.handler.HttpProtocolHandler;
 import com.yonagi.ocean.core.ratelimiter.RateLimiterChecker;
 import com.yonagi.ocean.core.router.Router;
-import com.yonagi.ocean.middleware.Middleware;
+import com.yonagi.ocean.metrics.MetricsHandler;
+import com.yonagi.ocean.metrics.MetricsRegistry;
 import com.yonagi.ocean.middleware.MiddlewareChain;
-import com.yonagi.ocean.middleware.MiddlewareLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.List;
 
 /**
  * @author Yonagi
@@ -22,18 +18,21 @@ import java.util.List;
  */
 public class ServerContext {
 
-    private static final Logger log = LoggerFactory.getLogger(ServerContext.class);
-
     private final ConnectionManager connectionManager;
     private final Router router;
     private final RateLimiterChecker rateLimiterChecker;
     private final MiddlewareChain middlewareChain;
+    private final MetricsRegistry metricsRegistry;
+    private final MetricsHandler metricsHandler;
 
-    public ServerContext(MiddlewareChain middlewareChain, RateLimiterChecker rateLimiterChecker, Router router, ConnectionManager connectionManager) {
+    public ServerContext(MiddlewareChain middlewareChain, RateLimiterChecker rateLimiterChecker, Router router,
+                         ConnectionManager connectionManager, MetricsRegistry metricsRegistry) {
         this.middlewareChain = middlewareChain;
         this.rateLimiterChecker = rateLimiterChecker;
         this.router = router;
         this.connectionManager = connectionManager;
+        this.metricsRegistry = metricsRegistry;
+        this.metricsHandler = new MetricsHandler(metricsRegistry);
     }
 
     public ConnectionManager getConnectionManager() {
@@ -50,5 +49,13 @@ public class ServerContext {
 
     public MiddlewareChain getMiddlewareChain() {
         return middlewareChain;
+    }
+
+    public MetricsRegistry getMetricsRegistry() {
+        return metricsRegistry;
+    }
+
+    public MetricsHandler getMetricsHandler() {
+        return metricsHandler;
     }
 }
