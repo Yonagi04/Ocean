@@ -27,7 +27,9 @@ public class ResponseSenderMiddleware implements Middleware {
             if (!httpContext.isCommited()) {
                 HttpResponse response = httpContext.getResponse();
                 String traceId = httpContext.getTraceId();
-                Map<String, String> headers = response.getHeaders() == null ? new HashMap<String, String>() : response.getHeaders();
+                Map<String, String> headers = response.getHeaders() != null
+                        ? new HashMap<>(response.getHeaders())
+                        : new HashMap<>();
                 headers.put("X-Trace-Id", traceId);
 
                 HttpResponse finalResponse = response.toBuilder()
@@ -35,6 +37,7 @@ public class ResponseSenderMiddleware implements Middleware {
                         .build();
                 finalResponse.write(httpContext.getRequest(), httpContext.getOutput(), httpContext.isKeepalive());
                 httpContext.getOutput().flush();
+                httpContext.commitResponse();
             }
         }
     }

@@ -55,6 +55,14 @@ public class HttpResponse {
 
     }
 
+    private HttpResponse(Builder builder) {
+        this.httpVersion = builder.httpVersion;
+        this.httpStatus = builder.httpStatus;
+        this.contentType = builder.contentType;
+        this.body = builder.body;
+        this.headers = builder.headers;
+    }
+
     public HttpVersion getHttpVersion() {
         return httpVersion;
     }
@@ -81,7 +89,8 @@ public class HttpResponse {
                 .httpVersion(httpVersion)
                 .httpStatus(httpStatus)
                 .contentType(contentType)
-                .headers(headerCopy);
+                .headers(headerCopy)
+                .body(body);
     }
 
     /**
@@ -252,6 +261,10 @@ public class HttpResponse {
         }
 
         public HttpResponse build() {
+            if (httpVersion == null) {
+                log.warn("HTTP version is not set, using default HTTP/1.1");
+                httpVersion = HttpVersion.HTTP_1_1;
+            }
             if (httpStatus == null) {
                 throw new IllegalStateException("Status code, status text must be set");
             }
@@ -259,13 +272,7 @@ public class HttpResponse {
                 log.warn("Content-Type is empty, using default value 'text/plain; charset=utf-8'");
                 contentType = "text/plain; charset=utf-8";
             }
-            HttpResponse httpResponse = new HttpResponse();
-            httpResponse.httpVersion = this.httpVersion != null ? this.httpVersion : HttpVersion.HTTP_1_1;
-            httpResponse.httpStatus = this.httpStatus;
-            httpResponse.contentType = this.contentType;
-            httpResponse.body = this.body;
-            httpResponse.headers = this.headers;
-            return httpResponse;
+            return new HttpResponse(this);
         }
     }
 }
