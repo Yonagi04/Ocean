@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>Ocean 管理控制台</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    body { background-color: #121212; color: #e0e0e0; font-family: 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; }
+    header { background-color: #1f1f1f; text-align: center; padding: 20px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+    header h1 { color: #00bcd4; margin: 0; font-size: 24px; }
+    header p { color: #aaa; font-size: 14px; }
+    .dashboard { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; padding: 20px; }
+    .card { background-color: #1e1e1e; border-radius: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.4); padding: 20px; width: 380px; transition: transform 0.2s ease; }
+    .card:hover { transform: translateY(-5px); }
+    .card h2 { color: #80deea; font-size: 18px; margin-bottom: 10px; }
+    .metric { font-size: 16px; margin: 5px 0; }
+    canvas { width: 100%; height: 250px; }
+    footer { text-align: center; color: #888; font-size: 13px; padding: 15px; border-top: 1px solid #333; }
+    .refresh-hint { color: #999; font-size: 12px; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Ocean 管理控制台</h1>
+    <p>服务器运行状态与实时指标，页面每 10 秒自动刷新</p>
+  </header>
+
+  <div class="dashboard">
+    <!-- 线程池 -->
+    <div class="card">
+      <h2>线程池状态</h2>
+      <p class="metric">活跃线程数: <span id="activeThreads">{{ activeThreads }}</span></p>
+      <p class="metric">队列大小: <span id="queueSize">{{ queueSize }}</span></p>
+      <canvas id="threadChart"></canvas>
+    </div>
+
+    <!-- 请求 -->
+    <div class="card">
+      <h2>请求统计</h2>
+      <p class="metric">请求总数: <span id="reqTotal">{{ reqTotal }}</span></p>
+      <p class="metric">平均延迟: <span id="avgLatency">{{ avgLatency }}</span> ms</p>
+      <p class="metric">最大延迟: <span id="maxLatency">{{ maxLatency }}</span> ms</p>
+      <canvas id="reqChart"></canvas>
+    </div>
+
+    <!-- 缓存 -->
+    <div class="card">
+      <h2>缓存命中</h2>
+      <p class="metric">端侧缓存命中总数: <span id="cacheHit">{{ cacheHit }}</span></p>
+      <p class="metric">HTTP缓存命中总数: <span id="httpCacheHit">{{ httpCacheHit }}</span></p>
+      <canvas id="cacheChart"></canvas>
+    </div>
+
+    <!-- 错误 -->
+    <div class="card">
+      <h2>错误与限流</h2>
+      <p class="metric">404 Not Found: <span id="notFound">{{ notFound }}</span></p>
+      <p class="metric">429 Rejected: <span id="ratelimit">{{ ratelimit }}</span></p>
+      <p class="metric">500 Internal Server Error: <span id="internalError">{{ internalError }}</span></p>
+      <canvas id="errorChart"></canvas>
+    </div>
+  </div>
+
+  <footer>
+    Ocean © 2025
+  </footer>
+
+  <script>
+    function initCharts() {
+      // 线程池图表
+      new Chart(document.getElementById('threadChart'), {
+        type: 'bar',
+        data: {
+          labels: ['活跃线程', '队列大小'],
+          datasets: [{
+            label: '线程状态',
+            data: [{{ activeThreads }}, {{ queueSize }}],
+            backgroundColor: ['#26c6da', '#ffb74d']
+          }]
+        },
+        options: { scales: { y: { beginAtZero: true } } }
+      });
+
+      // 请求延迟图表
+      new Chart(document.getElementById('reqChart'), {
+        type: 'bar',
+        data: {
+          labels: ['平均延迟(ms)', '最大延迟(ms)'],
+          datasets: [{
+            label: '请求延迟',
+            data: [{{ avgLatency }}, {{ maxLatency }}],
+            backgroundColor: ['#42a5f5', '#7e57c2']
+          }]
+        },
+      });
+
+      // 缓存命中图表
+      new Chart(document.getElementById('cacheChart'), {
+        type: 'bar',
+        data: {
+          labels: ['端侧缓存命中次数', 'HTTP缓存命中次数'],
+          datasets: [{
+            label: '缓存命中',
+            data: [{{ cacheHit }}, {{ httpCacheHit }}],
+            backgroundColor: ['#81c784', '#ff8a65']
+          }]
+        },
+        options: { scales: { y: { beginAtZero: true } } }
+      });
+
+      // 错误与限流图表
+      new Chart(document.getElementById('errorChart'), {
+        type: 'bar',
+        data: {
+          labels: ['404', '429', '500'],
+          datasets: [{
+            label: '错误与限流',
+            data: [{{ notFound }}, {{ ratelimit }}, {{ internalError }}],
+            backgroundColor: ['#ef5350', '#ba68c8']
+          }]
+        },
+        options: { scales: { y: { beginAtZero: true } } }
+      });
+    }
+
+    window.onload = initCharts;
+    setTimeout(() => location.reload(), 10000);
+  </script>
+</body>
+</html>

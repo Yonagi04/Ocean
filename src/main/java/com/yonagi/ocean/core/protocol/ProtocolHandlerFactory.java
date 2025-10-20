@@ -1,5 +1,6 @@
 package com.yonagi.ocean.core.protocol;
 
+import com.yonagi.ocean.core.context.ConnectionContext;
 import com.yonagi.ocean.core.protocol.handler.HttpProtocolHandler;
 
 import java.util.List;
@@ -13,10 +14,5 @@ import java.util.List;
  */
 public interface ProtocolHandlerFactory {
 
-    List<HttpProtocolHandler> createHandlers(
-            boolean isSsl,
-            boolean sslEnabled,
-            boolean redirectSslEnabled,
-            int sslPort
-    );
+    List<HttpProtocolHandler> createHandlers(ConnectionContext connectionContext);
 }

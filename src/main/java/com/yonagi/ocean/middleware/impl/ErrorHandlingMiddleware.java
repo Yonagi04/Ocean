@@ -28,6 +28,7 @@ public class ErrorHandlingMiddleware implements Middleware {
             executor.proceed(httpContext);
         } catch (Exception e) {
             log.error("[{}] {}", httpContext.getTraceId(), e.getMessage(), e);
+            httpContext.getConnectionContext().getServerContext().getMetricsRegistry().getInternalServerErrorCounter().increment();
             HttpResponse httpResponse = httpContext.getResponse().toBuilder()
                     .httpVersion(httpContext.getRequest().getHttpVersion())
                     .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)

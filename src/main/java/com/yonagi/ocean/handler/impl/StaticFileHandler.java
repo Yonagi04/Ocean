@@ -80,6 +80,8 @@ public class StaticFileHandler implements RequestHandler {
 
             String ifNoneMatch = request.getHeaders() != null ? request.getHeaders().get("if-none-match") : null;
             if (ifNoneMatch != null && matchesEtag(ifNoneMatch, etag)) {
+                MetricsRegistry metricsRegistry = httpContext.getConnectionContext().getServerContext().getMetricsRegistry();
+                metricsRegistry.getHttpCacheHitCounter().increment();
                 HttpResponse notModified = httpContext.getResponse().toBuilder()
                         .httpVersion(request.getHttpVersion())
                         .httpStatus(HttpStatus.NOT_MODIFIED)

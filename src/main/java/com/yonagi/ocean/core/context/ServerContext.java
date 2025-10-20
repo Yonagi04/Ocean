@@ -1,5 +1,6 @@
 package com.yonagi.ocean.core.context;
 
+import com.yonagi.ocean.admin.AdminHandler;
 import com.yonagi.ocean.admin.health.HealthCheckHandler;
 import com.yonagi.ocean.admin.health.HealthCheckService;
 import com.yonagi.ocean.core.ConnectionManager;
@@ -24,8 +25,8 @@ public class ServerContext {
     private final MiddlewareChain middlewareChain;
     private final MetricsRegistry metricsRegistry;
     private final MetricsHandler metricsHandler;
-    private final HealthCheckService healthCheckService;
     private final HealthCheckHandler healthCheckHandler;
+    private final AdminHandler adminHandler;
 
     public ServerContext(MiddlewareChain middlewareChain, RateLimiterChecker rateLimiterChecker, Router router,
                          ConnectionManager connectionManager, MetricsRegistry metricsRegistry, HealthCheckService healthCheckService) {
@@ -35,8 +36,8 @@ public class ServerContext {
         this.connectionManager = connectionManager;
         this.metricsRegistry = metricsRegistry;
         this.metricsHandler = new MetricsHandler(metricsRegistry);
-        this.healthCheckService = healthCheckService;
         this.healthCheckHandler = new HealthCheckHandler(healthCheckService);
+        this.adminHandler = new AdminHandler(metricsRegistry);
     }
 
     public ConnectionManager getConnectionManager() {
@@ -67,7 +68,7 @@ public class ServerContext {
         return healthCheckHandler;
     }
 
-    public HealthCheckService getHealthCheckService() {
-        return healthCheckService;
+    public AdminHandler getAdminHandler() {
+        return adminHandler;
     }
 }

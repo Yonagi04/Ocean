@@ -1,5 +1,6 @@
 package com.yonagi.ocean.core.protocol;
 
+import com.yonagi.ocean.core.context.ConnectionContext;
 import com.yonagi.ocean.core.protocol.handler.HttpProtocolHandler;
 import com.yonagi.ocean.core.protocol.handler.impl.CorsPreflightProtocolHandler;
 import com.yonagi.ocean.core.protocol.handler.impl.HstsProtocolHandler;
@@ -19,15 +20,15 @@ import java.util.List;
 public class DefaultProtocolHandlerFactory implements ProtocolHandlerFactory {
 
     @Override
-    public List<HttpProtocolHandler> createHandlers(boolean isSsl, boolean sslEnabled, boolean redirectSslEnabled, int sslPort) {
+    public List<HttpProtocolHandler> createHandlers(ConnectionContext connectionContext) {
         List<HttpProtocolHandler> handlers = new ArrayList<>();
 
-        if (!isSsl && sslEnabled && redirectSslEnabled) {
-            handlers.add(new HttpsRedirectProtocolHandler(sslPort));
+        if (!connectionContext.isSsl() && connectionContext.isSslEnabled() && connectionContext.isRedirectSslEnabled()) {
+            handlers.add(new HttpsRedirectProtocolHandler(connectionContext.getSslPort()));
         }
         handlers.add(new RequestBodyReaderProtocolHandler());
-        handlers.add(new HstsProtocolHandler(isSsl));
-        handlers.add(new CorsPreflightProtocolHandler(isSsl));
+        handlers.add(new HstsProtocolHandler(connectionContext.isSsl()));
+        handlers.add(new CorsPreflightProtocolHandler(connectionContext.isSsl()));
 
         return handlers;
     }

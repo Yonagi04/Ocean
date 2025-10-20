@@ -1,5 +1,6 @@
 package com.yonagi.ocean.core;
 
+import com.yonagi.ocean.admin.metrics.MetricsRegistry;
 import com.yonagi.ocean.core.context.ConnectionContext;
 import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.DefaultProtocolHandlerFactory;
@@ -57,10 +58,7 @@ public class ClientHandler implements Runnable {
         this.router = connectionContext.getServerContext().getRouter();
         this.chain = connectionContext.getServerContext().getMiddlewareChain();
 
-        this.protocolHandlers = new DefaultProtocolHandlerFactory().createHandlers(
-                connectionContext.isSsl(),
-                connectionContext.isSslEnabled(),
-                connectionContext.isRedirectSslEnabled(), connectionContext.getSslPort());
+        this.protocolHandlers = new DefaultProtocolHandlerFactory().createHandlers(connectionContext);
     }
 
     @Override
@@ -153,6 +151,7 @@ public class ClientHandler implements Runnable {
 
     private void handleRequest(HttpRequest request, OutputStream output, boolean keepAlive) throws IOException {
         HttpResponse initialResponse = new HttpResponse.Builder()
+                .httpVersion(request.getHttpVersion())
                 .httpStatus(HttpStatus.OK)
                 .contentType("text/plain; charset=utf-8")
                 .build();
@@ -203,6 +202,7 @@ public class ClientHandler implements Runnable {
 
     private void sendFatalErrorResponse(HttpContext httpContext) {
         try {
+            httpContext.getConnectionContext().getServerContext().getMetricsRegistry().getInternalServerErrorCounter().increment();
             HttpResponse errorResponse = httpContext.getResponse().toBuilder()
                     .httpVersion(httpContext.getResponse().getHttpVersion())
                     .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)

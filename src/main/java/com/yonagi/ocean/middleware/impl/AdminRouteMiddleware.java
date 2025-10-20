@@ -1,5 +1,6 @@
 package com.yonagi.ocean.middleware.impl;
 
+import com.yonagi.ocean.admin.AdminHandler;
 import com.yonagi.ocean.admin.health.HealthCheckHandler;
 import com.yonagi.ocean.core.ErrorPageRender;
 import com.yonagi.ocean.core.context.HttpContext;
@@ -28,12 +29,16 @@ public class AdminRouteMiddleware implements Middleware {
     public void handle(HttpContext httpContext, ChainExecutor executor) throws Exception {
         MetricsHandler metricsHandler = httpContext.getConnectionContext().getServerContext().getMetricsHandler();
         HealthCheckHandler healthCheckHandler = httpContext.getConnectionContext().getServerContext().getHealthCheckHandler();
+        AdminHandler adminHandler = httpContext.getConnectionContext().getServerContext().getAdminHandler();
         Set<String> allowIps = AdminUtil.getWhiteList();
         String metricsUri = AdminUtil.getMetricUri();
         String healthUri = AdminUtil.getHealthUri();
+        String adminUri = AdminUtil.getAdminUri();
 
         HttpRequest request = httpContext.getRequest();
-        if (metricsUri.equalsIgnoreCase(request.getUri()) || healthUri.equalsIgnoreCase(request.getUri())) {
+        if (metricsUri.equalsIgnoreCase(request.getUri()) ||
+                healthUri.equalsIgnoreCase(request.getUri()) ||
+                adminUri.equalsIgnoreCase(request.getUri())) {
             String clientIp = (String) request.getAttribute("clientIp");
             if (!allowIps.contains(clientIp)) {
                 HttpResponse errorResponse = httpContext.getResponse().toBuilder()
@@ -50,6 +55,8 @@ public class AdminRouteMiddleware implements Middleware {
                 metricsHandler.handle(httpContext);
             } else if (healthUri.equalsIgnoreCase(request.getUri())) {
                 healthCheckHandler.handle(httpContext);
+            } else if (adminUri.equalsIgnoreCase(request.getUri())) {
+                adminHandler.handle(httpContext);
             }
             return;
         }

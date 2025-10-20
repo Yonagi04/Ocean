@@ -39,4 +39,8 @@ public class AdminUtil {
     public static String getHealthUri() {
         return LocalConfigLoader.getProperty("server.admin.health.uri", "/health");
     }
+
+    public static String getAdminUri() {
+        return LocalConfigLoader.getProperty("server.admin.uri", "/admin");
+    }
 }
