@@ -32,26 +32,48 @@ public class AdminHandler implements RequestHandler {
         try {
             double activeThreadsCount = metricsRegistry.getGaugeValue("app.threadpool.active");
             double queueSize = metricsRegistry.getGaugeValue("app.threadpool.queue.size");
+
             double cacheHitCount = metricsRegistry.getCacheHitCounter().count();
             double httpCacheHitCount = metricsRegistry.getHttpCacheHitCounter().count();
+            double routeFallbackCount = metricsRegistry.getRouteFallbackCounter().count();
+
             double notFoundCount = metricsRegistry.getNotFoundCounter().count();
             double internalErrorCount = metricsRegistry.getInternalServerErrorCounter().count();
             double ratelimitCount = metricsRegistry.getRateLimitRejectedCounter().count();
+
             long requestCount = metricsRegistry.getTotalRequestCount();
             double avgLatency = metricsRegistry.getAverageLatency();
             double maxLatency = metricsRegistry.getMaxLatency();
 
+            String appVersion = httpContext.getConnectionContext().getServerContext().getEnvironmentInfo().getAppVersion();
+            String osName = httpContext.getConnectionContext().getServerContext().getEnvironmentInfo().getOsName();
+            String javaVersion = httpContext.getConnectionContext().getServerContext().getEnvironmentInfo().getJavaVersion();
+            double jvmMemoryUsed = metricsRegistry.getJvmMemoryUsedMB();
+            double processCpuUsage = metricsRegistry.getProcessCpuUsagePercentage();
+            String startTime = httpContext.getConnectionContext().getServerContext().getEnvironmentInfo().getUptime();
+
             Map<String, Object> model = new HashMap<>();
             model.put("activeThreads", activeThreadsCount);
             model.put("queueSize", queueSize);
+
             model.put("cacheHit", cacheHitCount);
             model.put("httpCacheHit", httpCacheHitCount);
+            model.put("routeFallback", routeFallbackCount);
+
             model.put("notFound", notFoundCount);
             model.put("ratelimit", ratelimitCount);
+            model.put("internalError", internalErrorCount);
+
             model.put("reqTotal", requestCount);
             model.put("avgLatency", avgLatency);
             model.put("maxLatency", maxLatency);
-            model.put("internalError", internalErrorCount);
+
+            model.put("appVersion", appVersion);
+            model.put("osName", osName);
+            model.put("javaVersion", javaVersion);
+            model.put("jvmMemoryUsed", jvmMemoryUsed);
+            model.put("processCpuUsage", processCpuUsage);
+            model.put("uptime", startTime);
 
             String html = TemplateRenderer.render("admin", model);
             HttpResponse response = httpContext.getResponse().toBuilder()

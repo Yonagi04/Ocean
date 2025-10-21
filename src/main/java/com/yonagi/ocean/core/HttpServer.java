@@ -8,6 +8,7 @@ import com.yonagi.ocean.cache.StaticFileCacheFactory;
 import com.yonagi.ocean.core.configuration.KeepAliveConfig;
 import com.yonagi.ocean.core.configuration.source.router.*;
 import com.yonagi.ocean.core.context.ConnectionContext;
+import com.yonagi.ocean.core.context.EnvironmentInfo;
 import com.yonagi.ocean.core.context.ServerContext;
 import com.yonagi.ocean.framework.ControllerRegistry;
 import com.yonagi.ocean.core.gzip.GzipEncoderManager;
@@ -117,7 +118,8 @@ public class HttpServer {
                 this.router,
                 this.connectionManager,
                 new MetricsRegistry(threadPool),
-                new HealthCheckService(List.of(new NacosHealthIndicator(), new ThreadPoolHealthIndicator(threadPool)))
+                new HealthCheckService(List.of(new NacosHealthIndicator(), new ThreadPoolHealthIndicator(threadPool))),
+                new EnvironmentInfo(LocalConfigLoader.getProperty("server.version"))
         );
 
         log.info("HTTP Keep-Alive enabled: {}, timeout: {}s, max requests: {}",

@@ -27,9 +27,11 @@ public class ServerContext {
     private final MetricsHandler metricsHandler;
     private final HealthCheckHandler healthCheckHandler;
     private final AdminHandler adminHandler;
+    private final EnvironmentInfo environmentInfo;
 
     public ServerContext(MiddlewareChain middlewareChain, RateLimiterChecker rateLimiterChecker, Router router,
-                         ConnectionManager connectionManager, MetricsRegistry metricsRegistry, HealthCheckService healthCheckService) {
+                         ConnectionManager connectionManager, MetricsRegistry metricsRegistry, HealthCheckService healthCheckService,
+                         EnvironmentInfo environmentInfo) {
         this.middlewareChain = middlewareChain;
         this.rateLimiterChecker = rateLimiterChecker;
         this.router = router;
@@ -38,6 +40,7 @@ public class ServerContext {
         this.metricsHandler = new MetricsHandler(metricsRegistry);
         this.healthCheckHandler = new HealthCheckHandler(healthCheckService);
         this.adminHandler = new AdminHandler(metricsRegistry);
+        this.environmentInfo = environmentInfo;
     }
 
     public ConnectionManager getConnectionManager() {
@@ -70,5 +73,9 @@ public class ServerContext {
 
     public AdminHandler getAdminHandler() {
         return adminHandler;
+    }
+
+    public EnvironmentInfo getEnvironmentInfo() {
+        return environmentInfo;
     }
 }

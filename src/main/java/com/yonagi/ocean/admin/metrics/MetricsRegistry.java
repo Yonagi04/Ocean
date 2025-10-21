@@ -4,6 +4,8 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Meter;
 import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.Timer;
+import io.micrometer.core.instrument.binder.jvm.JvmMemoryMetrics;
+import io.micrometer.core.instrument.binder.system.ProcessorMetrics;
 import io.micrometer.prometheusmetrics.PrometheusConfig;
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 
@@ -31,6 +33,9 @@ public class MetricsRegistry {
 
     public MetricsRegistry(ThreadPoolExecutor threadPoolExecutor) {
         this.registry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
+
+        new JvmMemoryMetrics().bindTo(registry);
+        new ProcessorMetrics().bindTo(registry);
 
         this.notFoundCounter = Counter.builder("not.found.total")
                 .description("Counts requests not found (404s)")
@@ -143,5 +148,20 @@ public class MetricsRegistry {
             }
         }
         return totalCount;
+    }
+
+    public double getProcessCpuUsagePercentage() {
+        Double usage = getGaugeValue("process.cpu.usage");
+        return usage * 100.0;
+    }
+
+    public double getJvmMemoryUsedMB() {
+        long bytesUsed = 0;
+        for (Meter meter : registry.find("jvm.memory.used").meters()) {
+            if (meter instanceof io.micrometer.core.instrument.Gauge) {
+                bytesUsed += ((io.micrometer.core.instrument.Gauge) meter).value();
+            }
+        }
+        return bytesUsed / (1024L * 1024L);
     }
 }

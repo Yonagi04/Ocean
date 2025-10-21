@@ -30,7 +30,6 @@ public class AdminRouteMiddleware implements Middleware {
         MetricsHandler metricsHandler = httpContext.getConnectionContext().getServerContext().getMetricsHandler();
         HealthCheckHandler healthCheckHandler = httpContext.getConnectionContext().getServerContext().getHealthCheckHandler();
         AdminHandler adminHandler = httpContext.getConnectionContext().getServerContext().getAdminHandler();
-        Set<String> allowIps = AdminUtil.getWhiteList();
         String metricsUri = AdminUtil.getMetricUri();
         String healthUri = AdminUtil.getHealthUri();
         String adminUri = AdminUtil.getAdminUri();
@@ -40,7 +39,7 @@ public class AdminRouteMiddleware implements Middleware {
                 healthUri.equalsIgnoreCase(request.getUri()) ||
                 adminUri.equalsIgnoreCase(request.getUri())) {
             String clientIp = (String) request.getAttribute("clientIp");
-            if (!allowIps.contains(clientIp)) {
+            if (!AdminUtil.isIpInWhiteList(clientIp)) {
                 HttpResponse errorResponse = httpContext.getResponse().toBuilder()
                         .httpVersion(request.getHttpVersion())
                         .httpStatus(HttpStatus.FORBIDDEN)
