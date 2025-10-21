@@ -74,6 +74,15 @@ public enum ContentType {
         return EXTENSION_MAP.getOrDefault(extension.toLowerCase(), UNKNOWN);
     }
 
+    public static ContentType fromName(String fileName) {
+        int dotIndex = fileName.lastIndexOf('.');
+        if (dotIndex == -1) {
+            return UNKNOWN;
+        }
+        String extension = fileName.substring(dotIndex + 1).toLowerCase();
+        return fromExtension(extension);
+    }
+
     public static ContentType fromMime(String mime) {
         if (mime == null) return UNKNOWN;
         return MIME_MAP.getOrDefault(mime.toLowerCase(), UNKNOWN);

@@ -3,6 +3,7 @@ package com.yonagi.ocean.handler.impl;
 import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
+import com.yonagi.ocean.core.protocol.enums.ContentType;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.core.protocol.enums.HttpVersion;
 import com.yonagi.ocean.handler.RequestHandler;
@@ -53,14 +54,10 @@ public class HeadHandler implements RequestHandler {
             log.warn("[{}] Attempted directory traversal attack: {}", httpContext.getTraceId(), uri);
             return;
         }
-        String contentType = MimeTypeUtil.getMimeType(file.getName());
-        if (contentType == null) {
-            contentType = "application/octet-stream";
-        }
         HttpResponse response = httpContext.getResponse().toBuilder()
                 .httpVersion(request.getHttpVersion())
                 .httpStatus(HttpStatus.OK)
-                .contentType(contentType)
+                .contentType(ContentType.fromName(file.getName()))
                 .headers(headers)
                 .build();
         httpContext.setResponse(response);
@@ -71,7 +68,7 @@ public class HeadHandler implements RequestHandler {
         HttpResponse response = httpContext.getResponse().toBuilder()
                 .httpVersion(HttpVersion.HTTP_1_1)
                 .httpStatus(HttpStatus.NOT_FOUND)
-                .contentType("text/plain; charset=utf/8")
+                .contentType(ContentType.TEXT_PLAIN)
                 .headers(headers)
                 .build();
         httpContext.setResponse(response);

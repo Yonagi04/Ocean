@@ -3,6 +3,7 @@ package com.yonagi.ocean.core;
 import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
+import com.yonagi.ocean.core.protocol.enums.ContentType;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.utils.TemplateRenderer;
 
@@ -49,7 +50,7 @@ public class ErrorPageRender {
 
         HttpResponse errorResponse = response.toBuilder()
                 .httpStatus(response.getHttpStatus())
-                .contentType("text/html; charset=utf-8")
+                .contentType(ContentType.TEXT_HTML)
                 .body(html.getBytes(StandardCharsets.UTF_8))
                 .build();
 

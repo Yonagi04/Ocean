@@ -3,6 +3,7 @@ package com.yonagi.ocean.core.protocol.handler.impl;
 import com.alibaba.nacos.api.naming.pojo.healthcheck.impl.Http;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
+import com.yonagi.ocean.core.protocol.enums.ContentType;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.core.protocol.handler.HttpProtocolHandler;
 import com.yonagi.ocean.utils.LocalConfigLoader;
@@ -46,7 +47,7 @@ public class HttpsRedirectProtocolHandler implements HttpProtocolHandler {
         HttpResponse redirectResponse = new HttpResponse.Builder()
                 .httpVersion(request.getHttpVersion())
                 .httpStatus(HttpStatus.PERMANENT_REDIRECT)
-                .contentType("text/html")
+                .contentType(ContentType.TEXT_HTML)
                 .headers(responseHeaders)
                 .body(String.format("Redirecting to %s", redirectLocation).getBytes())
                 .build();

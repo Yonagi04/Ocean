@@ -4,6 +4,7 @@ import com.yonagi.ocean.core.configuration.RedirectConfig;
 import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
+import com.yonagi.ocean.core.protocol.enums.ContentType;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.handler.RequestHandler;
 import com.yonagi.ocean.utils.LocalConfigLoader;
@@ -115,7 +116,7 @@ public class RedirectHandler implements RequestHandler {
         HttpResponse.Builder builder = httpContext.getResponse().toBuilder()
                 .httpVersion(request.getHttpVersion())
                 .httpStatus(HttpStatus.fromCode(statusCode))
-                .contentType(request.getAttribute("contentType") != null ? (String) request.getAttribute("contentType") : "text/html; charset=utf-8");
+                .contentType(request.getAttribute("contentType") != null ? ContentType.fromMime((String) request.getAttribute("contentType")) : ContentType.TEXT_HTML);
         Map<String, String> responseHeaders = (Map<String, String>) request.getAttribute("HstsHeaders");
         responseHeaders.put("Location", finalLocation);
         builder.headers(responseHeaders);

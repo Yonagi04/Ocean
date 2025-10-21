@@ -3,6 +3,7 @@ package com.yonagi.ocean.core.protocol.handler.impl;
 import com.yonagi.ocean.core.CorsManager;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
+import com.yonagi.ocean.core.protocol.enums.ContentType;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.core.protocol.handler.HttpProtocolHandler;
 import com.yonagi.ocean.utils.LocalConfigLoader;
@@ -66,7 +67,7 @@ public class CorsPreflightProtocolHandler implements HttpProtocolHandler {
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.NO_CONTENT)
                     .headers(headers)
-                    .contentType("text/plain; charset=utf/8")
+                    .contentType(ContentType.TEXT_PLAIN)
                     .body(new byte[0])
                     .build();
             response.write(request, output, false);

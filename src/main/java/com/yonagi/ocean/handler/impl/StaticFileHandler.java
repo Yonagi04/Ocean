@@ -6,6 +6,7 @@ import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.gzip.GzipEncoder;
 import com.yonagi.ocean.core.gzip.GzipEncoderManager;
 import com.yonagi.ocean.core.protocol.*;
+import com.yonagi.ocean.core.protocol.enums.ContentType;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.core.protocol.enums.HttpVersion;
 import com.yonagi.ocean.handler.RequestHandler;
@@ -60,10 +61,7 @@ public class StaticFileHandler implements RequestHandler {
             return;
         }
 
-        String contentType = MimeTypeUtil.getMimeType(file.getName());
-        if (contentType == null) {
-            contentType = "application/octet-stream";
-        }
+        ContentType contentType = ContentType.fromName(file.getName());
 
         try {
             boolean isInCache = fileCache.contain(file.getCanonicalPath());
@@ -117,7 +115,7 @@ public class StaticFileHandler implements RequestHandler {
             HttpResponse errorResponse = httpContext.getResponse().toBuilder()
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .contentType("text/html; charset=utf-8")
+                    .contentType(ContentType.TEXT_HTML)
                     .build();
             httpContext.setResponse(errorResponse);
             ErrorPageRender.render(httpContext);
@@ -130,7 +128,7 @@ public class StaticFileHandler implements RequestHandler {
         HttpResponse httpResponse = httpContext.getResponse().toBuilder()
                 .httpVersion(HttpVersion.HTTP_1_1)
                 .httpStatus(HttpStatus.NOT_FOUND)
-                .contentType("text/html")
+                .contentType(ContentType.TEXT_HTML)
                 .headers(headers)
                 .build();
         httpContext.setResponse(httpResponse);

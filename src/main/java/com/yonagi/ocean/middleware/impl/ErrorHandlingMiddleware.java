@@ -3,6 +3,7 @@ package com.yonagi.ocean.middleware.impl;
 import com.yonagi.ocean.core.ErrorPageRender;
 import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.HttpResponse;
+import com.yonagi.ocean.core.protocol.enums.ContentType;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.middleware.ChainExecutor;
 import com.yonagi.ocean.middleware.Middleware;
@@ -32,7 +33,7 @@ public class ErrorHandlingMiddleware implements Middleware {
             HttpResponse httpResponse = httpContext.getResponse().toBuilder()
                     .httpVersion(httpContext.getRequest().getHttpVersion())
                     .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .contentType("text/plain; charset=utf-8")
+                    .contentType(ContentType.TEXT_PLAIN)
                     .body("Internal server error".getBytes())
                     .build();
             httpContext.setResponse(httpResponse);

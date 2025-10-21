@@ -1,6 +1,7 @@
 package com.yonagi.ocean.admin.metrics;
 
 import com.yonagi.ocean.core.context.HttpContext;
+import com.yonagi.ocean.core.protocol.enums.ContentType;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.handler.RequestHandler;
 
@@ -26,7 +27,7 @@ public class MetricsHandler implements RequestHandler {
         httpContext.setResponse(httpContext.getResponse().toBuilder()
                 .httpVersion(httpContext.getRequest().getHttpVersion())
                 .httpStatus(HttpStatus.OK)
-                .contentType("text/plain; version=0.0.4; charset=utf-8")
+                .contentType(ContentType.TEXT_PLAIN)
                 .body(metricsData.getBytes())
                 .build());
     }
