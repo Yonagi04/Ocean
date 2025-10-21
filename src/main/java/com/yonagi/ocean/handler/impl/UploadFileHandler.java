@@ -5,6 +5,7 @@ import com.yonagi.ocean.core.ErrorPageRender;
 import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
+import com.yonagi.ocean.core.protocol.enums.ContentType;
 import com.yonagi.ocean.core.protocol.enums.HttpMethod;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.core.protocol.enums.HttpVersion;
@@ -52,7 +53,7 @@ public class UploadFileHandler implements RequestHandler {
             HttpResponse response = httpContext.getResponse().toBuilder()
                     .httpVersion(HttpVersion.HTTP_1_1)
                     .httpStatus(HttpStatus.METHOD_NOT_ALLOWED)
-                    .contentType("text/html")
+                    .contentType(ContentType.TEXT_HTML)
                     .headers(headers)
                     .build();
             httpContext.setResponse(response);
@@ -66,7 +67,7 @@ public class UploadFileHandler implements RequestHandler {
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.BAD_REQUEST)
                     .headers(headers)
-                    .contentType("text/html; charset=utf-8")
+                    .contentType(ContentType.TEXT_HTML)
                     .build();
             httpContext.setResponse(response);
             ErrorPageRender.render(httpContext);
@@ -111,7 +112,7 @@ public class UploadFileHandler implements RequestHandler {
             HttpResponse response = httpContext.getResponse().toBuilder()
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.BAD_REQUEST)
-                    .contentType("text/html; charset=utf-8")
+                    .contentType(ContentType.TEXT_PLAIN)
                     .headers(headers)
                     .build();
             httpContext.setResponse(response);
@@ -131,7 +132,7 @@ public class UploadFileHandler implements RequestHandler {
                 HttpResponse response = httpContext.getResponse().toBuilder()
                         .httpVersion(request.getHttpVersion())
                         .httpStatus(HttpStatus.BAD_REQUEST)
-                        .contentType("text/html; charset=utf-8")
+                        .contentType(ContentType.TEXT_PLAIN)
                         .headers(headers)
                         .build();
                 httpContext.setResponse(response);
@@ -152,7 +153,7 @@ public class UploadFileHandler implements RequestHandler {
                             HttpResponse errorResponse = httpContext.getResponse().toBuilder()
                                     .httpVersion(request.getHttpVersion())
                                     .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-                                    .contentType("text/html; charset=utf-8")
+                                    .contentType(ContentType.TEXT_PLAIN)
                                     .build();
                             httpContext.setResponse(errorResponse);
                             ErrorPageRender.render(httpContext);
@@ -184,7 +185,7 @@ public class UploadFileHandler implements RequestHandler {
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.CREATED)
                     .headers(headers)
-                    .contentType("application/json")
+                    .contentType(ContentType.APPLICATION_JSON)
                     .body(responseBody.getBytes(StandardCharsets.UTF_8))
                     .build();
             httpContext.setResponse(response);
@@ -194,7 +195,7 @@ public class UploadFileHandler implements RequestHandler {
             HttpResponse errorResponse = httpContext.getResponse().toBuilder()
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .contentType("text/html; charset=utf-8")
+                    .contentType(ContentType.TEXT_PLAIN)
                     .build();
             httpContext.setResponse(errorResponse);
             ErrorPageRender.render(httpContext);

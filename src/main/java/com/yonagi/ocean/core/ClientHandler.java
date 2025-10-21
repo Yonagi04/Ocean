@@ -5,6 +5,7 @@ import com.yonagi.ocean.core.context.ConnectionContext;
 import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.DefaultProtocolHandlerFactory;
 import com.yonagi.ocean.core.protocol.HttpResponse;
+import com.yonagi.ocean.core.protocol.enums.ContentType;
 import com.yonagi.ocean.core.protocol.enums.HttpMethod;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpRequestParser;
@@ -153,7 +154,7 @@ public class ClientHandler implements Runnable {
         HttpResponse initialResponse = new HttpResponse.Builder()
                 .httpVersion(request.getHttpVersion())
                 .httpStatus(HttpStatus.OK)
-                .contentType("text/plain; charset=utf-8")
+                .contentType(ContentType.TEXT_PLAIN)
                 .build();
         HttpContext httpContext = new HttpContext(request, initialResponse, output, keepAlive, connectionContext);
 
@@ -206,7 +207,7 @@ public class ClientHandler implements Runnable {
             HttpResponse errorResponse = httpContext.getResponse().toBuilder()
                     .httpVersion(httpContext.getResponse().getHttpVersion())
                     .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .contentType("text/plain; charset=utf-8")
+                    .contentType(ContentType.TEXT_PLAIN)
                     .body("FATAL SERVER ERROR".getBytes())
                     .build();
             httpContext.setResponse(errorResponse);

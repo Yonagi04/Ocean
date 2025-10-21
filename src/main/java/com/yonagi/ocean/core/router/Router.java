@@ -4,6 +4,7 @@ import com.yonagi.ocean.core.ErrorPageRender;
 import com.yonagi.ocean.core.configuration.RouteConfig;
 import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.HttpResponse;
+import com.yonagi.ocean.core.protocol.enums.ContentType;
 import com.yonagi.ocean.core.protocol.enums.HttpMethod;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
@@ -300,7 +301,7 @@ public class Router {
             HttpResponse errorResponse = httpContext.getResponse().toBuilder()
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.METHOD_NOT_ALLOWED)
-                    .contentType("text/plain; charset=utf-8")
+                    .contentType(ContentType.TEXT_PLAIN)
                     .body("HTTP Method not specified or supported.".getBytes())
                     .build();
             httpContext.setResponse(errorResponse);

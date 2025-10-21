@@ -3,6 +3,7 @@ package com.yonagi.ocean.admin;
 import com.yonagi.ocean.admin.metrics.MetricsRegistry;
 import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.HttpResponse;
+import com.yonagi.ocean.core.protocol.enums.ContentType;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.handler.RequestHandler;
 import com.yonagi.ocean.utils.TemplateRenderer;
@@ -78,7 +79,7 @@ public class AdminHandler implements RequestHandler {
             String html = TemplateRenderer.render("admin", model);
             HttpResponse response = httpContext.getResponse().toBuilder()
                     .httpStatus(HttpStatus.OK)
-                    .contentType("text/html; charset=utf-8")
+                    .contentType(ContentType.TEXT_HTML)
                     .body(html.getBytes(StandardCharsets.UTF_8))
                     .build();
             httpContext.setResponse(response);

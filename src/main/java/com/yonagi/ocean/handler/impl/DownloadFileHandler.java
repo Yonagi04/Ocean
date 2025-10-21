@@ -4,6 +4,7 @@ import com.yonagi.ocean.core.ErrorPageRender;
 import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
+import com.yonagi.ocean.core.protocol.enums.ContentType;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.core.protocol.enums.HttpVersion;
 import com.yonagi.ocean.handler.RequestHandler;
@@ -54,7 +55,7 @@ public class DownloadFileHandler implements RequestHandler {
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.OK)
                     .headers(headers)
-                    .contentType(MimeTypeUtil.getMimeType(fileName))
+                    .contentType(ContentType.fromName(fileName))
                     .build();
             response.writeStreaming(request, output, httpContext.isKeepalive(), file.length());
             output.flush();
@@ -76,7 +77,7 @@ public class DownloadFileHandler implements RequestHandler {
             HttpResponse errorResponse = httpContext.getResponse().toBuilder()
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .contentType("text/html; charset=utf-8")
+                    .contentType(ContentType.TEXT_HTML)
                     .build();
             httpContext.setResponse(errorResponse);
             ErrorPageRender.render(httpContext);
@@ -105,7 +106,7 @@ public class DownloadFileHandler implements RequestHandler {
         HttpResponse httpResponse = httpContext.getResponse().toBuilder()
                 .httpVersion(HttpVersion.HTTP_1_1)
                 .httpStatus(HttpStatus.NOT_FOUND)
-                .contentType("text/html")
+                .contentType(ContentType.TEXT_HTML)
                 .headers(headers)
                 .build();
         httpContext.setResponse(httpResponse);

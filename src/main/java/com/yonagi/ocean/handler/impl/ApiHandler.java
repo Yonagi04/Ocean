@@ -8,6 +8,7 @@ import com.yonagi.ocean.core.gzip.GzipEncoder;
 import com.yonagi.ocean.core.gzip.GzipEncoderManager;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
+import com.yonagi.ocean.core.protocol.enums.ContentType;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.handler.RequestHandler;
 import org.slf4j.Logger;
@@ -55,7 +56,7 @@ public class ApiHandler implements RequestHandler {
             HttpResponse response = httpContext.getResponse().toBuilder()
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
-                    .contentType("text/plain; charset=utf-8")
+                    .contentType(ContentType.TEXT_PLAIN)
                     .headers(headers)
                     .body("Unsupported Media Type".getBytes())
                     .build();
@@ -73,7 +74,7 @@ public class ApiHandler implements RequestHandler {
             HttpResponse errorResponse = httpContext.getResponse().toBuilder()
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.BAD_REQUEST)
-                    .contentType("text/plain; charset=utf-8")
+                    .contentType(ContentType.TEXT_PLAIN)
                     .headers(headers)
                     .body((msgPrefix + e.getMessage()).getBytes())
                     .build();
@@ -94,7 +95,7 @@ public class ApiHandler implements RequestHandler {
         HttpResponse response = httpContext.getResponse().toBuilder()
                 .httpVersion(request.getHttpVersion())
                 .httpStatus(HttpStatus.CREATED)
-                .contentType("application/json")
+                .contentType(ContentType.APPLICATION_JSON)
                 .headers(headers)
                 .body(finalBody)
                 .build();

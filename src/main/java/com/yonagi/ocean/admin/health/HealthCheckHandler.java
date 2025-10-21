@@ -2,6 +2,7 @@ package com.yonagi.ocean.admin.health;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yonagi.ocean.core.context.HttpContext;
+import com.yonagi.ocean.core.protocol.enums.ContentType;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.handler.RequestHandler;
 
@@ -32,7 +33,7 @@ public class HealthCheckHandler implements RequestHandler {
         httpContext.setResponse(httpContext.getResponse().toBuilder()
                 .httpVersion(httpContext.getRequest().getHttpVersion())
                 .httpStatus(status)
-                .contentType("application/json; charset=utf-8")
+                .contentType(ContentType.APPLICATION_JSON)
                 .body(jsonBody.getBytes())
                 .build());
     }

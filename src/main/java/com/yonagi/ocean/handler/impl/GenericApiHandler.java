@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
+import com.yonagi.ocean.core.protocol.enums.ContentType;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.handler.RequestHandler;
 import org.slf4j.Logger;
@@ -65,7 +66,7 @@ public class GenericApiHandler implements RequestHandler {
         HttpResponse response = httpContext.getResponse().toBuilder()
                 .httpVersion(request.getHttpVersion())
                 .httpStatus(HttpStatus.OK)
-                .contentType("application/json")
+                .contentType(ContentType.APPLICATION_JSON)
                 .headers(headers)
                 .body(responseBody.getBytes())
                 .build();

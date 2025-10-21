@@ -6,6 +6,7 @@ import com.yonagi.ocean.core.ErrorPageRender;
 import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
+import com.yonagi.ocean.core.protocol.enums.ContentType;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.admin.metrics.MetricsHandler;
 import com.yonagi.ocean.admin.utils.AdminUtil;
@@ -43,7 +44,7 @@ public class AdminRouteMiddleware implements Middleware {
                 HttpResponse errorResponse = httpContext.getResponse().toBuilder()
                         .httpVersion(request.getHttpVersion())
                         .httpStatus(HttpStatus.FORBIDDEN)
-                        .contentType("text/plain; charset=utf-8")
+                        .contentType(ContentType.TEXT_PLAIN)
                         .body("Access denied.".getBytes())
                         .build();
                 httpContext.setResponse(errorResponse);

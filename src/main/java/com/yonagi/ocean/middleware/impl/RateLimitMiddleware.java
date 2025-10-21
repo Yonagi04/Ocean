@@ -5,6 +5,7 @@ import com.yonagi.ocean.core.context.ConnectionContext;
 import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
+import com.yonagi.ocean.core.protocol.enums.ContentType;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.core.ratelimiter.RateLimiterChecker;
 import com.yonagi.ocean.admin.metrics.MetricsRegistry;
@@ -32,7 +33,7 @@ public class RateLimitMiddleware implements Middleware {
             HttpResponse errorResponse = httpContext.getResponse().toBuilder()
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.TOO_MANY_REQUESTS)
-                    .contentType("text/plain; charset=utf-8")
+                    .contentType(ContentType.TEXT_PLAIN)
                     .body("Rate limit exceeded. Try again later.".getBytes())
                     .build();
             httpContext.setResponse(errorResponse);

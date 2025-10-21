@@ -3,6 +3,7 @@ package com.yonagi.ocean.framework;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.yonagi.ocean.core.context.HttpContext;
+import com.yonagi.ocean.core.protocol.enums.ContentType;
 import com.yonagi.ocean.framework.annotation.PathVariable;
 import com.yonagi.ocean.framework.annotation.RequestBody;
 import com.yonagi.ocean.framework.annotation.RequestParam;
@@ -117,7 +118,7 @@ public class MethodInvokingHandler implements RequestHandler {
             HttpResponse response = httpContext.getResponse().toBuilder()
                     .httpVersion(httpContext.getRequest().getHttpVersion())
                     .httpStatus(HttpStatus.BAD_REQUEST)
-                    .contentType("text/plain; charset=utf-8")
+                    .contentType(ContentType.TEXT_PLAIN)
                     .body(("Missing required parameter: " + e.getMessage()).getBytes())
                     .build();
             httpContext.setResponse(response);
@@ -126,7 +127,7 @@ public class MethodInvokingHandler implements RequestHandler {
             HttpResponse response = httpContext.getResponse().toBuilder()
                     .httpVersion(httpContext.getRequest().getHttpVersion())
                     .httpStatus(HttpStatus.BAD_REQUEST)
-                    .contentType("text/plain; charset=utf-8")
+                    .contentType(ContentType.TEXT_PLAIN)
                     .body(("Fail to deserialize body").getBytes())
                     .build();
             httpContext.setResponse(response);
@@ -135,7 +136,7 @@ public class MethodInvokingHandler implements RequestHandler {
             HttpResponse response = httpContext.getResponse().toBuilder()
                     .httpVersion(httpContext.getRequest().getHttpVersion())
                     .httpStatus(HttpStatus.BAD_REQUEST)
-                    .contentType("text/plain; charset=utf-8")
+                    .contentType(ContentType.TEXT_PLAIN)
                     .body(("Fail to deserialize body").getBytes())
                     .build();
             httpContext.setResponse(response);
@@ -144,7 +145,7 @@ public class MethodInvokingHandler implements RequestHandler {
             HttpResponse response = httpContext.getResponse().toBuilder()
                     .httpVersion(httpContext.getRequest().getHttpVersion())
                     .httpStatus(HttpStatus.BAD_REQUEST)
-                    .contentType("text/plain; charset=utf-8")
+                    .contentType(ContentType.TEXT_PLAIN)
                     .body(("Bad Request").getBytes())
                     .build();
             httpContext.setResponse(response);
@@ -153,7 +154,7 @@ public class MethodInvokingHandler implements RequestHandler {
             HttpResponse response = httpContext.getResponse().toBuilder()
                     .httpVersion(httpContext.getRequest().getHttpVersion())
                     .httpStatus(HttpStatus.BAD_REQUEST)
-                    .contentType("text/plain; charset=utf-8")
+                    .contentType(ContentType.TEXT_PLAIN)
                     .body(("Unsupport Media Type").getBytes())
                     .build();
             httpContext.setResponse(response);
@@ -162,7 +163,7 @@ public class MethodInvokingHandler implements RequestHandler {
             HttpResponse response = httpContext.getResponse().toBuilder()
                     .httpVersion(httpContext.getRequest().getHttpVersion())
                     .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .contentType("text/plain; charset=utf-8")
+                    .contentType(ContentType.TEXT_PLAIN)
                     .body(("Internal Server Error: Illegal Access or Illegal Argument on Controller method").getBytes())
                     .build();
             httpContext.setResponse(response);
@@ -172,7 +173,7 @@ public class MethodInvokingHandler implements RequestHandler {
             HttpResponse response = httpContext.getResponse().toBuilder()
                     .httpVersion(httpContext.getRequest().getHttpVersion())
                     .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .contentType("text/plain; charset=utf-8")
+                    .contentType(ContentType.TEXT_PLAIN)
                     .body(("Internal Server Error").getBytes())
                     .build();
             httpContext.setResponse(response);
@@ -343,7 +344,7 @@ public class MethodInvokingHandler implements RequestHandler {
             HttpResponse response = httpContext.getResponse().toBuilder()
                     .httpVersion(HttpVersion.HTTP_1_1)
                     .httpStatus(HttpStatus.OK)
-                    .contentType("application/json; charset=utf-8")
+                    .contentType(ContentType.APPLICATION_JSON)
                     .body(jsonResponse.getBytes())
                     .build();
             httpContext.setResponse(response);

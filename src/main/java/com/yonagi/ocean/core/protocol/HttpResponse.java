@@ -1,5 +1,6 @@
 package com.yonagi.ocean.core.protocol;
 
+import com.yonagi.ocean.core.protocol.enums.ContentType;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.core.protocol.enums.HttpVersion;
 import org.slf4j.Logger;
@@ -26,7 +27,7 @@ public class HttpResponse {
 
     private HttpVersion httpVersion;
     private HttpStatus httpStatus;
-    private String contentType;
+    private ContentType contentType;
     private byte[] body;
 
     // Additional headers, e.g., for CORS, caching, etc.
@@ -47,12 +48,8 @@ public class HttpResponse {
         }
         HttpResponse that = (HttpResponse) obj;
         return Objects.equals(httpVersion, that.httpVersion) && Objects.equals(httpStatus, that.httpStatus)
-                && Objects.equals(contentType, that.contentType) && Arrays.equals(body, that.body)
+                && Objects.equals(contentType.getValue(), that.contentType.getValue()) && Arrays.equals(body, that.body)
                 && Objects.equals(headers, that.headers);
-    }
-
-    private HttpResponse() {
-
     }
 
     private HttpResponse(Builder builder) {
@@ -71,7 +68,7 @@ public class HttpResponse {
         return httpStatus;
     }
 
-    public String getContentType() {
+    public ContentType getContentType() {
         return contentType;
     }
 
@@ -114,7 +111,7 @@ public class HttpResponse {
                 .append(httpStatus.toString()).append("\r\n");
 
         String contentLengthValue = null;
-        String contentTypeValue = this.contentType;
+        ContentType contentTypeValue = this.contentType;
 
         if (headers != null) {
             for (Map.Entry<String, String> entry : headers.entrySet()) {
@@ -126,7 +123,7 @@ public class HttpResponse {
                     continue;
                 }
                 if (key.equalsIgnoreCase("Content-Type")) {
-                    contentTypeValue = entry.getValue();
+                    contentTypeValue = ContentType.fromMime(entry.getValue());
                     continue;
                 }
                 if (key.equalsIgnoreCase("Content-Length")) {
@@ -139,7 +136,7 @@ public class HttpResponse {
         }
 
         if (!forbidsBody && contentTypeValue != null) {
-            headerBuilder.append("Content-Type: ").append(contentTypeValue).append("\r\n");
+            headerBuilder.append("Content-Type: ").append(contentTypeValue.getValue()).append("\r\n");
         }
 
         if (!forbidsBody) {
@@ -180,7 +177,7 @@ public class HttpResponse {
         StringBuilder headerBuilder = new StringBuilder();
         headerBuilder.append(httpVersion.getVersion()).append(" ")
                 .append(httpStatus.toString()).append("\r\n");
-        headerBuilder.append("Content-Type: ").append(contentType).append("\r\n");
+        headerBuilder.append("Content-Type: ").append(contentType.getValue()).append("\r\n");
 
         if (headers != null) {
             for (Map.Entry<String, String> entry : headers.entrySet()) {
@@ -212,7 +209,7 @@ public class HttpResponse {
     @Override
     public String toString() {
         return httpVersion.getVersion() + " " + httpStatus.toString() + "\r\n" +
-               "Content-Type: " + contentType + "\r\n" +
+               "Content-Type: " + contentType.getValue() + "\r\n" +
                 (headers != null ? headers.entrySet().stream()
                         .filter(entry -> {
                             String key = entry.getKey();
@@ -230,7 +227,7 @@ public class HttpResponse {
     public static class Builder {
         private HttpVersion httpVersion;
         private HttpStatus httpStatus;
-        private String contentType;
+        private ContentType contentType;
         private byte[] body;
         private Map<String, String> headers;
 
@@ -244,8 +241,7 @@ public class HttpResponse {
             return this;
         }
 
-        // TODO contentType
-        public Builder contentType(String contentType) {
+        public Builder contentType(ContentType contentType) {
             this.contentType = contentType;
             return this;
         }
@@ -270,7 +266,7 @@ public class HttpResponse {
             }
             if (contentType == null) {
                 log.warn("Content-Type is empty, using default value 'text/plain; charset=utf-8'");
-                contentType = "text/plain; charset=utf-8";
+                contentType = ContentType.TEXT_PLAIN;
             }
             return new HttpResponse(this);
         }
