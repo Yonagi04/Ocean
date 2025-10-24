@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title data-i18n-key="title">Ocean 管理控制台</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://unpkg.com/chart.js@4.4.1/dist/chart.umd.js"></script>
   <style>
     body { background-color: #121212; color: #e0e0e0; font-family: 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; }
     header { background-color: #1f1f1f; text-align: center; padding: 20px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); position: relative; }
@@ -99,7 +99,7 @@
     <div class="card">
       <h2 data-i18n-key="error_ratelimit_title">错误与限流统计</h2>
       <p class="metric" data-i18n-key="error_404">404 Not Found: <strong><span id="notFound">{{ notFound }}</span></strong></p>
-      <p class="metric" data-i18n-key="error_429">429 Rejected (限流): <strong><span id="ratelimit">{{ ratelimit }}</span></strong></p>
+      <p class="metric" data-i18n-key="error_429">429 Rejected: <strong><span id="ratelimit">{{ ratelimit }}</span></strong></p>
       <p class="metric" data-i18n-key="error_500">500 Internal Error: <strong><span id="internalError">{{ internalError }}</span></strong></p>
       <div class="chart-wrapper">
         <canvas id="errorChart"></canvas>
