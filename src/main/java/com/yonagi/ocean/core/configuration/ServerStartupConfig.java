@@ -1,10 +1,13 @@
 package com.yonagi.ocean.core.configuration;
 
 import com.yonagi.ocean.utils.LocalConfigLoader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.lang.management.ManagementFactory;
+import java.lang.reflect.Method;
+import java.util.List;
+import java.util.concurrent.*;
 
 /**
  * @author Yonagi
@@ -15,12 +18,18 @@ import java.util.concurrent.TimeUnit;
  */
 public final class ServerStartupConfig {
 
+    private static final Logger log = LoggerFactory.getLogger(ServerStartupConfig.class);
+
     private final Integer httpPort;
     private final Integer sslPort;
     private final boolean sslEnabled;
     private final String webRoot;
-    private final ThreadPoolExecutor threadPool;
-    private final ThreadPoolExecutor listenerPool;
+
+    // Virtual thread & fallback thread pool
+    private ExecutorService workerThreadExecutor;
+    private ExecutorService listenerThreadExecutor;
+    private final Boolean virtualThreadsEnabled;
+
     private final KeepAliveConfig keepAliveConfig;
 
     private final String keyStorePath;
@@ -43,22 +52,16 @@ public final class ServerStartupConfig {
         this.sslPort = Integer.parseInt(LocalConfigLoader.getProperty("server.ssl.port", "8443"));
 
         this.webRoot = LocalConfigLoader.getProperty("server.webroot", "/www");
-        this.threadPool = new ThreadPoolExecutor(
-                corePoolSize,
-                maximumPoolSize,
-                keepAliveTime,
-                TimeUnit.SECONDS,
-                new ArrayBlockingQueue<>(queueCapacity),
-                new ThreadPoolExecutor.AbortPolicy()
-        );
-        this.listenerPool = new ThreadPoolExecutor(
-                2,
-                2,
-                0L,
-                TimeUnit.SECONDS,
-                new ArrayBlockingQueue<>(10),
-                new ThreadPoolExecutor.AbortPolicy()
-        );
+
+        this.virtualThreadsEnabled = detectVirtualThreadSupport();
+        if (virtualThreadsEnabled) {
+            log.info("Using virtual thread support");
+            initializeVirtualThreadExecutors();
+        } else {
+            log.warn("Virtual thread support disabled, please check properties, or ensure your JVM supports virtual threads and enable preview features if necessary.");
+            initializeTraditionalThreadPools(corePoolSize, maximumPoolSize, keepAliveTime, queueCapacity);
+        }
+
         this.keepAliveConfig = new KeepAliveConfig.Builder()
                 .enabled(Boolean.parseBoolean(LocalConfigLoader.getProperty("server.keep_alive.enabled", "true")))
                 .timeoutSeconds(Integer.parseInt(LocalConfigLoader.getProperty("server.keep_alive.timeout_seconds", "60")))
@@ -73,6 +76,99 @@ public final class ServerStartupConfig {
         this.keyAlias = LocalConfigLoader.getProperty("server.ssl.key_alias");
         this.keyPassword = LocalConfigLoader.getProperty("server.ssl.key_password");
         this.redirectSslEnabled = Boolean.parseBoolean(LocalConfigLoader.getProperty("server.ssl.redirect_ssl", "false"));
+    }
+
+    private boolean detectVirtualThreadSupport() {
+        if (!Boolean.parseBoolean(LocalConfigLoader.getProperty("server.thread.virtual_threads_enabled", "false"))) {
+            return false;
+        }
+        String javaVersion = System.getProperty("java.version");
+        int majorVersion = extractMajorVersion(javaVersion);
+        if (majorVersion >= 21) {
+            return testVirtualThreadCreation();
+        } else if (majorVersion >= 19) {
+            if (isPreviewEnabled()) {
+                return testVirtualThreadCreation();
+            } else {
+                return false;
+            }
+        }
+        return false;
+    }
+
+    private int extractMajorVersion(String version) {
+        try {
+            String[] parts = version.split("\\.");
+            if (parts[0].equals("1")) {
+                return Integer.parseInt(parts[1]);
+            } else {
+                return Integer.parseInt(parts[0]);
+            }
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    private boolean isPreviewEnabled() {
+        try {
+            List<String> inputArguments = ManagementFactory.getRuntimeMXBean().getInputArguments();
+            boolean previewEnabled = inputArguments.stream()
+                    .anyMatch(arg -> arg.equals("--enable-preview") || arg.equals("-XX:+EnablePreview"));
+            return previewEnabled;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean testVirtualThreadCreation() {
+        try {
+            Class<?> threadClass = Thread.class;
+            var builderMethod = threadClass.getMethod("ofVirtual");
+            var builder = builderMethod.invoke(null);
+
+            var executorMethod = Executors.class.getMethod("newVirtualThreadPerTaskExecutor");
+            ExecutorService testExecutor = (ExecutorService) executorMethod.invoke(null);
+
+            testExecutor.submit(() -> {
+                log.debug("Virtual Thread test task executed on: {}", Thread.currentThread());
+            }).get(1, TimeUnit.SECONDS);
+
+            testExecutor.shutdown();
+            testExecutor.awaitTermination(5, TimeUnit.SECONDS);
+
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private void initializeVirtualThreadExecutors() {
+        try {
+            Method newVirtualThreadPerTaskExecutor = Executors.class.getMethod("newVirtualThreadPerTaskExecutor");
+            this.workerThreadExecutor = (ExecutorService) newVirtualThreadPerTaskExecutor.invoke(null);
+            this.listenerThreadExecutor = (ExecutorService) newVirtualThreadPerTaskExecutor.invoke(null);
+        } catch (Exception e) {
+            throw new RuntimeException("Virtual Thread initialization failed", e);
+        }
+    }
+
+    private void initializeTraditionalThreadPools(int corePoolSize, int maximumPoolSize, long keepAliveTime, int queueCapacity) {
+        this.workerThreadExecutor = new ThreadPoolExecutor(
+                corePoolSize,
+                maximumPoolSize,
+                keepAliveTime,
+                TimeUnit.SECONDS,
+                new ArrayBlockingQueue<>(queueCapacity),
+                new ThreadPoolExecutor.AbortPolicy()
+        );
+        this.listenerThreadExecutor = new ThreadPoolExecutor(
+                1,
+                2,
+                keepAliveTime,
+                TimeUnit.SECONDS,
+                new ArrayBlockingQueue<>(100),
+                new ThreadPoolExecutor.AbortPolicy()
+        );
     }
 
     public int getHttpPort() {
@@ -91,12 +187,16 @@ public final class ServerStartupConfig {
         return webRoot;
     }
 
-    public ThreadPoolExecutor getThreadPool() {
-        return threadPool;
+    public ExecutorService getWorkerThreadExecutor() {
+        return workerThreadExecutor;
     }
 
-    public ThreadPoolExecutor getListenerPool() {
-        return listenerPool;
+    public ExecutorService getListenerThreadExecutor() {
+        return listenerThreadExecutor;
+    }
+
+    public Boolean getVirtualThreadsEnabled() {
+        return virtualThreadsEnabled;
     }
 
     public KeepAliveConfig getKeepAliveConfig() {

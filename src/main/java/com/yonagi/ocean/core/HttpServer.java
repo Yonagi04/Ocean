@@ -2,8 +2,10 @@ package com.yonagi.ocean.core;
 
 import com.alibaba.nacos.api.config.ConfigService;
 import com.yonagi.ocean.admin.health.HealthCheckService;
+import com.yonagi.ocean.admin.health.HealthIndicator;
 import com.yonagi.ocean.admin.health.impl.NacosHealthIndicator;
 import com.yonagi.ocean.admin.health.impl.ThreadPoolHealthIndicator;
+import com.yonagi.ocean.admin.health.impl.VirtualThreadHealthIndicator;
 import com.yonagi.ocean.cache.StaticFileCacheFactory;
 import com.yonagi.ocean.core.configuration.KeepAliveConfig;
 import com.yonagi.ocean.core.configuration.source.router.*;
@@ -22,7 +24,6 @@ import com.yonagi.ocean.middleware.MiddlewareChain;
 import com.yonagi.ocean.middleware.MiddlewareLoader;
 import com.yonagi.ocean.utils.LocalConfigLoader;
 import com.yonagi.ocean.utils.NacosConfigLoader;
-import org.checkerframework.checker.units.qual.N;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,9 +36,12 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.security.KeyStore;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * @author Yonagi
@@ -50,13 +54,18 @@ public class HttpServer {
 
     private ServerSocket httpServerSocket;
     private ServerSocket httpsServerSocket;
-    private Boolean isRunning;
+    private final AtomicBoolean isRunning = new AtomicBoolean(false);
+
+    private final CountDownLatch shutdownLatch = new CountDownLatch(1);
 
     private Integer httpPort;
     private String webRoot;
 
-    private ThreadPoolExecutor threadPool;
-    private ThreadPoolExecutor listenerPool;
+    // Virtual thread & thread pool
+    private ExecutorService workerThreadExecutor;
+    private ExecutorService listenerThreadExecutor;
+    private Boolean virtualThreadsEnabled;
+
     private KeepAliveConfig keepAliveConfig;
     private ConnectionManager connectionManager;
 
@@ -77,16 +86,17 @@ public class HttpServer {
     private static final Logger log = LoggerFactory.getLogger(HttpServer.class);
 
     public HttpServer() {
-        log.info("\n" +
-                " _______  _______  _______  _______  _       \n" +
-                "(  ___  )(  ____ \\(  ____ \\(  ___  )( (    /|\n" +
-                "| (   ) || (    \\/| (    \\/| (   ) ||  \\  ( |\n" +
-                "| |   | || |      | (__    | (___) ||   \\ | |\n" +
-                "| |   | || |      |  __)   |  ___  || (\\ \\) |\n" +
-                "| |   | || |      | (      | (   ) || | \\   |\n" +
-                "| (___) || (____/\\| (____/\\| )   ( || )  \\  |\n" +
-                "(_______)(_______/(_______/|/     \\||/    )_)\n" +
-                "                                             ");
+        log.info("""
+                
+                 _______  _______  _______  _______  _      \s
+                (  ___  )(  ____ \\(  ____ \\(  ___  )( (    /|
+                | (   ) || (    \\/| (    \\/| (   ) ||  \\  ( |
+                | |   | || |      | (__    | (___) ||   \\ | |
+                | |   | || |      |  __)   |  ___  || (\\ \\) |
+                | |   | || |      | (      | (   ) || | \\   |
+                | (___) || (____/\\| (____/\\| )   ( || )  \\  |
+                (_______)(_______/(_______/|/     \\||/    )_)
+                                                            \s""");
         ServerStartupConfig startupConfig = new ServerStartupConfig();
         this.httpPort = startupConfig.getHttpPort();
         this.sslEnabled = startupConfig.isSslEnabled();
@@ -94,8 +104,11 @@ public class HttpServer {
         this.redirectSslEnabled = startupConfig.isRedirectSslEnabled();
 
         this.webRoot = startupConfig.getWebRoot();
-        this.threadPool = startupConfig.getThreadPool();
-        this.listenerPool = startupConfig.getListenerPool();
+
+        this.workerThreadExecutor = startupConfig.getWorkerThreadExecutor();
+        this.listenerThreadExecutor = startupConfig.getListenerThreadExecutor();
+        this.virtualThreadsEnabled = startupConfig.getVirtualThreadsEnabled();
+
         this.keepAliveConfig = startupConfig.getKeepAliveConfig();
 
         // Nacos Setup
@@ -117,8 +130,8 @@ public class HttpServer {
                 this.rateLimiterChecker,
                 this.router,
                 this.connectionManager,
-                new MetricsRegistry(threadPool),
-                new HealthCheckService(List.of(new NacosHealthIndicator(), new ThreadPoolHealthIndicator(threadPool))),
+                new MetricsRegistry(workerThreadExecutor, virtualThreadsEnabled),
+                new HealthCheckService(createHealthIndicators()),
                 new EnvironmentInfo(LocalConfigLoader.getProperty("server.version"))
         );
 
@@ -135,13 +148,25 @@ public class HttpServer {
                 this.sslEnabled = false;
             }
         }
+
+        registerShutdownHook();
+    }
+
+    private void registerShutdownHook() {
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            log.info("Shutdown hook triggered, stopping Ocean server...");
+            stop();
+        }, "Ocean-Shutdown-Hook"));
     }
 
     public void start() {
-        isRunning = true;
+        if (!isRunning.compareAndSet(false, true)) {
+            log.warn("Server is already running");
+            return;
+        }
         try {
             httpServerSocket = new ServerSocket(httpPort);
-            listenerPool.execute(new ListenerThread(httpServerSocket, httpPort, false, sslEnabled));
+            listenerThreadExecutor.execute(new ListenerThread(httpServerSocket, httpPort, false, sslEnabled));
             log.info("Ocean HTTP listener is running at http://{}:{}", InetAddress.getLocalHost().getHostAddress(), httpPort);
         } catch (Exception e) {
             log.error("Failed to start HTTP listener on port {}: {}", httpPort, e.getMessage(), e);
@@ -164,7 +189,7 @@ public class HttpServer {
                 } else {
                     log.warn("HTTPS ServerSocket is not an instance of SSLServerSocket. Cannot disable client auth");
                 }
-                listenerPool.execute(new ListenerThread(httpsServerSocket, sslPort, true, sslEnabled));
+                listenerThreadExecutor.execute(new ListenerThread(httpsServerSocket, sslPort, true, sslEnabled));
                 log.info("Ocean HTTPS listener is running at https://{}:{}", InetAddress.getLocalHost().getHostAddress(), sslPort);
             } catch (Exception e) {
                 log.error("Failed to start HTTPS listener on port {}: {}", sslPort, e.getMessage(), e);
@@ -177,9 +202,35 @@ public class HttpServer {
         }
     }
 
+    public void awaitShutdown() {
+        if (virtualThreadsEnabled) {
+            log.info("Server is running in Virtual Thread mode. Main thread will block until shutdown...");
+        }
+
+        try {
+            shutdownLatch.await();
+        } catch (InterruptedException e) {
+            log.warn("Server await interrupted", e);
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    public boolean awaitShutdown(long timeout, TimeUnit unit) {
+        try {
+            return shutdownLatch.await(timeout, unit);
+        } catch (InterruptedException e) {
+            log.warn("Server await interrupted", e);
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
     public void stop() {
-        isRunning = false;
-        listenerPool.shutdownNow();
+        if (!isRunning.compareAndSet(true, false)) {
+            log.warn("Server is not running or already stopped");
+            return;
+        }
+        listenerThreadExecutor.shutdownNow();
         try {
             if (httpServerSocket != null && !httpServerSocket.isClosed()) {
                 httpServerSocket.close();
@@ -194,8 +245,8 @@ public class HttpServer {
         } catch (Exception e) {
             log.warn("Error closing HTTPS server socket: {}", e.getMessage());
         }
-        if (threadPool != null && !threadPool.isShutdown()) {
-            threadPool.shutdown();
+        if (workerThreadExecutor != null && !workerThreadExecutor.isShutdown()) {
+            workerThreadExecutor.shutdown();
         }
         if (connectionManager != null) {
             try {
@@ -209,6 +260,19 @@ public class HttpServer {
         }
 
         log.info("Ocean stopped.");
+        shutdownLatch.countDown();
+    }
+
+    private List<HealthIndicator> createHealthIndicators() {
+        List<HealthIndicator> indicators = new java.util.ArrayList<>();
+        indicators.add(new NacosHealthIndicator());
+
+        if (this.virtualThreadsEnabled) {
+            indicators.add(new VirtualThreadHealthIndicator(workerThreadExecutor));
+        } else {
+            indicators.add(new ThreadPoolHealthIndicator((ThreadPoolExecutor) workerThreadExecutor));
+        }
+        return indicators;
     }
 
     private void initializeComponents(ServerStartupConfig startupConfig) {
@@ -320,13 +384,13 @@ public class HttpServer {
         public void run() {
             log.info("{} listener started on port {}", isSsl ? "HTTPS" : "HTTP", port);
 
-            while (isRunning) {
+            while (isRunning.get()) {
                 try {
                     Socket client = serverSocket.accept();
                     ConnectionContext connectContext = new ConnectionContext(isSsl, sslEnabled, redirectSslEnabled, sslPort, serverContext);
-                    threadPool.execute(new ClientHandler(client, connectContext));
+                    workerThreadExecutor.execute(new ClientHandler(client, connectContext));
                 } catch (Exception e) {
-                    if (isRunning) {
+                    if (isRunning.get()) {
                         log.error("{} listener error on port {}: {}", isSsl ? "HTTPS" : "HTTP", port, e.getMessage());
                     } else {
                         log.info("{} listener on port {} stopped successfully.", isSsl ? "HTTPS" : "HTTP", port);

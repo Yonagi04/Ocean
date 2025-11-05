@@ -20,6 +20,16 @@ public class Main {
 
     public static void main(String[] args) throws IOException {
         log.info("Ocean is starting...");
-        new HttpServer().start();
+        try {
+            HttpServer server = new HttpServer();
+            server.start();
+            log.info("Ocean server started successfully. Press Ctrl+C to stop.");
+
+            server.awaitShutdown();
+            log.info("Ocean server has been shut down.");
+        } catch (Exception e) {
+            log.error("Failed to start Ocean server", e);
+            System.exit(1);
+        }
     }
 }
