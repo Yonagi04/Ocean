@@ -7,6 +7,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * @author Yonagi
@@ -21,6 +24,10 @@ public class LRUCache<K, V> {
     private final Map<K, CacheEntry> cache;
     private final LinkedHashMap<K, Long> accessOrder;
 
+    private final ReadWriteLock rwLock = new ReentrantReadWriteLock();
+    private final Lock readLock = rwLock.readLock();
+    private final Lock writeLock = rwLock.writeLock();
+
     public LRUCache(int maxSize, long ttlMs) {
         this.maxSize = maxSize;
         this.ttlMs = ttlMs;
@@ -33,75 +40,105 @@ public class LRUCache<K, V> {
         };
     }
 
-    public synchronized V get(K key) {
-        CacheEntry entry = cache.get(key);
-        if (entry == null) {
-            return null;
-        }
+    public V get(K key) {
+        writeLock.lock();
+        try {
+            CacheEntry entry = cache.get(key);
+            if (entry == null) {
+                return null;
+            }
 
-        if (entry.isExpired()) {
-            cache.remove(key);
+            if (entry.isExpired()) {
+                cache.remove(key);
+                accessOrder.remove(key);
+                return null;
+            }
+
+            // 更新访问顺序
+            accessOrder.put(key, entry.getLastAccessTime());
+            return (V) entry.getHandler();
+        } finally {
+            writeLock.unlock();
+        }
+    }
+
+    public V put(K key, V value) {
+        writeLock.lock();
+        try {
+            CacheEntry oldEntry = cache.get(key);
+
+            // 创建新的缓存条目
+            CacheEntry newEntry = new CacheEntry((RequestHandler) value, ttlMs);
+            cache.put(key, newEntry);
+            accessOrder.put(key, newEntry.getLastAccessTime());
+
+            // 如果超过最大大小，移除最旧的条目
+            while (accessOrder.size() > maxSize) {
+                Map.Entry<K, Long> eldest = accessOrder.entrySet().iterator().next();
+                K eldestKey = eldest.getKey();
+                cache.remove(eldestKey);
+                accessOrder.remove(eldestKey);
+            }
+
+            return oldEntry != null ? (V) oldEntry.getHandler() : null;
+        } finally {
+            writeLock.unlock();
+        }
+    }
+
+    public V remove(K key) {
+        writeLock.lock();
+        try {
+            CacheEntry entry = cache.remove(key);
             accessOrder.remove(key);
-            return null;
+            return entry != null ? (V) entry.getHandler() : null;
+        } finally {
+            writeLock.unlock();
         }
-
-        // 更新访问顺序
-        accessOrder.put(key, entry.getLastAccessTime());
-        return (V) entry.getHandler();
     }
 
-    public synchronized V put(K key, V value) {
-        CacheEntry oldEntry = cache.get(key);
-
-        // 创建新的缓存条目
-        CacheEntry newEntry = new CacheEntry((RequestHandler) value, ttlMs);
-        cache.put(key, newEntry);
-        accessOrder.put(key, newEntry.getLastAccessTime());
-
-        // 如果超过最大大小，移除最旧的条目
-        while (accessOrder.size() > maxSize) {
-            Map.Entry<K, Long> eldest = accessOrder.entrySet().iterator().next();
-            K eldestKey = eldest.getKey();
-            cache.remove(eldestKey);
-            accessOrder.remove(eldestKey);
+    public int size() {
+        readLock.lock();
+        try {
+            return cache.size();
+        } finally {
+            readLock.unlock();
         }
-
-        return oldEntry != null ? (V) oldEntry.getHandler() : null;
     }
 
-    public synchronized V remove(K key) {
-        CacheEntry entry = cache.remove(key);
-        accessOrder.remove(key);
-        return entry != null ? (V) entry.getHandler() : null;
-    }
-
-    public synchronized int size() {
-        return cache.size();
-    }
-
-    public synchronized void clear() {
-        cache.clear();
-        accessOrder.clear();
+    public void clear() {
+        writeLock.lock();
+        try {
+            cache.clear();
+            accessOrder.clear();
+        } finally {
+            writeLock.unlock();
+        }
     }
 
     /**
      * 清理过期的条目
      */
-    public synchronized int cleanupExpired() {
-        List<K> expiredKeys = new ArrayList<>();
-        long now = System.currentTimeMillis();
+    public int cleanupExpired() {
+        writeLock.lock();
+        try {
+            List<K> expiredKeys = new ArrayList<>();
+            long now = System.currentTimeMillis();
 
-        for (Map.Entry<K, CacheEntry> entry : cache.entrySet()) {
-            if (entry.getValue().isExpired()) {
-                expiredKeys.add(entry.getKey());
+            for (Map.Entry<K, CacheEntry> entry : cache.entrySet()) {
+                if (entry.getValue().isExpired()) {
+                    expiredKeys.add(entry.getKey());
+                }
             }
-        }
 
-        for (K key : expiredKeys) {
-            cache.remove(key);
-            accessOrder.remove(key);
-        }
+            for (K key : expiredKeys) {
+                cache.remove(key);
+                accessOrder.remove(key);
+            }
 
-        return expiredKeys.size();
+            return expiredKeys.size();
+        } finally {
+            writeLock.unlock();
+        }
     }
 }

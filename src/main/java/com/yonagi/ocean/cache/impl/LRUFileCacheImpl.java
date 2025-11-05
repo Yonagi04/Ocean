@@ -17,6 +17,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * @author Yonagi
@@ -40,6 +44,8 @@ public class LRUFileCacheImpl implements StaticFileCache {
 
     private static final Logger log = LoggerFactory.getLogger(LRUFileCacheImpl.class);
 
+    private static final ReentrantLock lock = new ReentrantLock();
+
     public LRUFileCacheImpl() {
         this(CacheConfig.builder().type(CacheConfig.Type.LRU).build());
     }
@@ -60,84 +66,119 @@ public class LRUFileCacheImpl implements StaticFileCache {
 
 
     @Override
-    public synchronized CachedFile get(File file) throws IOException {
-        String path = file.getCanonicalPath();
-        long now = System.currentTimeMillis();
+    public CachedFile get(File file) throws IOException {
+        lock.lock();
+        try {
+            String path = file.getCanonicalPath();
+            long now = System.currentTimeMillis();
 
-        CachedFile cached = cache.get(path);
-        if (cached != null) {
-            long fileLastModified = file.lastModified();
-            if (fileLastModified != cached.getLastModified()) {
-                cache.remove(path);
-                missCount.incrementAndGet();
-            } else if (ttlMs > 0 && (now - cached.getCacheTime()) > ttlMs) {
-                cache.remove(path);
-                missCount.incrementAndGet();
+            CachedFile cached = cache.get(path);
+            if (cached != null) {
+                long fileLastModified = file.lastModified();
+                if (fileLastModified != cached.getLastModified()) {
+                    cache.remove(path);
+                    missCount.incrementAndGet();
+                } else if (ttlMs > 0 && (now - cached.getCacheTime()) > ttlMs) {
+                    cache.remove(path);
+                    missCount.incrementAndGet();
+                } else {
+                    hitCount.incrementAndGet();
+                    return cached;
+                }
             } else {
-                hitCount.incrementAndGet();
-                return cached;
+                missCount.incrementAndGet();
             }
-        } else {
-            missCount.incrementAndGet();
+            byte[] data = Files.readAllBytes(file.toPath());
+            CachedFile newCached = new CachedFile(
+                    data,
+                    file.lastModified(),
+                    MimeTypeUtil.getMimeType(file.getName()),
+                    now
+            );
+            cache.put(path, newCached);
+            return newCached;
+        } finally {
+            lock.unlock();
         }
-        byte[] data = Files.readAllBytes(file.toPath());
-        CachedFile newCached = new CachedFile(
-                data,
-                file.lastModified(),
-                MimeTypeUtil.getMimeType(file.getName()),
-                now
-        );
-        cache.put(path, newCached);
-        return newCached;
     }
 
     @Override
-    public synchronized void put(File file, CachedFile cf) throws IOException {
-        long size = cf.getContent().length;
-        if ("MEMORY".equalsIgnoreCase(policy)) {
-            while (currentMemoryBytes + size > maxMemoryBytes && !cache.isEmpty()) {
-                Map.Entry<String, CachedFile> eldest = cache.entrySet().iterator().next();
-                remove(new File(eldest.getKey()));
+    public void put(File file, CachedFile cf) throws IOException {
+        lock.lock();
+        try {
+            long size = cf.getContent().length;
+            if ("MEMORY".equalsIgnoreCase(policy)) {
+                while (currentMemoryBytes + size > maxMemoryBytes && !cache.isEmpty()) {
+                    Map.Entry<String, CachedFile> eldest = cache.entrySet().iterator().next();
+                    remove(new File(eldest.getKey()));
+                }
             }
+            String path = file.getCanonicalPath();
+            cache.put(path, cf);
+            currentMemoryBytes += size;
+        } finally {
+            lock.unlock();
         }
-        String path = file.getCanonicalPath();
-        cache.put(path, cf);
-        currentMemoryBytes += size;
     }
 
     @Override
     public void remove(File file) throws IOException {
-        CachedFile removed = cache.remove(file.getCanonicalPath());
-        if (removed != null) {
-            currentMemoryBytes -= removed.getContent().length;
+        lock.lock();
+        try {
+            CachedFile removed = cache.remove(file.getCanonicalPath());
+            if (removed != null) {
+                currentMemoryBytes -= removed.getContent().length;
+            }
+        } finally {
+            lock.unlock();
         }
     }
 
     @Override
     public void clear() {
-        cache.clear();
+        lock.lock();
+        try {
+            cache.clear();
+        } finally {
+            lock.unlock();
+        }
     }
 
     @Override
-    public synchronized boolean contain(String path) {
-        return cache.containsKey(path);
+    public boolean contain(String path) {
+        lock.lock();
+        try {
+            return cache.containsKey(path);
+        } finally {
+            lock.unlock();
+        }
     }
 
-    public synchronized CachedFile reload(File file) throws IOException {
-        String path = file.getCanonicalPath();
-        byte[] data = Files.readAllBytes(file.toPath());
-        CachedFile newCached = new CachedFile(
-                data,
-                file.lastModified(),
-                MimeTypeUtil.getMimeType(file.getName()),
-                System.currentTimeMillis()
-        );
-        cache.put(path, newCached);
-        return newCached;
+    public CachedFile reload(File file) throws IOException {
+        lock.lock();
+        try {
+            String path = file.getCanonicalPath();
+            byte[] data = Files.readAllBytes(file.toPath());
+            CachedFile newCached = new CachedFile(
+                    data,
+                    file.lastModified(),
+                    MimeTypeUtil.getMimeType(file.getName()),
+                    System.currentTimeMillis()
+            );
+            cache.put(path, newCached);
+            return newCached;
+        } finally {
+            lock.unlock();
+        }
     }
 
-    public synchronized int size() {
-        return cache.size();
+    public int size() {
+        lock.lock();
+        try {
+            return cache.size();
+        } finally {
+            lock.unlock();
+        }
     }
 
     public long getHitCount() {
@@ -149,19 +190,24 @@ public class LRUFileCacheImpl implements StaticFileCache {
     }
 
     @Override
-    public synchronized void startCleaner(long periodMs) {
-        if (ttlMs < 0) {
-            return;
+    public void startCleaner(long periodMs) {
+        lock.lock();
+        try {
+            if (ttlMs < 0) {
+                return;
+            }
+            if (cleanerService != null && !cleanerService.isShutdown()) {
+                return;
+            }
+            cleanerService = Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "StaticFileCacheLRU-Cleaner");
+                t.setDaemon(true);
+                return t;
+            });
+            cleanerService.scheduleAtFixedRate(this::cleanupExpired, periodMs, periodMs, TimeUnit.MILLISECONDS);
+        } finally {
+            lock.unlock();
         }
-        if (cleanerService != null && !cleanerService.isShutdown()) {
-            return;
-        }
-        cleanerService = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "StaticFileCacheLRU-Cleaner");
-            t.setDaemon(true);
-            return t;
-        });
-        cleanerService.scheduleAtFixedRate(this::cleanupExpired, periodMs, periodMs, TimeUnit.MILLISECONDS);
     }
 
     public synchronized void stopCleaner() {
@@ -171,18 +217,23 @@ public class LRUFileCacheImpl implements StaticFileCache {
         }
     }
 
-    private synchronized void cleanupExpired() {
-        if (ttlMs < 0) {
-            return;
-        }
-        long now = System.currentTimeMillis();
-        Iterator<Map.Entry<String, CachedFile>> iterator = cache.entrySet().iterator();
-        while (iterator.hasNext()) {
-            Map.Entry<String, CachedFile> next = iterator.next();
-            CachedFile cf = next.getValue();
-            if (now - cf.getCacheTime() > ttlMs) {
-                iterator.remove();
+    private void cleanupExpired() {
+        lock.lock();
+        try {
+            if (ttlMs < 0) {
+                return;
             }
+            long now = System.currentTimeMillis();
+            Iterator<Map.Entry<String, CachedFile>> iterator = cache.entrySet().iterator();
+            while (iterator.hasNext()) {
+                Map.Entry<String, CachedFile> next = iterator.next();
+                CachedFile cf = next.getValue();
+                if (now - cf.getCacheTime() > ttlMs) {
+                    iterator.remove();
+                }
+            }
+        } finally {
+            lock.unlock();
         }
     }
 

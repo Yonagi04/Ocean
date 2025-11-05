@@ -1,5 +1,7 @@
 package com.yonagi.ocean.core.ratelimiter.algorithm;
 
+import java.util.concurrent.locks.ReentrantLock;
+
 /**
  * @author Yonagi
  * @version 1.0
@@ -13,7 +15,7 @@ public class TokenBucket implements RateLimiter {
 
     private final double ratePerSecond;
 
-    private final Object lock = new Object();
+    private final ReentrantLock lock = new ReentrantLock();
 
     private double tokens;
     private long lastRefillTimestamp;
@@ -27,7 +29,8 @@ public class TokenBucket implements RateLimiter {
 
     @Override
     public boolean tryAcquire() {
-        synchronized (lock) {
+        lock.lock();
+        try {
             refill();
             if (tokens >= 1) {
                 tokens -= 1.0;
@@ -35,6 +38,8 @@ public class TokenBucket implements RateLimiter {
             } else {
                 return false;
             }
+        } finally {
+            lock.unlock();
         }
     }
 
