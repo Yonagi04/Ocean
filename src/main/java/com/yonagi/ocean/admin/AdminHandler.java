@@ -33,6 +33,10 @@ public class AdminHandler implements RequestHandler {
         try {
             double activeThreadsCount = metricsRegistry.getGaugeValue("app.threadpool.active");
             double queueSize = metricsRegistry.getGaugeValue("app.threadpool.queue.size");
+            double maxSize = metricsRegistry.getGaugeValue("app.threadpool.max.size");
+
+            double virtualThreadActiveCount = metricsRegistry.getGaugeValue("app.threadpool.virtual.threads.active");
+            double platformTotalThreads = metricsRegistry.getGaugeValue("app.threadpool.platform.threads.total");
 
             double cacheHitCount = metricsRegistry.getCacheHitCounter().count();
             double httpCacheHitCount = metricsRegistry.getHttpCacheHitCounter().count();
@@ -56,6 +60,10 @@ public class AdminHandler implements RequestHandler {
             Map<String, Object> model = new HashMap<>();
             model.put("activeThreads", activeThreadsCount);
             model.put("queueSize", queueSize);
+            model.put("maxSize", maxSize);
+
+            model.put("virtualThreadActiveCount", virtualThreadActiveCount);
+            model.put("platformTotalThreads", platformTotalThreads);
 
             model.put("cacheHit", cacheHitCount);
             model.put("httpCacheHit", httpCacheHitCount);

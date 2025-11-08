@@ -9,6 +9,8 @@ import io.micrometer.core.instrument.binder.system.ProcessorMetrics;
 import io.micrometer.prometheusmetrics.PrometheusConfig;
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 
+import java.lang.management.ManagementFactory;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -31,7 +33,7 @@ public class MetricsRegistry {
     private final Counter httpCacheHitCounter;
     private final Counter internalServerErrorCounter;
 
-    public MetricsRegistry(ThreadPoolExecutor threadPoolExecutor) {
+    public MetricsRegistry(ExecutorService threadPoolExecutor, Boolean virtualThreadEnabled) {
         this.registry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
 
         new JvmMemoryMetrics().bindTo(registry);
@@ -56,12 +58,27 @@ public class MetricsRegistry {
                 .description("Counts internal server errors (500s)")
                 .register(registry);
 
-        gauge("app.threadpool.active",
-                threadPoolExecutor,
-                ThreadPoolExecutor::getActiveCount);
-        gauge("app.threadpool.queue.size",
-                threadPoolExecutor,
-                executor -> executor.getQueue().size());
+        if (virtualThreadEnabled) {
+            gauge("app.threadpool.virtual.threads.active",
+                    threadPoolExecutor,
+                    executor -> (double) Thread.activeCount());
+
+            gauge("app.threadpool.platform.threads.total",
+                    threadPoolExecutor,
+                    executor -> (double) ManagementFactory.getThreadMXBean().getThreadCount());
+        } else {
+            ThreadPoolExecutor tpe = (ThreadPoolExecutor) threadPoolExecutor;
+
+            gauge("app.threadpool.active",
+                    tpe,
+                    executor -> (double) tpe.getActiveCount());
+            gauge("app.threadpool.queue.size",
+                    tpe,
+                    executor -> (double) tpe.getQueue().size());
+            gauge("app.threadpool.max.size",
+                    tpe,
+                    executor -> (double) tpe.getMaximumPoolSize());
+        }
     }
 
     public String getPrometheusFormattedData() {

@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * @author Yonagi
@@ -42,6 +43,7 @@ public class GzipEncoderManager {
     private static final Logger log = LoggerFactory.getLogger(GzipEncoderManager.class);
 
     private static volatile GzipEncoderManager INSTANCE;
+    private static ReentrantLock lock = new ReentrantLock();
 
     private static final AtomicReference<GzipEncoder> ENCODER_REF = new AtomicReference<>();
     private static ConfigSource configSource;
@@ -51,10 +53,13 @@ public class GzipEncoderManager {
 
     public static void init() {
         if (INSTANCE == null) {
-            synchronized (GzipEncoderManager.class) {
+            lock.lock();
+            try {
                 if (INSTANCE == null) {
                     INSTANCE = new GzipEncoderManager();
                 }
+            } finally {
+                lock.unlock();
             }
         }
 

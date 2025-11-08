@@ -30,15 +30,15 @@
       padding: 8px 12px;
       font-size: 14px;
       border-radius: 6px;
-      border: 1px solid #333; 
-      background-color: #2a2a2a; 
-      color: #e0e0e0; 
+      border: 1px solid #333;
+      background-color: #2a2a2a;
+      color: #e0e0e0;
       cursor: pointer;
-      appearance: none; 
+      appearance: none;
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23e0e0e0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
       background-repeat: no-repeat;
       background-position: right 8px center;
-      padding-right: 28px; 
+      padding-right: 28px;
     }
     select.lang:focus {
       outline: none;
@@ -55,7 +55,7 @@
       <option value="ja">日本語</option>
     </select>
   </div>
-  
+
   <header>
     <h1 data-i18n-key="header_title">Ocean 管理控制台</h1>
     <p data-i18n-key="header_subtitle">服务器运行状态与实时指标，页面每 10 秒自动刷新</p>
@@ -68,8 +68,18 @@
       <!-- 动态数据：使用 Span ID 标记，值包含在 Strong 标签内 -->
       <p class="metric" data-i18n-key="threadpool_active_threads">活跃线程数: <strong><span id="activeThreads">{{ activeThreads }}</span></strong></p>
       <p class="metric" data-i18n-key="threadpool_queue_size">队列等待数: <strong><span id="queueSize">{{ queueSize }}</span></strong></p>
+      <p class="metric" data-i18n-key="threadpool_max_size">最大线程数: <strong><span id="maxSize">{{ maxSize }}</span></strong></p>
       <div class="chart-wrapper">
         <canvas id="threadChart"></canvas>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 data-i18n-key="virtualthread_title">虚拟线程状态</h2>
+      <p class="metric" data-i18n-key="virtualthread_active_count">活跃虚拟线程数: <strong><span id="virtualThreadActiveCount">{{ virtualThreadActiveCount }}</span></strong></p>
+      <p class="metric" data-i18n-key="virtualthread_total_count">总平台线程数: <strong><span id="platformTotalThreads">{{ platformTotalThreads }}</span></strong></p>
+      <div class="chart-wrapper">
+        <canvas id="vtChart"></canvas>
       </div>
     </div>
 
@@ -105,7 +115,7 @@
         <canvas id="errorChart"></canvas>
       </div>
     </div>
-    
+
     <!-- 资源与环境 -->
     <div class="card" style="width: 800px;">
       <h2 data-i18n-key="env_info_title">资源与环境信息</h2>
@@ -138,13 +148,21 @@
         title: 'Ocean 管理控制台',
         header_title: 'Ocean 管理控制台',
         header_subtitle: '服务器运行状态与实时指标，页面每 10 秒自动刷新',
-        
+
         threadpool_title: '线程池状态',
         threadpool_active_threads: '活跃线程数:',
         threadpool_queue_size: '队列等待数:',
+        threadpool_max_size: '最大线程数:',
         chart_label_active_threads: '活跃线程',
         chart_label_queue_size: '队列等待',
+        chart_label_max_size: '最大线程',
         chart_label_thread_unit: '线程数',
+
+        virtualthread_title: '虚拟线程状态',
+        virtualthread_active_count: '活跃虚拟线程数:',
+        virtualthread_total_count: '总平台线程数:',
+        chart_label_vt_active: '活跃虚拟线程',
+        chart_label_vt_platform: '平台线程',
 
         request_latency_title: '请求延迟 (所有请求)',
         request_total_count: '请求总数:',
@@ -166,7 +184,7 @@
         error_429: '429 Rejected:',
         error_500: '500 Internal Error:',
         chart_label_error_unit: '次数',
-        
+
         env_info_title: '资源与环境信息',
         env_info_version: '服务版本:',
         env_info_java: 'Java 版本:',
@@ -174,7 +192,7 @@
         env_info_uptime: '已运行时间:',
         env_info_memory: 'JVM 内存使用:',
         env_info_cpu: '进程 CPU 使用率:',
-        
+
         footer_refresh_hint: '数据为当前时刻快照，自动刷新频率：10 秒。',
       },
       'en': {
@@ -185,9 +203,17 @@
         threadpool_title: 'Thread Pool Status',
         threadpool_active_threads: 'Active Threads:',
         threadpool_queue_size: 'Queue Size:',
+        threadpool_max_size: 'Max Threads:',
         chart_label_active_threads: 'Active Threads',
         chart_label_queue_size: 'Queue Wait',
         chart_label_thread_unit: 'Threads',
+        chart_label_max_size: 'Max Threads',
+
+        virtualthread_title: 'Virtual Threads',
+        virtualthread_active_count: 'Active Virtual Threads:',
+        virtualthread_total_count: 'Platform Threads:',
+        chart_label_vt_active: 'Active VT',
+        chart_label_vt_platform: 'Platform Threads',
 
         request_latency_title: 'Request Latency (All Requests)',
         request_total_count: 'Total Requests:',
@@ -196,7 +222,7 @@
         chart_label_avg_latency: 'Avg Latency (ms)',
         chart_label_max_latency: 'Max Latency (ms)',
         chart_label_ms_unit: 'Milliseconds (ms)',
-        
+
         cache_route_title: 'Cache & Routing',
         cache_hit_client: 'Client Cache Hits:',
         cache_hit_http: 'HTTP Cache Hits:',
@@ -228,9 +254,17 @@
         threadpool_title: 'スレッドプール状態',
         threadpool_active_threads: 'アクティブスレッド数:',
         threadpool_queue_size: 'キューサイズ:',
+        threadpool_max_size: '最大スレッド数:',
         chart_label_active_threads: 'アクティブスレッド',
         chart_label_queue_size: 'キュー待機',
         chart_label_thread_unit: 'スレッド数',
+        chart_label_max_size: '最大スレッド',
+
+        virtualthread_title: '仮想スレッド状態',
+        virtualthread_active_count: 'アクティブ仮想スレッド数:',
+        virtualthread_total_count: 'プラットフォームスレッド総数:',
+        chart_label_vt_active: 'アクティブVT',
+        chart_label_vt_platform: 'プラットフォームスレッド',
 
         request_latency_title: 'リクエスト遅延 (全リクエスト)',
         request_total_count: 'リクエスト総数:',
@@ -260,7 +294,7 @@
         env_info_uptime: '稼働時間:',
         env_info_memory: 'JVMメモリ使用量:',
         env_info_cpu: 'プロセスCPU使用率:',
-        
+
         footer_refresh_hint: 'データは現在のスナップショットです。自動更新頻度: 10秒。',
       }
     };
@@ -279,21 +313,21 @@
         const key = element.getAttribute('data-i18n-key');
         if (t[key]) {
           // 核心修正：查找并保存 strong 元素，因为它是所有 metric 值的容器
-          const valueWrapper = element.querySelector('strong'); 
+          const valueWrapper = element.querySelector('strong');
 
           // 1. 设置元素的文本内容 (这会清除所有子节点，包括 strong/span)
           element.textContent = t[key] + (valueWrapper ? ' ' : '');
 
           // 2. 如果找到了值容器，则重新将其添加到元素中
           if (valueWrapper) {
-             element.appendChild(valueWrapper); 
+             element.appendChild(valueWrapper);
           }
         }
       });
-      
+
       initCharts(lang);
     }
-    
+
     function initCharts(lang) {
         if (window.charts) {
             Object.values(window.charts).forEach(chart => chart.destroy());
@@ -308,20 +342,42 @@
             }
             return 0;
         };
-        
+
         // 1. 线程池图表
         window.charts.threadChart = new Chart(document.getElementById('threadChart'), {
           type: 'bar',
           data: {
-            labels: [t.chart_label_active_threads, t.chart_label_queue_size],
+            labels: [t.chart_label_active_threads, t.chart_label_queue_size, t.chart_label_max_size],
             datasets: [{
               label: t.threadpool_title,
-              data: [getMetricValue('activeThreads'), getMetricValue('queueSize')],
-              backgroundColor: ['#4dd0e1', '#ffc400']
+              data: [getMetricValue('activeThreads'), getMetricValue('queueSize'), getMetricValue('maxSize')],
+              backgroundColor: ['#4dd0e1', '#ffc400', '#9575cd']
             }]
           },
           options: {
             scales: { y: { beginAtZero: true, title: { display: true, text: t.chart_label_thread_unit } } },
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } }
+          }
+        });
+
+        // vt图表
+        window.charts.vtChart = new Chart(document.getElementById('vtChart'), {
+          type: 'bar',
+          data: {
+            labels: [t.chart_label_vt_active, t.chart_label_vt_platform],
+            datasets: [{
+              label: t.virtualthread_title,
+              data: [
+                getMetricValue('virtualThreadActiveCount'),
+                getMetricValue('platformTotalThreads')
+              ],
+              backgroundColor: ['#4db6ac', '#ba68c8']
+            }]
+          },
+          options: {
+            scales: { y: { beginAtZero: true } },
             responsive: true,
             maintainAspectRatio: false,
             plugins: { legend: { display: false } }
@@ -388,7 +444,7 @@
     window.onload = function() {
         const langSelect = document.getElementById('langSelect');
         const urlParams = new URLSearchParams(window.location.search);
-        
+
         // 1. 获取语言偏好：优先URL参数，其次 localStorage，最后默认中文
         let savedLang = urlParams.get('lang') || localStorage.getItem('adminLang') || 'zh';
 
@@ -400,7 +456,7 @@
 
         // 3. 应用翻译 (修复后的函数)
         applyTranslations(currentLang);
-        
+
         // 4. 监听切换事件
         langSelect.addEventListener('change', function() {
             const newLang = this.value;
@@ -408,7 +464,7 @@
             // 重新加载页面，带上语言参数
             window.location.search = `?lang=${newLang}`;
         });
-        
+
         // 5. 设置自动刷新（10秒）
         setTimeout(() => location.reload(), 10000);
     };

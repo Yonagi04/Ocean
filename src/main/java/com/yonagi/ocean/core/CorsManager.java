@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * @author Yonagi
@@ -47,6 +48,7 @@ public class CorsManager {
     private static final Logger log = LoggerFactory.getLogger(CorsManager.class);
 
     private static volatile CorsManager INSTANCE;
+    private static ReentrantLock lock = new ReentrantLock();
 
     private static final AtomicReference<CorsConfig> REF = new AtomicReference<>();
     private static ConfigSource configSource;
@@ -56,10 +58,13 @@ public class CorsManager {
 
     public static void init() {
         if (INSTANCE == null) {
-            synchronized (CorsManager.class) {
+            lock.lock();
+            try {
                 if (INSTANCE == null) {
                     INSTANCE = new CorsManager();
                 }
+            } finally {
+                lock.unlock();
             }
         }
         if (REF.get() != null) {
