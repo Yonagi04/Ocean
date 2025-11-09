@@ -4,6 +4,8 @@ import com.yonagi.ocean.admin.AdminHandler;
 import com.yonagi.ocean.admin.health.HealthCheckHandler;
 import com.yonagi.ocean.admin.health.HealthCheckService;
 import com.yonagi.ocean.core.ConnectionManager;
+import com.yonagi.ocean.core.reverseproxy.ReverseProxyChecker;
+import com.yonagi.ocean.core.reverseproxy.ReverseProxyManager;
 import com.yonagi.ocean.core.ratelimiter.RateLimiterChecker;
 import com.yonagi.ocean.core.router.Router;
 import com.yonagi.ocean.admin.metrics.MetricsHandler;
@@ -22,6 +24,7 @@ public class ServerContext {
     private final ConnectionManager connectionManager;
     private final Router router;
     private final RateLimiterChecker rateLimiterChecker;
+    private final ReverseProxyChecker reverseProxyChecker;
     private final MiddlewareChain middlewareChain;
     private final MetricsRegistry metricsRegistry;
     private final MetricsHandler metricsHandler;
@@ -29,11 +32,12 @@ public class ServerContext {
     private final AdminHandler adminHandler;
     private final EnvironmentInfo environmentInfo;
 
-    public ServerContext(MiddlewareChain middlewareChain, RateLimiterChecker rateLimiterChecker, Router router,
-                         ConnectionManager connectionManager, MetricsRegistry metricsRegistry, HealthCheckService healthCheckService,
-                         EnvironmentInfo environmentInfo) {
+    public ServerContext(MiddlewareChain middlewareChain, RateLimiterChecker rateLimiterChecker, ReverseProxyChecker reverseProxyChecker,
+                         Router router, ConnectionManager connectionManager, MetricsRegistry metricsRegistry,
+                         HealthCheckService healthCheckService, EnvironmentInfo environmentInfo) {
         this.middlewareChain = middlewareChain;
         this.rateLimiterChecker = rateLimiterChecker;
+        this.reverseProxyChecker = reverseProxyChecker;
         this.router = router;
         this.connectionManager = connectionManager;
         this.metricsRegistry = metricsRegistry;
@@ -53,6 +57,10 @@ public class ServerContext {
 
     public RateLimiterChecker getRateLimiterChecker() {
         return rateLimiterChecker;
+    }
+
+    public ReverseProxyChecker getReverseProxyChecker() {
+        return reverseProxyChecker;
     }
 
     public MiddlewareChain getMiddlewareChain() {

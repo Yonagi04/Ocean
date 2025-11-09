@@ -12,6 +12,8 @@ import com.yonagi.ocean.core.configuration.source.router.*;
 import com.yonagi.ocean.core.context.ConnectionContext;
 import com.yonagi.ocean.core.context.EnvironmentInfo;
 import com.yonagi.ocean.core.context.ServerContext;
+import com.yonagi.ocean.core.reverseproxy.ReverseProxyChecker;
+import com.yonagi.ocean.core.reverseproxy.ReverseProxyManager;
 import com.yonagi.ocean.framework.ControllerRegistry;
 import com.yonagi.ocean.core.gzip.GzipEncoderManager;
 import com.yonagi.ocean.core.ratelimiter.RateLimiterChecker;
@@ -76,6 +78,11 @@ public class HttpServer {
     private RateLimiterChecker rateLimiterChecker;
     private RateLimiterManager rateLimiterManager;
     private com.yonagi.ocean.core.configuration.source.ratelimit.ConfigSource rateLimitConfigSource;
+
+    private ReverseProxyChecker reverseProxyChecker;
+    private ReverseProxyManager reverseProxyManager;
+    private com.yonagi.ocean.core.configuration.source.reverseproxy.ConfigSource reverseProxyConfigSource;
+
     private ServerContext serverContext;
 
     private int sslPort;
@@ -128,6 +135,7 @@ public class HttpServer {
         this.serverContext = new ServerContext(
                 new MiddlewareChain(MiddlewareLoader.loadMiddlewares()),
                 this.rateLimiterChecker,
+                this.reverseProxyChecker,
                 this.router,
                 this.connectionManager,
                 new MetricsRegistry(workerThreadExecutor, virtualThreadsEnabled),
@@ -332,11 +340,33 @@ public class HttpServer {
 
         this.rateLimiterChecker = new RateLimiterChecker(rateLimiterManager);
 
+        // Initialize reverse proxy manager and initial reverse proxy configuration
+        com.yonagi.ocean.core.configuration.source.reverseproxy.NacosConfigSource initialNacosReverseProxySource =
+                new com.yonagi.ocean.core.configuration.source.reverseproxy.NacosConfigSource(initialConfigService);
+        com.yonagi.ocean.core.configuration.source.reverseproxy.MutableConfigSource reverseProxyProxy =
+                new com.yonagi.ocean.core.configuration.source.reverseproxy.MutableConfigSource(initialNacosReverseProxySource);
+
+        this.reverseProxyConfigSource = new com.yonagi.ocean.core.configuration.source.reverseproxy.FallbackConfigSource(
+                reverseProxyProxy,
+                new com.yonagi.ocean.core.configuration.source.reverseproxy.LocalConfigSource()
+        );
+        this.reverseProxyManager = new ReverseProxyManager();
+        ReverseProxyManager.setInstance(this.reverseProxyManager);
+
+        ReverseProxyManager.ReverseProxyConfigRecoveryAction reverseProxyConfigRecoveryAction =
+                new ReverseProxyManager.ReverseProxyConfigRecoveryAction(reverseProxyProxy, this.reverseProxyManager);
+        NacosConfigLoader.registerRecoveryAction(reverseProxyConfigRecoveryAction);
+
+        this.reverseProxyChecker = new ReverseProxyChecker(reverseProxyManager);
+
         // Register route configuration change listener
         this.routeConfigSource.onChange(() -> routeConfigManager.refreshRoutes(routeConfigSource));
 
         // Register rate limit configuration change listener
         this.rateLimitConfigSource.onChange(() -> rateLimiterManager.refreshRateLimiter(rateLimitConfigSource));
+
+        // Register reverse proxy configuration change listener
+        this.reverseProxyConfigSource.onChange(() -> reverseProxyManager.refreshReverseProxyConfigs(reverseProxyConfigSource));
 
         // Initialize routes if enabled
         if (Boolean.parseBoolean(LocalConfigLoader.getProperty("server.router.enabled", "true"))) {
@@ -347,6 +377,11 @@ public class HttpServer {
         if (Boolean.parseBoolean(LocalConfigLoader.getProperty("server.rate_limit.enabled", "true"))) {
             this.rateLimiterManager.refreshRateLimiter(rateLimitConfigSource);
             this.rateLimiterManager.preloadGlobalLimiter();
+        }
+
+        // Initialize reverse proxy if enabled
+        if (Boolean.parseBoolean(LocalConfigLoader.getProperty("server.reverse_proxy.enabled", "true"))) {
+            this.reverseProxyManager.refreshReverseProxyConfigs(reverseProxyConfigSource);
         }
     }
 

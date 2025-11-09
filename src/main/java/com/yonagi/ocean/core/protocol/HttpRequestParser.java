@@ -22,8 +22,6 @@ public class HttpRequestParser {
     private static final Logger log = LoggerFactory.getLogger(HttpRequestParser.class);
 
     public static HttpRequest parse(InputStream input) throws IOException {
-//        BufferedReader reader = new BufferedReader(new InputStreamReader(input, StandardCharsets.ISO_8859_1));
-
         String requestLine = readLineFromInputStream(input);
         if (requestLine == null || requestLine.isEmpty()) {
             return null;

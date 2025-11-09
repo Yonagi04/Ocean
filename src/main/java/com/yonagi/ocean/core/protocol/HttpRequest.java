@@ -88,6 +88,17 @@ public class HttpRequest {
         return defaultValue;
     }
 
+    public Builder toBuilder() {
+        return new Builder()
+                .method(this.method)
+                .uri(this.uri)
+                .httpVersion(this.httpVersion)
+                .headers(this.headers)
+                .body(this.body)
+                .queryParams(this.queryParams)
+                .rawBodyInputStream(this.rawBodyInputStream);
+    }
+
     public static class Builder {
         private HttpMethod method;
         private String uri;
