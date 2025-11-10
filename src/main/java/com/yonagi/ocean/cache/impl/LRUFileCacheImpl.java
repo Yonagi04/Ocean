@@ -3,7 +3,7 @@ package com.yonagi.ocean.cache.impl;
 import com.yonagi.ocean.cache.CachedFile;
 import com.yonagi.ocean.cache.StaticFileCache;
 import com.yonagi.ocean.cache.config.CacheConfig;
-import com.yonagi.ocean.utils.MimeTypeUtil;
+import com.yonagi.ocean.core.protocol.enums.ContentType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -89,7 +89,7 @@ public class LRUFileCacheImpl implements StaticFileCache {
             CachedFile newCached = new CachedFile(
                     data,
                     file.lastModified(),
-                    MimeTypeUtil.getMimeType(file.getName()),
+                    ContentType.fromName(file.getName()).getValue(),
                     now
             );
             cache.put(path, newCached);
@@ -159,7 +159,7 @@ public class LRUFileCacheImpl implements StaticFileCache {
             CachedFile newCached = new CachedFile(
                     data,
                     file.lastModified(),
-                    MimeTypeUtil.getMimeType(file.getName()),
+                    ContentType.fromName(file.getName()).getValue(),
                     System.currentTimeMillis()
             );
             cache.put(path, newCached);

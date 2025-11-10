@@ -2,7 +2,7 @@ package com.yonagi.ocean.cache.impl;
 
 import com.yonagi.ocean.cache.CachedFile;
 import com.yonagi.ocean.cache.StaticFileCache;
-import com.yonagi.ocean.utils.MimeTypeUtil;
+import com.yonagi.ocean.core.protocol.enums.ContentType;
 
 import java.io.File;
 import java.io.IOException;
@@ -23,7 +23,7 @@ public class NoCacheImpl implements StaticFileCache {
         return new CachedFile(
                 data,
                 file.lastModified(),
-                MimeTypeUtil.getMimeType(file.getName()),
+                ContentType.fromName(file.getName()).getValue(),
                 System.currentTimeMillis()
         );
     }

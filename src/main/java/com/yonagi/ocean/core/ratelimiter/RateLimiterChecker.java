@@ -5,7 +5,7 @@ import com.yonagi.ocean.core.ratelimiter.config.enums.RateLimitType;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.enums.HttpMethod;
 import com.yonagi.ocean.core.ratelimiter.algorithm.RateLimiter;
-import com.yonagi.ocean.utils.IpExtractor;
+import com.yonagi.ocean.core.ratelimiter.utils.IpExtractor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

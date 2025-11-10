@@ -1,4 +1,4 @@
-package com.yonagi.ocean.utils;
+package com.yonagi.ocean.core.ratelimiter.utils;
 
 import com.yonagi.ocean.core.protocol.HttpRequest;
 

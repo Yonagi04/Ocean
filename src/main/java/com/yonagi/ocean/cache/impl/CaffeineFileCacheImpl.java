@@ -5,7 +5,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.yonagi.ocean.cache.CachedFile;
 import com.yonagi.ocean.cache.StaticFileCache;
 import com.yonagi.ocean.cache.config.CacheConfig;
-import com.yonagi.ocean.utils.MimeTypeUtil;
+import com.yonagi.ocean.core.protocol.enums.ContentType;
 
 import java.io.File;
 import java.io.IOException;
@@ -72,7 +72,7 @@ public class CaffeineFileCacheImpl implements StaticFileCache {
         CachedFile newCached = new CachedFile(
                 data,
                 file.lastModified(),
-                MimeTypeUtil.getMimeType(file.getName()),
+                ContentType.fromName(file.getName()).getValue(),
                 System.currentTimeMillis()
         );
         cache.put(file.getCanonicalPath(), newCached);
