@@ -2,7 +2,7 @@ package com.yonagi.ocean.cache.provider;
 
 import com.yonagi.ocean.cache.StaticFileCache;
 import com.yonagi.ocean.cache.impl.CaffeineFileCacheImpl;
-import com.yonagi.ocean.cache.configuration.CacheConfig;
+import com.yonagi.ocean.cache.config.CacheConfig;
 
 public class CaffeineCacheProvider implements CacheProvider {
     @Override

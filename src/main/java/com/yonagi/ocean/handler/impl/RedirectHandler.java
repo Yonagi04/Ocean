@@ -1,6 +1,6 @@
 package com.yonagi.ocean.handler.impl;
 
-import com.yonagi.ocean.core.configuration.RedirectConfig;
+import com.yonagi.ocean.handler.config.RedirectConfig;
 import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;

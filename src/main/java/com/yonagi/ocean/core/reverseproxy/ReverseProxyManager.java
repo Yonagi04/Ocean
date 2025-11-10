@@ -1,10 +1,10 @@
 package com.yonagi.ocean.core.reverseproxy;
 
 import com.alibaba.nacos.api.config.ConfigService;
-import com.yonagi.ocean.core.configuration.ReverseProxyConfig;
-import com.yonagi.ocean.core.configuration.source.reverseproxy.ConfigSource;
-import com.yonagi.ocean.core.configuration.source.reverseproxy.MutableConfigSource;
-import com.yonagi.ocean.core.configuration.source.reverseproxy.NacosConfigSource;
+import com.yonagi.ocean.core.reverseproxy.config.ReverseProxyConfig;
+import com.yonagi.ocean.core.reverseproxy.config.source.ConfigSource;
+import com.yonagi.ocean.core.reverseproxy.config.source.MutableConfigSource;
+import com.yonagi.ocean.core.reverseproxy.config.source.NacosConfigSource;
 import com.yonagi.ocean.spi.ConfigRecoveryAction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

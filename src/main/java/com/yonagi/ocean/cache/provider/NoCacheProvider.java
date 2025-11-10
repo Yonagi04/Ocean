@@ -2,7 +2,7 @@ package com.yonagi.ocean.cache.provider;
 
 import com.yonagi.ocean.cache.StaticFileCache;
 import com.yonagi.ocean.cache.impl.NoCacheImpl;
-import com.yonagi.ocean.cache.configuration.CacheConfig;
+import com.yonagi.ocean.cache.config.CacheConfig;
 
 public class NoCacheProvider implements CacheProvider {
     @Override

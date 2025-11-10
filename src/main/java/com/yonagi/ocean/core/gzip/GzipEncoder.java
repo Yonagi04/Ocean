@@ -1,6 +1,6 @@
 package com.yonagi.ocean.core.gzip;
 
-import com.yonagi.ocean.core.configuration.GzipConfig;
+import com.yonagi.ocean.core.gzip.config.GzipConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,7 +27,7 @@ public class GzipEncoder {
 
     public void updateConfig(GzipConfig newConfig) {
         this.currentConfig = newConfig;
-        log.info("GzipEncoder configuration updated: enabled={}, minLength={}, compressionLevel={}",
+        log.info("GzipEncoder config updated: enabled={}, minLength={}, compressionLevel={}",
                 currentConfig.isEnabled(), currentConfig.getMinContentLength(), currentConfig.getCompressionLevel());
     }
 

@@ -1,6 +1,6 @@
 package com.yonagi.ocean.core.protocol.handler.impl;
 
-import com.yonagi.ocean.core.CorsManager;
+import com.yonagi.ocean.core.cors.CorsManager;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
 import com.yonagi.ocean.core.protocol.enums.ContentType;

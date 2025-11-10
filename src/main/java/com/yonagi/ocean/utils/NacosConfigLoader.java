@@ -76,7 +76,7 @@ public class NacosConfigLoader {
         String serverAddr = LocalConfigLoader.getProperty("nacos.server_addr");
 
         if (!nacosEnabled) {
-            log.warn("Nacos disabled in configuration, using local configuration only.");
+            log.warn("Nacos disabled in config, using local config only.");
             initialized.set(true);
             return;
         }
@@ -177,7 +177,7 @@ public class NacosConfigLoader {
         if (configService == null) {
             return;
         }
-        log.info("Nacos reconnected successfully! Triggering {} configuration recovery actions", recoveryActions.size());
+        log.info("Nacos reconnected successfully! Triggering {} config recovery actions", recoveryActions.size());
 
         ConfigService finalConfigService = configService;
 
@@ -231,7 +231,7 @@ public class NacosConfigLoader {
                         return props;
                     }
                 } catch (NacosException e) {
-                    log.warn("Fail to fetch configuration from Nacos, attempt {}/{}", attempt + 1, maxRetries, e);
+                    log.warn("Fail to fetch config from Nacos, attempt {}/{}", attempt + 1, maxRetries, e);
                 }
                 attempt++;
                 Thread.sleep((long) retryInterval * attempt);
@@ -239,7 +239,7 @@ public class NacosConfigLoader {
         } catch (InterruptedException ignored) {
 
         }
-        log.error("Could not fetch configuration from Nacos after \" + maxRetries + \" attempts. Using local configuration.");
+        log.error("Could not fetch config from Nacos after \" + maxRetries + \" attempts. Using local config.");
         return null;
     }
 
@@ -264,7 +264,7 @@ public class NacosConfigLoader {
                         }
                     }
                 } catch (NacosException e) {
-                    log.warn("Fail to fetch configuration from Nacos, attempt {}/{}", attempt + 1, maxRetries, e);
+                    log.warn("Fail to fetch config from Nacos, attempt {}/{}", attempt + 1, maxRetries, e);
                 } catch (JsonMappingException e) {
                     log.error("Nacos ConfigService returned invalid JSON array: {}", e.getMessage());
                     return null;
@@ -278,7 +278,7 @@ public class NacosConfigLoader {
         } catch (InterruptedException ignored) {
 
         }
-        log.error("Could not fetch configuration from Nacos after {} attempts. Using local configuration.", maxRetries);
+        log.error("Could not fetch config from Nacos after {} attempts. Using local config.", maxRetries);
         return null;
     }
 

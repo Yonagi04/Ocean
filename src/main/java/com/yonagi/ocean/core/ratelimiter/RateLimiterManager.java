@@ -1,11 +1,11 @@
 package com.yonagi.ocean.core.ratelimiter;
 
 import com.alibaba.nacos.api.config.ConfigService;
-import com.yonagi.ocean.core.configuration.RateLimitConfig;
-import com.yonagi.ocean.core.configuration.enums.RateLimitType;
-import com.yonagi.ocean.core.configuration.source.ratelimit.ConfigSource;
-import com.yonagi.ocean.core.configuration.source.ratelimit.MutableConfigSource;
-import com.yonagi.ocean.core.configuration.source.ratelimit.NacosConfigSource;
+import com.yonagi.ocean.core.ratelimiter.config.RateLimitConfig;
+import com.yonagi.ocean.core.ratelimiter.config.enums.RateLimitType;
+import com.yonagi.ocean.core.ratelimiter.config.source.ConfigSource;
+import com.yonagi.ocean.core.ratelimiter.config.source.MutableConfigSource;
+import com.yonagi.ocean.core.ratelimiter.config.source.NacosConfigSource;
 import com.yonagi.ocean.core.ratelimiter.algorithm.AllwaysAllowRateLimiter;
 import com.yonagi.ocean.core.ratelimiter.algorithm.RateLimiter;
 import com.yonagi.ocean.core.ratelimiter.algorithm.TokenBucket;

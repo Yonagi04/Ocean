@@ -7,19 +7,20 @@ import com.yonagi.ocean.admin.health.impl.NacosHealthIndicator;
 import com.yonagi.ocean.admin.health.impl.ThreadPoolHealthIndicator;
 import com.yonagi.ocean.admin.health.impl.VirtualThreadHealthIndicator;
 import com.yonagi.ocean.cache.StaticFileCacheFactory;
-import com.yonagi.ocean.core.configuration.KeepAliveConfig;
-import com.yonagi.ocean.core.configuration.source.router.*;
+import com.yonagi.ocean.core.config.KeepAliveConfig;
 import com.yonagi.ocean.core.context.ConnectionContext;
 import com.yonagi.ocean.core.context.EnvironmentInfo;
 import com.yonagi.ocean.core.context.ServerContext;
+import com.yonagi.ocean.core.cors.CorsManager;
 import com.yonagi.ocean.core.reverseproxy.ReverseProxyChecker;
 import com.yonagi.ocean.core.reverseproxy.ReverseProxyManager;
+import com.yonagi.ocean.core.router.config.source.*;
 import com.yonagi.ocean.framework.ControllerRegistry;
 import com.yonagi.ocean.core.gzip.GzipEncoderManager;
 import com.yonagi.ocean.core.ratelimiter.RateLimiterChecker;
 import com.yonagi.ocean.core.ratelimiter.RateLimiterManager;
 import com.yonagi.ocean.core.router.RouteManager;
-import com.yonagi.ocean.core.configuration.ServerStartupConfig;
+import com.yonagi.ocean.core.config.ServerStartupConfig;
 import com.yonagi.ocean.core.router.Router;
 import com.yonagi.ocean.admin.metrics.MetricsRegistry;
 import com.yonagi.ocean.middleware.MiddlewareChain;
@@ -77,11 +78,11 @@ public class HttpServer {
 
     private RateLimiterChecker rateLimiterChecker;
     private RateLimiterManager rateLimiterManager;
-    private com.yonagi.ocean.core.configuration.source.ratelimit.ConfigSource rateLimitConfigSource;
+    private com.yonagi.ocean.core.ratelimiter.config.source.ConfigSource rateLimitConfigSource;
 
     private ReverseProxyChecker reverseProxyChecker;
     private ReverseProxyManager reverseProxyManager;
-    private com.yonagi.ocean.core.configuration.source.reverseproxy.ConfigSource reverseProxyConfigSource;
+    private com.yonagi.ocean.core.reverseproxy.config.source.ConfigSource reverseProxyConfigSource;
 
     private ServerContext serverContext;
 
@@ -304,7 +305,7 @@ public class HttpServer {
 
         log.info("Controller scanning and static route registration completed.");
 
-        // Initialize router configuration manager and initial router configuration
+        // Initialize router config manager and initial router config
         ConfigService initialConfigService = NacosConfigLoader.getConfigService();
         NacosConfigSource initialNacosRouteSource = new NacosConfigSource(initialConfigService);
         MutableConfigSource routeProxy = new MutableConfigSource(initialNacosRouteSource);
@@ -321,15 +322,15 @@ public class HttpServer {
         );
         NacosConfigLoader.registerRecoveryAction(routeConfigRecoveryAction);
 
-        // Initialize rate limiter manager and initial rate limit configuration
-        com.yonagi.ocean.core.configuration.source.ratelimit.NacosConfigSource initialNacosRateLimiterSource =
-                new com.yonagi.ocean.core.configuration.source.ratelimit.NacosConfigSource(initialConfigService);
-        com.yonagi.ocean.core.configuration.source.ratelimit.MutableConfigSource ratelimitProxy =
-                new com.yonagi.ocean.core.configuration.source.ratelimit.MutableConfigSource(initialNacosRateLimiterSource);
+        // Initialize rate limiter manager and initial rate limit config
+        com.yonagi.ocean.core.ratelimiter.config.source.NacosConfigSource initialNacosRateLimiterSource =
+                new com.yonagi.ocean.core.ratelimiter.config.source.NacosConfigSource(initialConfigService);
+        com.yonagi.ocean.core.ratelimiter.config.source.MutableConfigSource ratelimitProxy =
+                new com.yonagi.ocean.core.ratelimiter.config.source.MutableConfigSource(initialNacosRateLimiterSource);
 
-        this.rateLimitConfigSource = new com.yonagi.ocean.core.configuration.source.ratelimit.FallbackConfigSource(
+        this.rateLimitConfigSource = new com.yonagi.ocean.core.ratelimiter.config.source.FallbackConfigSource(
                 ratelimitProxy,
-                new com.yonagi.ocean.core.configuration.source.ratelimit.LocalConfigSource()
+                new com.yonagi.ocean.core.ratelimiter.config.source.LocalConfigSource()
         );
         this.rateLimiterManager = new RateLimiterManager();
         RateLimiterManager.setInstance(this.rateLimiterManager);
@@ -340,15 +341,15 @@ public class HttpServer {
 
         this.rateLimiterChecker = new RateLimiterChecker(rateLimiterManager);
 
-        // Initialize reverse proxy manager and initial reverse proxy configuration
-        com.yonagi.ocean.core.configuration.source.reverseproxy.NacosConfigSource initialNacosReverseProxySource =
-                new com.yonagi.ocean.core.configuration.source.reverseproxy.NacosConfigSource(initialConfigService);
-        com.yonagi.ocean.core.configuration.source.reverseproxy.MutableConfigSource reverseProxyProxy =
-                new com.yonagi.ocean.core.configuration.source.reverseproxy.MutableConfigSource(initialNacosReverseProxySource);
+        // Initialize reverse proxy manager and initial reverse proxy config
+        com.yonagi.ocean.core.reverseproxy.config.source.NacosConfigSource initialNacosReverseProxySource =
+                new com.yonagi.ocean.core.reverseproxy.config.source.NacosConfigSource(initialConfigService);
+        com.yonagi.ocean.core.reverseproxy.config.source.MutableConfigSource reverseProxyProxy =
+                new com.yonagi.ocean.core.reverseproxy.config.source.MutableConfigSource(initialNacosReverseProxySource);
 
-        this.reverseProxyConfigSource = new com.yonagi.ocean.core.configuration.source.reverseproxy.FallbackConfigSource(
+        this.reverseProxyConfigSource = new com.yonagi.ocean.core.reverseproxy.config.source.FallbackConfigSource(
                 reverseProxyProxy,
-                new com.yonagi.ocean.core.configuration.source.reverseproxy.LocalConfigSource()
+                new com.yonagi.ocean.core.reverseproxy.config.source.LocalConfigSource()
         );
         this.reverseProxyManager = new ReverseProxyManager();
         ReverseProxyManager.setInstance(this.reverseProxyManager);
@@ -359,13 +360,13 @@ public class HttpServer {
 
         this.reverseProxyChecker = new ReverseProxyChecker(reverseProxyManager);
 
-        // Register route configuration change listener
+        // Register route config change listener
         this.routeConfigSource.onChange(() -> routeConfigManager.refreshRoutes(routeConfigSource));
 
-        // Register rate limit configuration change listener
+        // Register rate limit config change listener
         this.rateLimitConfigSource.onChange(() -> rateLimiterManager.refreshRateLimiter(rateLimitConfigSource));
 
-        // Register reverse proxy configuration change listener
+        // Register reverse proxy config change listener
         this.reverseProxyConfigSource.onChange(() -> reverseProxyManager.refreshReverseProxyConfigs(reverseProxyConfigSource));
 
         // Initialize routes if enabled

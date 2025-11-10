@@ -2,7 +2,7 @@ package com.yonagi.ocean.cache.impl;
 
 import com.yonagi.ocean.cache.CachedFile;
 import com.yonagi.ocean.cache.StaticFileCache;
-import com.yonagi.ocean.cache.configuration.CacheConfig;
+import com.yonagi.ocean.cache.config.CacheConfig;
 import com.yonagi.ocean.utils.MimeTypeUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,10 +17,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * @author Yonagi

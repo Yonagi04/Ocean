@@ -4,7 +4,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.yonagi.ocean.cache.CachedFile;
 import com.yonagi.ocean.cache.StaticFileCache;
-import com.yonagi.ocean.cache.configuration.CacheConfig;
+import com.yonagi.ocean.cache.config.CacheConfig;
 import com.yonagi.ocean.utils.MimeTypeUtil;
 
 import java.io.File;

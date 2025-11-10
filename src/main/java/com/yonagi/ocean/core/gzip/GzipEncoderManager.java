@@ -1,8 +1,8 @@
 package com.yonagi.ocean.core.gzip;
 
 import com.alibaba.nacos.api.config.ConfigService;
-import com.yonagi.ocean.core.configuration.GzipConfig;
-import com.yonagi.ocean.core.configuration.source.gzip.*;
+import com.yonagi.ocean.core.gzip.config.GzipConfig;
+import com.yonagi.ocean.core.gzip.config.source.*;
 import com.yonagi.ocean.spi.ConfigRecoveryAction;
 import com.yonagi.ocean.utils.NacosConfigLoader;
 import org.slf4j.Logger;

@@ -1,7 +1,7 @@
 package com.yonagi.ocean.core.reverseproxy;
 
 import com.yonagi.ocean.core.ErrorPageRender;
-import com.yonagi.ocean.core.configuration.ReverseProxyConfig;
+import com.yonagi.ocean.core.reverseproxy.config.ReverseProxyConfig;
 import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
@@ -58,7 +58,7 @@ public class ReverseProxyHandler implements RequestHandler {
                     .build();
             httpContext.setResponse(errorResponse);
             ErrorPageRender.render(httpContext);
-            log.error("[{}] Reverse proxy configuration is missing", traceId);
+            log.error("[{}] Reverse proxy config is missing", traceId);
             return;
         }
 

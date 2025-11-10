@@ -1,7 +1,7 @@
 package com.yonagi.ocean.core.router;
 
 import com.yonagi.ocean.core.ErrorPageRender;
-import com.yonagi.ocean.core.configuration.RouteConfig;
+import com.yonagi.ocean.core.router.config.RouteConfig;
 import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.HttpResponse;
 import com.yonagi.ocean.core.protocol.enums.ContentType;

@@ -1,6 +1,6 @@
 package com.yonagi.ocean.core;
 
-import com.yonagi.ocean.core.configuration.KeepAliveConfig;
+import com.yonagi.ocean.core.config.KeepAliveConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -1,11 +1,10 @@
 package com.yonagi.ocean.core.reverseproxy;
 
-import com.yonagi.ocean.core.configuration.ReverseProxyConfig;
+import com.yonagi.ocean.core.reverseproxy.config.ReverseProxyConfig;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**

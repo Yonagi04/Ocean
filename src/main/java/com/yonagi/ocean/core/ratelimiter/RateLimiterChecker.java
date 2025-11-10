@@ -1,7 +1,7 @@
 package com.yonagi.ocean.core.ratelimiter;
 
-import com.yonagi.ocean.core.configuration.RateLimitConfig;
-import com.yonagi.ocean.core.configuration.enums.RateLimitType;
+import com.yonagi.ocean.core.ratelimiter.config.RateLimitConfig;
+import com.yonagi.ocean.core.ratelimiter.config.enums.RateLimitType;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.enums.HttpMethod;
 import com.yonagi.ocean.core.ratelimiter.algorithm.RateLimiter;

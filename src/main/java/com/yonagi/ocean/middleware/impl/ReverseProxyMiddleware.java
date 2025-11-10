@@ -1,6 +1,6 @@
 package com.yonagi.ocean.middleware.impl;
 
-import com.yonagi.ocean.core.configuration.ReverseProxyConfig;
+import com.yonagi.ocean.core.reverseproxy.config.ReverseProxyConfig;
 import com.yonagi.ocean.core.reverseproxy.ReverseProxyChecker;
 import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.reverseproxy.ReverseProxyHandler;

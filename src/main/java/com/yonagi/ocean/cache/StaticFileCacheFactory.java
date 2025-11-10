@@ -1,12 +1,12 @@
 package com.yonagi.ocean.cache;
 
 import com.alibaba.nacos.api.config.ConfigService;
-import com.yonagi.ocean.cache.configuration.source.*;
+import com.yonagi.ocean.cache.config.source.*;
 import com.yonagi.ocean.cache.provider.CacheProvider;
 import com.yonagi.ocean.cache.provider.CaffeineCacheProvider;
 import com.yonagi.ocean.cache.provider.LRUCacheProvider;
 import com.yonagi.ocean.cache.provider.NoCacheProvider;
-import com.yonagi.ocean.cache.configuration.CacheConfig;
+import com.yonagi.ocean.cache.config.CacheConfig;
 import com.yonagi.ocean.spi.ConfigRecoveryAction;
 import com.yonagi.ocean.utils.NacosConfigLoader;
 import org.slf4j.Logger;
