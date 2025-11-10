@@ -19,6 +19,7 @@ import org.apache.commons.fileupload.servlet.ServletFileUpload;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -60,19 +61,8 @@ public class UploadFileHandler implements RequestHandler {
             ErrorPageRender.render(httpContext);
             return;
         }
-        final InputStream bodyStream = request.getRawBodyInputStream();
-        if (bodyStream == null) {
-            log.error("[{}] BodyStream is null", httpContext.getTraceId());
-            HttpResponse response = httpContext.getResponse().toBuilder()
-                    .httpVersion(request.getHttpVersion())
-                    .httpStatus(HttpStatus.BAD_REQUEST)
-                    .headers(headers)
-                    .contentType(ContentType.TEXT_HTML)
-                    .build();
-            httpContext.setResponse(response);
-            ErrorPageRender.render(httpContext);
-            return;
-        }
+
+        ByteArrayInputStream bodyStream = new ByteArrayInputStream(request.getBody());
 
         RequestContext requestContext = new RequestContext() {
             @Override
@@ -87,19 +77,7 @@ public class UploadFileHandler implements RequestHandler {
 
             @Override
             public int getContentLength() {
-                String lengthString = request.getHeaders().get("content-length");
-                if (lengthString != null) {
-                    try {
-                        long length = Long.parseLong(lengthString);
-                        if (length > Integer.MAX_VALUE) {
-                            return -1;
-                        }
-                        return (int) length;
-                    } catch (NumberFormatException e) {
-                        return -1;
-                    }
-                }
-                return -1;
+                return request.getBody().length;
             }
 
             @Override

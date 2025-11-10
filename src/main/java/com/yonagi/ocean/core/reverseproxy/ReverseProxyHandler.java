@@ -6,26 +6,17 @@ import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.protocol.HttpResponse;
 import com.yonagi.ocean.core.protocol.enums.ContentType;
-import com.yonagi.ocean.core.protocol.enums.HttpMethod;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.handler.RequestHandler;
-import org.apache.commons.fileupload.FileItem;
-import org.apache.commons.fileupload.RequestContext;
-import org.apache.commons.fileupload.disk.DiskFileItemFactory;
-import org.apache.commons.fileupload.servlet.ServletFileUpload;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.net.ConnectException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpTimeoutException;
 import java.time.Duration;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -73,18 +64,73 @@ public class ReverseProxyHandler implements RequestHandler {
 
         String configId = proxyConfig.getId();
         URI upstreamUri = buildUpstreamUri(request, proxyConfig);
-        log.debug("[{}] {} Forwarding request {} to upstream: {}", traceId, configId, request.getUri(), upstreamUri);
+        log.info("[{}] {} Forwarding {} request {} to upstream: {}", traceId, configId, request.getMethod(), request.getUri(), upstreamUri);
+        
+        // 在设置请求体之前记录请求体状态
+        byte[] bodyBeforeProxy = request.getBody();
+        String contentLength = request.getHeaders().get("content-length");
+        log.debug("[{}] Request body status before proxying: body={}, bodyLength={}, contentLength={}",
+                traceId, bodyBeforeProxy != null ? "exists" : "null", 
+                bodyBeforeProxy != null ? bodyBeforeProxy.length : 0, contentLength);
+        
         try {
             java.net.http.HttpRequest.Builder requestBuilder = java.net.http.HttpRequest.newBuilder()
                     .uri(upstreamUri)
                     .timeout(Duration.ofMillis(proxyConfig.getTimeout()));
-            copyRequestHeaders(request, requestBuilder, proxyConfig);
-            setRequestBody(request, requestBuilder);
+            copyRequestHeaders(request, requestBuilder, proxyConfig, traceId);
+            setRequestBody(request, requestBuilder, traceId);
             java.net.http.HttpRequest upstreamRequest = requestBuilder.build();
-            java.net.http.HttpResponse<byte[]> upstreamResponse = httpClient.send(
-                    upstreamRequest,
-                    java.net.http.HttpResponse.BodyHandlers.ofByteArray()
-            );
+            
+            // 验证构建的请求
+            log.debug("[{}] Built upstream request: method={}, URI={}", traceId, upstreamRequest.method(), upstreamRequest.uri());
+            upstreamRequest.headers().map().forEach((name, values) -> {
+                if (name.equalsIgnoreCase("content-length")) {
+                    log.warn("[{}] WARNING: Content-Length header found in upstream request: {} = {}", traceId, name, values);
+                } else {
+                    log.debug("[{}] Upstream request header: {} = {}", traceId, name, values);
+                }
+            });
+            
+            // 记录 BodyPublisher 信息（用于调试）
+            if (upstreamRequest.bodyPublisher().isPresent()) {
+                log.debug("[{}] BodyPublisher is present for upstream request", traceId);
+                int requestBodyLength = request.getBody() != null ? request.getBody().length : 0;
+                log.debug("[{}] Request body length that should be sent: {} bytes", traceId, requestBodyLength);
+            } else {
+                log.debug("[{}] No BodyPublisher for upstream request", traceId);
+            }
+
+            java.net.http.HttpResponse<byte[]> upstreamResponse;
+            try {
+                upstreamResponse = httpClient.send(
+                        upstreamRequest,
+                        java.net.http.HttpResponse.BodyHandlers.ofByteArray()
+                );
+                log.debug("[{}] Received response from upstream: status={}, headers={}",
+                        traceId, upstreamResponse.statusCode(), upstreamResponse.headers().map().keySet());
+            } catch (java.io.IOException ioException) {
+                // 检查是否是 Content-Length 相关的错误
+                String ioErrorMessage = ioException.getMessage();
+                if (ioErrorMessage != null && ioErrorMessage.contains("content-length")) {
+                    log.error("[{}] IOException with Content-Length error detected during httpClient.send()", traceId);
+                    log.error("[{}] Error message: {}", traceId, ioErrorMessage);
+                    log.error("[{}] This error typically occurs when:", traceId);
+                    log.error("[{}]   1. The upstream server's response has Content-Length header but empty body", traceId);
+                    log.error("[{}]   2. Or there's a mismatch between declared and actual body length", traceId);
+                    log.error("[{}]   3. Or the connection was closed prematurely", traceId);
+                    
+                    // 检查是否是响应读取的问题
+                    Throwable cause = ioException.getCause();
+                    if (cause != null) {
+                        log.error("[{}] Caused by: {}", traceId, cause.getClass().getName());
+                        log.error("[{}] Cause message: {}", traceId, cause.getMessage());
+                        if (cause instanceof java.io.EOFException) {
+                            log.error("[{}] EOFException detected - connection may have been closed unexpectedly", traceId);
+                        }
+                    }
+                }
+                throw ioException; // 重新抛出异常，让外层的 catch 处理
+            }
             forwardResponse(httpContext, upstreamResponse);
         } catch (ConnectException e) {
             HttpResponse errorResponse = httpContext.getResponse().toBuilder()
@@ -112,7 +158,47 @@ public class ReverseProxyHandler implements RequestHandler {
                     .build();
             httpContext.setResponse(errorResponse);
             ErrorPageRender.render(httpContext);
-            log.error("[{}] [{}] Error proxying request to upstream {}: {}", traceId, configId, upstreamUri, e.getMessage(), e);
+            
+            // 记录详细的错误信息
+            String errorMessage = e.getMessage();
+            log.error("[{}] [{}] Error proxying request to upstream {}: {}", traceId, configId, upstreamUri, errorMessage, e);
+            
+            // 检查错误是否与 Content-Length 相关
+            if (errorMessage != null && errorMessage.contains("content-length")) {
+                log.error("[{}] Content-Length related error detected. Request details:", traceId);
+                log.error("[{}]   - Request body length: {} bytes", traceId, request.getBody() != null ? request.getBody().length : 0);
+                log.error("[{}]   - Content-Length header: {}", traceId, request.getHeaders().get("content-length"));
+                log.error("[{}]   - Content-Type: {}", traceId, request.getHeaders().get("content-type"));
+                log.error("[{}]   - Error message: {}", traceId, errorMessage);
+                log.error("[{}]   - Exception class: {}", traceId, e.getClass().getName());
+                
+                // 记录异常堆栈的前几行，以便定位问题
+                StackTraceElement[] stackTrace = e.getStackTrace();
+                if (stackTrace != null && stackTrace.length > 0) {
+                    log.error("[{}]   - Exception stack trace (first 10 lines):", traceId);
+                    for (int i = 0; i < Math.min(10, stackTrace.length); i++) {
+                        log.error("[{}]     at {}", traceId, stackTrace[i]);
+                    }
+                }
+                
+                // 检查错误信息中是否包含 813 字节的引用
+                if (errorMessage.contains("813")) {
+                    log.error("[{}] ERROR: Error message references 813 bytes, but we read {} bytes! " +
+                             "This suggests the original client request had Content-Length: 813, " +
+                             "but we only read {} bytes. This is a CRITICAL mismatch!", 
+                             traceId, request.getBody() != null ? request.getBody().length : 0, 
+                             request.getBody() != null ? request.getBody().length : 0);
+                    log.error("[{}] POSSIBLE CAUSE: The error may be from the upstream server's response, " +
+                             "not from our request. The upstream server may have expected 813 bytes " +
+                             "but received only {} bytes, causing it to return an error response " +
+                             "that HttpClient cannot parse.", traceId, request.getBody() != null ? request.getBody().length : 0);
+                }
+            }
+            
+            // 记录完整的异常堆栈（如果启用 DEBUG 级别）
+            if (log.isDebugEnabled()) {
+                log.debug("[{}] Full exception stack trace:", traceId, e);
+            }
         }
     }
 
@@ -151,67 +237,106 @@ public class ReverseProxyHandler implements RequestHandler {
         return prefix.replaceAll("/+$", "");
     }
 
-    private void copyRequestHeaders(HttpRequest request, java.net.http.HttpRequest.Builder requestBuilder, ReverseProxyConfig proxyConfig) {
+    private void copyRequestHeaders(HttpRequest request, java.net.http.HttpRequest.Builder requestBuilder, ReverseProxyConfig proxyConfig, String traceId) {
+        // 记录原始 Content-Length（如果存在）
+        String originalContentLength = request.getHeaders().get("content-length");
+        if (originalContentLength != null) {
+            log.debug("[{}] Original Content-Length header: {} (will be filtered and set by HttpClient based on BodyPublisher)", 
+                     traceId, originalContentLength);
+        }
+        
+        // 复制请求头（过滤掉 hop-by-hop 头部，包括 content-length）
         request.getHeaders().forEach((name, value) -> {
-            if (!HOP_BY_HOP_HEADERS.contains(name.toLowerCase())) {
+            String lowerName = name.toLowerCase();
+            if (!HOP_BY_HOP_HEADERS.contains(lowerName)) {
                 requestBuilder.header(name, value);
+            } else {
+                log.debug("[{}] Filtering out hop-by-hop header: {}", traceId, name);
             }
         });
-        requestBuilder.header("X-Forwarded-For", (String) request.getAttribute("clientIp"));
+        
+        // 添加 X-Forwarded-For 头部
+        String clientIp = (String) request.getAttribute("clientIp");
+        if (clientIp != null) {
+            requestBuilder.header("X-Forwarded-For", clientIp);
+        }
+        
+        // 添加配置中指定的额外头部
         proxyConfig.getAddHeaders().forEach((name, value) -> {
-            if (!HOP_BY_HOP_HEADERS.contains(name.toLowerCase())) {
+            String lowerName = name.toLowerCase();
+            if (!HOP_BY_HOP_HEADERS.contains(lowerName)) {
                 requestBuilder.header(name, value);
+            } else {
+                log.debug("[{}] Filtering out hop-by-hop header from addHeaders: {}", traceId, name);
             }
         });
     }
 
-    private void setRequestBody(HttpRequest request, java.net.http.HttpRequest.Builder requestBuilder) throws IOException {
+    private void setRequestBody(HttpRequest request, java.net.http.HttpRequest.Builder requestBuilder, String traceId) throws IOException {
         java.net.http.HttpRequest.BodyPublisher publisher;
+        byte[] body = request.getBody();
         String contentType = request.getHeaders().get("content-type");
+        boolean isMultipart = contentType != null && contentType.toLowerCase().startsWith("multipart/");
 
-//        if (contentType != null && contentType.startsWith("multipart/form-data")) {
-//            // 处理 multipart/form-data
-//            publisher = createMultipartBodyPublisher(request, contentType);
-//        } else {
-//            // 处理普通请求体
-//            byte[] body = request.getBody();
-//            if (body != null && body.length > 0) {
-//                publisher = java.net.http.HttpRequest.BodyPublishers.ofByteArray(body);
-//            } else {
-//                publisher = java.net.http.HttpRequest.BodyPublishers.noBody();
-//            }
-//        }
-        if (
-                request.getMethod() == HttpMethod.POST ||
-                request.getMethod() == HttpMethod.PUT ||
-                request.getMethod() == HttpMethod.PATCH
-        ) {
-            byte[] body = request.getBody();
+        boolean hasBodyMethod = "POST".equals(request.getMethod().name()) ||
+                                "PUT".equals(request.getMethod().name()) ||
+                                "PATCH".equals(request.getMethod().name());
 
+        String contentLengthHeader = request.getHeaders().get("content-length");
+        int expectedContentLength = 0;
+        if (contentLengthHeader != null && !contentLengthHeader.trim().isEmpty()) {
+            try {
+                expectedContentLength = Integer.parseInt(contentLengthHeader.trim());
+            } catch (NumberFormatException e) {
+                log.warn("[{}] Invalid Content-Length header: {}", traceId, contentLengthHeader);
+            }
+        }
+        
+        log.debug("[{}] Setting request body: method={}, hasBodyMethod={}, expectedLength={}, actualLength={}, isMultipart={}, contentType={}",
+                traceId, request.getMethod().name(), hasBodyMethod, expectedContentLength, 
+                body != null ? body.length : 0, isMultipart, contentType);
+
+        if (hasBodyMethod && expectedContentLength > 0) {
             if (body == null || body.length == 0) {
-                if (request.getRawBodyInputStream() != null) {
-                    // todo: 修复form-data上传阻塞的bug
-                    try (InputStream is = request.getRawBodyInputStream()) {
-                        body = is.readAllBytes();
-                    } catch (IOException e) {
-                        log.error("Failed to read raw body stream into memory.", e);
-                        body = null;
-                    }
-                    request = request.toBuilder()
-                            .body(body)
-                            .build();
-                    if (body != null && body.length > 0) {
-                        log.debug("Successfully loaded raw body stream ({} bytes) into memory.", body.length);
-                    }
-                }
+                log.error("[{}] CRITICAL: Request body is empty but Content-Length is {} bytes! " +
+                         "This will cause HttpClient to fail with 'fixed content-length: {}, bytes received: 0'. " +
+                         "Content-Type: {}, RawBodyInputStream: {}", 
+                         traceId, expectedContentLength, expectedContentLength, contentType, 
+                         request.getRawBodyInputStream() != null ? "exists" : "null");
+                throw new IOException("Request body is empty but Content-Length header indicates " + 
+                                     expectedContentLength + " bytes. This will cause upstream request to fail.");
             }
 
-            if (body != null && body.length > 0) {
-                publisher = java.net.http.HttpRequest.BodyPublishers.ofByteArray(body);
-            } else {
-                publisher = java.net.http.HttpRequest.BodyPublishers.noBody();
+            if (body.length != expectedContentLength) {
+                log.warn("[{}] Body length mismatch: expected {} bytes, actual {} bytes. " +
+                        "Content-Type: {}. This may cause issues but we'll proceed with actual data.", 
+                        traceId, expectedContentLength, body.length, contentType);
             }
+            if (body.length == 0) {
+                log.error("[{}] Body array is empty but we're trying to create BodyPublisher! This should not happen.", traceId);
+                throw new IOException("Body array is empty but Content-Length indicates " + expectedContentLength + " bytes");
+            }
+            byte[] bodyCopy = new byte[body.length];
+            System.arraycopy(body, 0, bodyCopy, 0, body.length);
+            log.debug("[{}] Created body array copy: {} bytes (original array hash: {}, copy array hash: {})",
+                    traceId, bodyCopy.length, System.identityHashCode(body), System.identityHashCode(bodyCopy));
+
+            if (bodyCopy.length == 0) {
+                log.error("[{}] CRITICAL: bodyCopy array is empty after copy!", traceId);
+                throw new IOException("Body array is empty after copy, cannot create BodyPublisher");
+            }
+            publisher = java.net.http.HttpRequest.BodyPublishers.ofByteArray(bodyCopy);
+            log.debug("[{}] BodyPublisher created successfully with {} bytes", traceId, bodyCopy.length);
+        } else if (body != null && body.length > 0) {
+            log.debug("[{}] Creating BodyPublisher with {} bytes (no Content-Length header)", traceId, body.length);
+            byte[] bodyCopy = new byte[body.length];
+            System.arraycopy(body, 0, bodyCopy, 0, body.length);
+            publisher = java.net.http.HttpRequest.BodyPublishers.ofByteArray(bodyCopy);
         } else {
+            if (hasBodyMethod) {
+                log.debug("[{}] No body data for {} request (expectedLength: {})", 
+                        traceId, request.getMethod().name(), expectedContentLength);
+            }
             publisher = java.net.http.HttpRequest.BodyPublishers.noBody();
         }
 
@@ -225,86 +350,8 @@ public class ReverseProxyHandler implements RequestHandler {
             case "OPTIONS" -> requestBuilder.method("OPTIONS", publisher);
             default -> requestBuilder.method(request.getMethod().name(), publisher);
         }
-    }
-
-    private java.net.http.HttpRequest.BodyPublisher createMultipartBodyPublisher(HttpRequest request, String contentType) throws IOException {
-        DiskFileItemFactory factory = new DiskFileItemFactory();
-        factory.setSizeThreshold(1024 * 1024);
-        factory.setRepository(new File(System.getProperty("java.io.tmpdir")));
-        ServletFileUpload upload = new ServletFileUpload(factory);
-
-        try {
-            RequestContext requestContext = new RequestContext() {
-                @Override
-                public String getCharacterEncoding() {
-                    return "UTF-8";
-                }
-
-                @Override
-                public String getContentType() {
-                    return contentType;
-                }
-
-                @Override
-                public int getContentLength() {
-                    String lengthString = request.getHeaders().get("content-length");
-                    if (lengthString != null) {
-                        try {
-                            long length = Long.parseLong(lengthString);
-
-                            if (length >= 0 && length <= Integer.MAX_VALUE) {
-                                return (int) length;
-                            }
-                            return -1;
-                        } catch (NumberFormatException e) {
-                            return -1;
-                        }
-                    }
-                    byte[] body = request.getBody();
-                    if (body != null && body.length <= Integer.MAX_VALUE) {
-                        return body.length;
-                    }
-                    return -1;
-                }
-
-                @Override
-                public InputStream getInputStream() throws IOException {
-                    return request.getRawBodyInputStream();
-                }
-            };
-
-            List<FileItem> items = upload.parseRequest(requestContext);
-            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-            String boundary = getBoundary(contentType);
-
-            for (FileItem item : items) {
-                outputStream.write(("--" + boundary + "\r\n").getBytes("UTF-8"));
-                if (item.isFormField()) {
-                    // 普通字段
-                    String fieldHeader = String.format("Content-Disposition: form-data; name=\"%s\"\r\n\r\n",
-                            item.getFieldName());
-                    outputStream.write(fieldHeader.getBytes("UTF-8"));
-                    outputStream.write(item.getString("UTF-8").getBytes("UTF-8"));
-                } else {
-                    // 文件字段
-                    String fileHeader = String.format("Content-Disposition: form-data; name=\"%s\"; filename=\"%s\"\r\n",
-                            item.getFieldName(), item.getName());
-                    outputStream.write(fileHeader.getBytes("UTF-8"));
-                    outputStream.write(("Content-Type: " + item.getContentType() + "\r\n\r\n").getBytes("UTF-8"));
-                    outputStream.write(item.get());
-                }
-                outputStream.write("\r\n".getBytes("UTF-8"));
-            }
-
-            outputStream.write(("--" + boundary + "--\r\n").getBytes("UTF-8"));
-            byte[] bodyBytes = outputStream.toByteArray();
-
-            log.debug("Rebuilt multipart body, size: {} bytes", bodyBytes.length);
-            return java.net.http.HttpRequest.BodyPublishers.ofByteArray(bodyBytes);
-        } catch (Exception e) {
-            log.error("Failed to process multipart/form-data", e);
-            throw new IOException("Failed to process multipart/form-data", e);
-        }
+        
+        log.debug("[{}] Request body publisher created successfully for {} request", traceId, request.getMethod().name());
     }
 
     private void forwardResponse(HttpContext httpContext, java.net.http.HttpResponse<byte[]> upstreamResponse) {
@@ -334,21 +381,5 @@ public class ReverseProxyHandler implements RequestHandler {
             }
         });
         httpContext.setResponse(responseBuilder.build());
-    }
-
-    private String getBoundary(String contentType) {
-        String[] parts = contentType.split("boundary=");
-        if (parts.length > 1) {
-            String boundary = parts[1].trim();
-            if (boundary.startsWith("\"") && boundary.endsWith("\"")) {
-                boundary = boundary.substring(1, boundary.length() - 1);
-            }
-            int semicolonIndex = boundary.indexOf(';');
-            if (semicolonIndex > 0) {
-                boundary = boundary.substring(0, semicolonIndex);
-            }
-            return boundary;
-        }
-        return "----WebKitFormBoundary";
     }
 }

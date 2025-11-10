@@ -58,13 +58,6 @@ public class HttpRequestParser {
         }
         builder.headers(headers);
 
-//        if ("POST".equalsIgnoreCase(method) ||
-//            "PUT".equalsIgnoreCase(method)) {
-//            int contentLength = headers.containsKey("content-length") ? Integer.parseInt(headers.get("content-length")) : 0;
-//            char[] bodyChars = new char[contentLength];
-//            reader.read(bodyChars);
-//            request.setBody(new String(bodyChars).getBytes());
-//        }
         builder.rawBodyInputStream(input);
 
         return builder.build();
@@ -99,7 +92,6 @@ public class HttpRequestParser {
             if (prevByte == '\r' && currentByte == '\n') {
                 byte[] lineBytes = lineBuffer.toByteArray();
                 if (lineBytes.length < 2) {
-                    // 仅包含 \r\n
                     return "";
                 }
                 return new String(lineBytes, 0, lineBytes.length - 2, StandardCharsets.ISO_8859_1);
