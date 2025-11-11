@@ -267,6 +267,9 @@ public class HttpServer {
         if (router != null) {
             router.shutdown();
         }
+        if (reverseProxyManager != null) {
+            reverseProxyManager.shutdownAll();
+        }
 
         log.info("Ocean stopped.");
         shutdownLatch.countDown();

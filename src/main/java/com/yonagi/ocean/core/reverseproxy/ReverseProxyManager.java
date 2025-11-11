@@ -10,6 +10,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @author Yonagi
@@ -47,6 +49,8 @@ public class ReverseProxyManager {
 
     private List<ReverseProxyConfig> reverseProxyConfigs;
 
+    private final Map<String, ReverseProxyHandler> handlerCache = new ConcurrentHashMap<>();
+
     public ReverseProxyManager() {
 
     }
@@ -62,6 +66,7 @@ public class ReverseProxyManager {
     public void refreshReverseProxyConfigs(ConfigSource source) {
         try {
             this.reverseProxyConfigs = source.load();
+            this.handlerCache.clear();
             log.info("Reverse Proxy rules refreshed - Total rules: {}", reverseProxyConfigs.size());
         } catch (Exception e) {
             log.error("Failed to refresh Reverse Proxy rules: {}", e.getMessage(), e);
@@ -76,5 +81,15 @@ public class ReverseProxyManager {
         return reverseProxyConfigs.stream()
                 .sorted((a, b) -> Integer.compare(b.getPath().length(), a.getPath().length()))
                 .toList();
+    }
+
+    public ReverseProxyHandler getOrCreateHandler(ReverseProxyConfig config) {
+        String key = config.getId();
+        return handlerCache.computeIfAbsent(key, k -> new ReverseProxyHandler(config));
+    }
+
+    public void shutdownAll() {
+        handlerCache.forEach((k, v) -> v.shutdown());
+        handlerCache.clear();
     }
 }

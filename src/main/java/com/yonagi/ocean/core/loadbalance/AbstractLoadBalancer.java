@@ -1,0 +1,80 @@
+package com.yonagi.ocean.core.loadbalance;
+
+import com.yonagi.ocean.core.loadbalance.config.LoadBalancerConfig;
+import com.yonagi.ocean.core.loadbalance.config.Upstream;
+import com.yonagi.ocean.core.loadbalance.config.enums.HealthCheckMode;
+import com.yonagi.ocean.utils.LocalConfigLoader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.net.URI;
+import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+
+/**
+ * @author Yonagi
+ * @version 1.0
+ * @program Ocean
+ * @description
+ * @date 2025/11/10 19:51
+ */
+public abstract class AbstractLoadBalancer implements LoadBalancer {
+
+    private static final Logger log = LoggerFactory.getLogger(AbstractLoadBalancer.class);
+
+    protected final LoadBalancerConfig config;
+
+    protected final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+
+    public AbstractLoadBalancer(LoadBalancerConfig config) {
+        this.config = config;
+    }
+
+    protected List<Upstream> getHealthyUpstreams() {
+        return config.getUpstreams().stream()
+                .filter(Upstream::isHealthy)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public void reportFailure(String url, long failureTime) {
+        if (config.getHealthCheckMode() != HealthCheckMode.PASSIVE_CHECK) {
+            return;
+        }
+        URI uri = URI.create(url);
+        String failedHost = uri.getScheme() + "://" + uri.getAuthority();
+
+        config.getUpstreams().stream()
+                .filter(u -> u.getUrl().equals(failedHost))
+                .findFirst()
+                .ifPresent(upstream -> {
+                    if (!upstream.getRecovering().compareAndSet(false, true)) {
+                        return;
+                    }
+
+                    upstream.setHealthy(false);
+                    log.error("PASSIVE CHECK: Upstream {} marked UNHEALTHY due to request failure.", url);
+
+                    long recoveryIntervalMillis = Long.parseLong(LocalConfigLoader.getProperty("server.load_balance.recovery_interval_millis", "30000L"));
+                    scheduler.schedule(() -> {
+                        try {
+                            boolean ok = HttpClient.checkHealth(upstream);
+                            if (ok) {
+                                upstream.setHealthy(true);
+                                log.info("PASSIVE CHECK: Upstream {} automatically recovered.", failedHost);
+                            } else {
+                                log.warn("PASSIVE CHECK: Upstream {} recovery failed, retrying...", failedHost);
+                                upstream.getRecovering().set(false); // 允许再次进入恢复
+                                reportFailure(url, failureTime);
+                            }
+                        } finally {
+                            upstream.getRecovering().set(false);
+                        }
+
+                    }, recoveryIntervalMillis, TimeUnit.MILLISECONDS);
+                });
+    }
+}

@@ -5,20 +5,21 @@ package com.yonagi.ocean.core.loadbalance.config.enums;
  * @version 1.0
  * @program Ocean
  * @description
- * @date 2025/11/08 16:12
+ * @date 2025/11/10 19:04
  */
-public enum LoadBalancing {
-    NONE,
-    ROUND_ROBIN,
-    RANDOM;
+public enum HealthCheckMode {
+    ACTIVE_CHECK,
+    PASSIVE_CHECK,
+    DISABLED;
 
-    public static LoadBalancing getLbType(String type) {
+    public static HealthCheckMode getHealthCheckStatus(String status) {
         try {
-            return LoadBalancing.valueOf(type.toUpperCase());
+            return HealthCheckMode.valueOf(status);
         } catch (IllegalArgumentException e) {
             return null;
         }
     }
+
 
     @Override
     public String toString() {

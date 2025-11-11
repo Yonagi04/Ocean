@@ -1,0 +1,65 @@
+[
+  {
+    "enabled": true,
+    "id": "echo",
+    "path": "echo",
+    "stripPrefix": false,
+    "timeout": 3000,
+    "lbConfig": {
+      "strategy": "NONE",
+      "healthCheckMode": "DISABLED",
+      "checkIntervalMs": 3000,
+      "upstreams": [
+        {
+          "url": "http://localhost:8088",
+          "weight": 1.0
+        }
+      ]
+    },
+    "addHeaders": {
+      "testHeader": "token"
+    }
+  },
+  {
+    "enabled": true,
+    "id": "status",
+    "path": "status",
+    "stripPrefix": true,
+    "timeout": 3000,
+    "addHeaders": {},
+    "lbConfig": {
+      "strategy": "ROUND_ROBIN",
+      "healthCheckMode": "ACTIVE_CHECK",
+      "checkIntervalMs": 10000,
+      "upstreams": [
+        {
+          "url": "http://localhost:8088",
+          "weight": 0.5
+        },
+        {
+          "url": "http://localhost:8089",
+          "weight": 0.5
+        }
+      ]
+    }
+  },
+  {
+    "enabled": true,
+    "id": "error",
+    "path": "error",
+    "stripPrefix": false,
+    "timeout": 3000,
+    "lbConfig": {
+        "strategy": "IP_HASH",
+        "healthCheckMode": "PASSIVE_CHECK",
+        "checkIntervalMs": 5000,
+        "upstreams": [
+            {
+            "url": "http://localhost:9999",
+            "weight": 1.0
+            }
+        ]
+    },
+    "addHeaders": {}
+  }
+]

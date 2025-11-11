@@ -1,6 +1,11 @@
 package com.yonagi.ocean.core.reverseproxy;
 
 import com.yonagi.ocean.core.ErrorPageRender;
+import com.yonagi.ocean.core.loadbalance.HealthChecker;
+import com.yonagi.ocean.core.loadbalance.LoadBalancer;
+import com.yonagi.ocean.core.loadbalance.LoadBalancerFactory;
+import com.yonagi.ocean.core.loadbalance.config.Upstream;
+import com.yonagi.ocean.core.loadbalance.config.enums.Strategy;
 import com.yonagi.ocean.core.reverseproxy.config.ReverseProxyConfig;
 import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.HttpRequest;
@@ -8,6 +13,7 @@ import com.yonagi.ocean.core.protocol.HttpResponse;
 import com.yonagi.ocean.core.protocol.enums.ContentType;
 import com.yonagi.ocean.core.protocol.enums.HttpStatus;
 import com.yonagi.ocean.handler.RequestHandler;
+import com.yonagi.ocean.utils.LocalConfigLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,6 +23,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpTimeoutException;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -35,8 +42,10 @@ public class ReverseProxyHandler implements RequestHandler {
             "te", "trailers", "transfer-encoding", "upgrade", "host", "content-length"
     );
 
-    private ReverseProxyConfig proxyConfig;
+    private final ReverseProxyConfig proxyConfig;
     private final HttpClient httpClient;
+    private final LoadBalancer loadBalancer;
+    private final HealthChecker healthChecker;
 
     public ReverseProxyHandler(ReverseProxyConfig proxyConfig) {
         this.proxyConfig = proxyConfig;
@@ -44,6 +53,14 @@ public class ReverseProxyHandler implements RequestHandler {
                 .followRedirects(HttpClient.Redirect.NEVER)
                 .connectTimeout(Duration.ofSeconds(5))
                 .build();
+        boolean enableLb = Boolean.parseBoolean(LocalConfigLoader.getProperty("server.load_balance.enabled", "false"));
+        if (enableLb) {
+            this.loadBalancer = LoadBalancerFactory.createLoadBalancer(proxyConfig.getLbConfig());
+        } else {
+            this.loadBalancer = LoadBalancerFactory.createLoadBalancer(proxyConfig.getLbConfig(), Strategy.NONE);
+        }
+        this.healthChecker = new HealthChecker(proxyConfig.getLbConfig());
+        this.healthChecker.start();
     }
 
     @Override
@@ -63,7 +80,31 @@ public class ReverseProxyHandler implements RequestHandler {
         }
 
         String configId = proxyConfig.getId();
-        URI upstreamUri = buildUpstreamUri(request, proxyConfig);
+        URI upstreamUri;
+        try {
+            upstreamUri = buildUpstreamUri(request, proxyConfig);
+        } catch (ConnectException e) {
+            HttpResponse errorResponse = httpContext.getResponse().toBuilder()
+                    .httpVersion(request.getHttpVersion())
+                    .httpStatus(HttpStatus.SERVICE_UNAVAILABLE)
+                    .contentType(ContentType.TEXT_HTML)
+                    .build();
+            httpContext.setResponse(errorResponse);
+            ErrorPageRender.render(httpContext);
+            log.error("[{}] {} Service Unavailable: {}", traceId, configId, e.getMessage(), e);
+            return;
+        } catch (Exception e) {
+            HttpResponse errorResponse = httpContext.getResponse().toBuilder()
+                    .httpVersion(request.getHttpVersion())
+                    .httpStatus(HttpStatus.BAD_GATEWAY)
+                    .contentType(ContentType.TEXT_HTML)
+                    .build();
+            httpContext.setResponse(errorResponse);
+            ErrorPageRender.render(httpContext);
+            log.error("[{}] {} Building Upstream uri meets with exception: {}", traceId, configId, e.getMessage(), e);
+            return;
+        }
+
         log.info("[{}] {} Forwarding {} request {} to upstream: {}", traceId, configId, request.getMethod(), request.getUri(), upstreamUri);
         
         // 在设置请求体之前记录请求体状态
@@ -92,7 +133,7 @@ public class ReverseProxyHandler implements RequestHandler {
             });
             
             // 记录 BodyPublisher 信息（用于调试）
-            if (upstreamRequest.bodyPublisher().isPresent()) {
+            if (log.isDebugEnabled() && upstreamRequest.bodyPublisher().isPresent()) {
                 log.debug("[{}] BodyPublisher is present for upstream request", traceId);
                 int requestBodyLength = request.getBody() != null ? request.getBody().length : 0;
                 log.debug("[{}] Request body length that should be sent: {} bytes", traceId, requestBodyLength);
@@ -112,14 +153,6 @@ public class ReverseProxyHandler implements RequestHandler {
                 // 检查是否是 Content-Length 相关的错误
                 String ioErrorMessage = ioException.getMessage();
                 if (ioErrorMessage != null && ioErrorMessage.contains("content-length")) {
-                    log.error("[{}] IOException with Content-Length error detected during httpClient.send()", traceId);
-                    log.error("[{}] Error message: {}", traceId, ioErrorMessage);
-                    log.error("[{}] This error typically occurs when:", traceId);
-                    log.error("[{}]   1. The upstream server's response has Content-Length header but empty body", traceId);
-                    log.error("[{}]   2. Or there's a mismatch between declared and actual body length", traceId);
-                    log.error("[{}]   3. Or the connection was closed prematurely", traceId);
-                    
-                    // 检查是否是响应读取的问题
                     Throwable cause = ioException.getCause();
                     if (cause != null) {
                         log.error("[{}] Caused by: {}", traceId, cause.getClass().getName());
@@ -129,7 +162,7 @@ public class ReverseProxyHandler implements RequestHandler {
                         }
                     }
                 }
-                throw ioException; // 重新抛出异常，让外层的 catch 处理
+                throw ioException;
             }
             forwardResponse(httpContext, upstreamResponse);
         } catch (ConnectException e) {
@@ -141,6 +174,8 @@ public class ReverseProxyHandler implements RequestHandler {
             httpContext.setResponse(errorResponse);
             ErrorPageRender.render(httpContext);
             log.error("[{}] {} Service Unavailable when proxying request to upstream {}: {}", traceId, configId, upstreamUri, e.getMessage(), e);
+            loadBalancer.reportFailure(upstreamUri.toString(), System.currentTimeMillis());
+            log.debug("[{}] Request from {} reported failure to load balancer for upstream {}", traceId, request.getAttribute("clientIp"), upstreamUri);
         } catch (HttpTimeoutException e) {
             HttpResponse errorResponse = httpContext.getResponse().toBuilder()
                     .httpVersion(request.getHttpVersion())
@@ -150,6 +185,8 @@ public class ReverseProxyHandler implements RequestHandler {
             httpContext.setResponse(errorResponse);
             ErrorPageRender.render(httpContext);
             log.error("[{}] {} Gateway Timeout when proxying request to upstream {}: {}", traceId, configId, upstreamUri, e.getMessage(), e);
+            loadBalancer.reportFailure(upstreamUri.toString(), System.currentTimeMillis());
+            log.debug("[{}] Request from {} reported failure to load balancer for upstream {}", traceId, request.getAttribute("clientIp"), upstreamUri);
         } catch (Exception e) {
             HttpResponse errorResponse = httpContext.getResponse().toBuilder()
                     .httpVersion(request.getHttpVersion())
@@ -158,53 +195,18 @@ public class ReverseProxyHandler implements RequestHandler {
                     .build();
             httpContext.setResponse(errorResponse);
             ErrorPageRender.render(httpContext);
-            
-            // 记录详细的错误信息
-            String errorMessage = e.getMessage();
-            log.error("[{}] [{}] Error proxying request to upstream {}: {}", traceId, configId, upstreamUri, errorMessage, e);
-            
-            // 检查错误是否与 Content-Length 相关
-            if (errorMessage != null && errorMessage.contains("content-length")) {
-                log.error("[{}] Content-Length related error detected. Request details:", traceId);
-                log.error("[{}]   - Request body length: {} bytes", traceId, request.getBody() != null ? request.getBody().length : 0);
-                log.error("[{}]   - Content-Length header: {}", traceId, request.getHeaders().get("content-length"));
-                log.error("[{}]   - Content-Type: {}", traceId, request.getHeaders().get("content-type"));
-                log.error("[{}]   - Error message: {}", traceId, errorMessage);
-                log.error("[{}]   - Exception class: {}", traceId, e.getClass().getName());
-                
-                // 记录异常堆栈的前几行，以便定位问题
-                StackTraceElement[] stackTrace = e.getStackTrace();
-                if (stackTrace != null && stackTrace.length > 0) {
-                    log.error("[{}]   - Exception stack trace (first 10 lines):", traceId);
-                    for (int i = 0; i < Math.min(10, stackTrace.length); i++) {
-                        log.error("[{}]     at {}", traceId, stackTrace[i]);
-                    }
-                }
-                
-                // 检查错误信息中是否包含 813 字节的引用
-                if (errorMessage.contains("813")) {
-                    log.error("[{}] ERROR: Error message references 813 bytes, but we read {} bytes! " +
-                             "This suggests the original client request had Content-Length: 813, " +
-                             "but we only read {} bytes. This is a CRITICAL mismatch!", 
-                             traceId, request.getBody() != null ? request.getBody().length : 0, 
-                             request.getBody() != null ? request.getBody().length : 0);
-                    log.error("[{}] POSSIBLE CAUSE: The error may be from the upstream server's response, " +
-                             "not from our request. The upstream server may have expected 813 bytes " +
-                             "but received only {} bytes, causing it to return an error response " +
-                             "that HttpClient cannot parse.", traceId, request.getBody() != null ? request.getBody().length : 0);
-                }
-            }
-            
-            // 记录完整的异常堆栈（如果启用 DEBUG 级别）
-            if (log.isDebugEnabled()) {
-                log.debug("[{}] Full exception stack trace:", traceId, e);
-            }
+            log.error("[{}] [{}] Error proxying request to upstream {}: {}", traceId, configId, upstreamUri, e.getMessage(), e);
         }
     }
 
-    private URI buildUpstreamUri(HttpRequest request, ReverseProxyConfig proxyConfig) {
+    private URI buildUpstreamUri(HttpRequest request, ReverseProxyConfig proxyConfig) throws ConnectException {
         String path = request.getUri();
-        String targetBase = proxyConfig.getTargetUrl();
+        Upstream selectedUpstream = loadBalancer.choose(request);
+        if (selectedUpstream == null) {
+            log.error("No healthy upstreams available for reverse proxy");
+            throw new ConnectException("No healthy upstreams available");
+        }
+        String targetBase = selectedUpstream.getUrl();
         String targetPath = path;
 
         if (proxyConfig.isStripPrefix()) {
@@ -381,5 +383,9 @@ public class ReverseProxyHandler implements RequestHandler {
             }
         });
         httpContext.setResponse(responseBuilder.build());
+    }
+
+    public void shutdown() {
+        healthChecker.stop();
     }
 }

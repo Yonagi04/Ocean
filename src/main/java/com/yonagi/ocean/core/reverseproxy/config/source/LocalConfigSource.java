@@ -2,8 +2,8 @@ package com.yonagi.ocean.core.reverseproxy.config.source;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yonagi.ocean.core.loadbalance.config.LoadBalancerConfig;
 import com.yonagi.ocean.core.reverseproxy.config.ReverseProxyConfig;
-import com.yonagi.ocean.core.loadbalance.config.enums.LoadBalancing;
 import com.yonagi.ocean.utils.LocalConfigLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,10 +58,9 @@ public class LocalConfigSource implements ConfigSource {
                         .enabled(dto.enabled)
                         .id(dto.id)
                         .path(dto.path)
-                        .targetUrl(dto.targetUrl)
                         .stripPrefix(dto.stripPrefix)
+                        .lbConfig(dto.lbConfig)
                         .timeout(dto.timeout)
-                        .loadBalancing(dto.loadBalancing)
                         .addHeaders(dto.addHeaders)
                         .build();
                 configs.add(config);
@@ -77,10 +76,9 @@ public class LocalConfigSource implements ConfigSource {
         public boolean enabled;
         public String id;
         public String path;
-        public String targetUrl;
         public Boolean stripPrefix;
+        public LoadBalancerConfig lbConfig;
         public Integer timeout;
-        public LoadBalancing loadBalancing;
         public Map<String, String> addHeaders;
     }
 

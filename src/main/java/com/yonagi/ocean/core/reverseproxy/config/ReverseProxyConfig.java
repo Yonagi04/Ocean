@@ -2,7 +2,7 @@ package com.yonagi.ocean.core.reverseproxy.config;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
-import com.yonagi.ocean.core.loadbalance.config.enums.LoadBalancing;
+import com.yonagi.ocean.core.loadbalance.config.LoadBalancerConfig;
 
 import java.util.Map;
 
@@ -22,13 +22,11 @@ public final class ReverseProxyConfig {
 
     private final String path;
 
-    private final String targetUrl;
-
     private final Boolean stripPrefix;
 
     private final Integer timeout;
 
-    private final LoadBalancing loadBalancing;
+    private final LoadBalancerConfig lbConfig;
 
     private final Map<String, String> addHeaders;
 
@@ -36,10 +34,9 @@ public final class ReverseProxyConfig {
         this.enabled = builder.enabled;
         this.id = builder.id;
         this.path = builder.path;
-        this.targetUrl = builder.targetUrl;
         this.stripPrefix = builder.stripPrefix;
+        this.lbConfig = builder.lbConfig;
         this.timeout = builder.timeout;
-        this.loadBalancing = builder.loadBalancing;
         this.addHeaders = builder.addHeaders;
     }
 
@@ -55,20 +52,16 @@ public final class ReverseProxyConfig {
         return path;
     }
 
-    public String getTargetUrl() {
-        return targetUrl;
-    }
-
     public Boolean isStripPrefix() {
         return stripPrefix;
     }
 
-    public Integer getTimeout() {
-        return timeout;
+    public LoadBalancerConfig getLbConfig() {
+        return lbConfig;
     }
 
-    public LoadBalancing getLoadBalancing() {
-        return loadBalancing;
+    public Integer getTimeout() {
+        return timeout;
     }
 
     public Map<String, String> getAddHeaders() {
@@ -84,22 +77,20 @@ public final class ReverseProxyConfig {
                 .enabled(this.enabled)
                 .id(this.id)
                 .path(this.path)
-                .targetUrl(this.targetUrl)
                 .stripPrefix(this.stripPrefix)
+                .lbConfig(this.lbConfig)
                 .timeout(this.timeout)
-                .loadBalancing(this.loadBalancing)
                 .addHeaders(this.addHeaders);
     }
 
-    @JsonPOJOBuilder(buildMethodName = "build", withPrefix = "")
+    @JsonPOJOBuilder(withPrefix = "")
     public static class Builder {
         private Boolean enabled;
         private String id;
         private String path;
-        private String targetUrl;
         private Boolean stripPrefix;
+        private LoadBalancerConfig lbConfig;
         private Integer timeout;
-        private LoadBalancing loadBalancing;
         private Map<String, String> addHeaders;
 
         public Builder enabled(Boolean enabled) {
@@ -117,23 +108,18 @@ public final class ReverseProxyConfig {
             return this;
         }
 
-        public Builder targetUrl(String targetUrl) {
-            this.targetUrl = targetUrl;
-            return this;
-        }
-
         public Builder stripPrefix(Boolean stripPrefix) {
             this.stripPrefix = stripPrefix;
             return this;
         }
 
-        public Builder timeout(Integer timeout) {
-            this.timeout = timeout;
+        public Builder lbConfig(LoadBalancerConfig lbConfig) {
+            this.lbConfig = lbConfig;
             return this;
         }
 
-        public Builder loadBalancing(LoadBalancing loadBalancing) {
-            this.loadBalancing = loadBalancing;
+        public Builder timeout(Integer timeout) {
+            this.timeout = timeout;
             return this;
         }
 

@@ -1,5 +1,6 @@
 package com.yonagi.ocean.middleware.impl;
 
+import com.yonagi.ocean.core.reverseproxy.ReverseProxyManager;
 import com.yonagi.ocean.core.reverseproxy.config.ReverseProxyConfig;
 import com.yonagi.ocean.core.reverseproxy.ReverseProxyChecker;
 import com.yonagi.ocean.core.context.HttpContext;
@@ -21,9 +22,11 @@ public class ReverseProxyMiddleware implements Middleware {
     @Override
     public void handle(HttpContext httpContext, ChainExecutor executor) throws Exception {
         ReverseProxyChecker reverseProxyChecker = httpContext.getConnectionContext().getServerContext().getReverseProxyChecker();
+        ReverseProxyManager reverseProxyManager = ReverseProxyManager.getInstance();
         ReverseProxyConfig proxyConfig = reverseProxyChecker.check(httpContext.getRequest());
         if (proxyConfig != null) {
-            new ReverseProxyHandler(proxyConfig).handle(httpContext);
+            ReverseProxyHandler handler = reverseProxyManager.getOrCreateHandler(proxyConfig);
+            handler.handle(httpContext);
             return;
         }
         executor.proceed(httpContext);

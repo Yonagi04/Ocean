@@ -51,7 +51,6 @@ public class NacosConfigSource implements ConfigSource {
             TypeReference<List<ReverseProxyConfig>> typeRef = new TypeReference<>() {};
             List<ReverseProxyConfig> reverseProxyConfigs = mapper.convertValue(jsonArrayConfig, typeRef);
             log.info("Loaded {} reverse proxy configurations from Nacos", reverseProxyConfigs.size());
-            // todo: lb
             return reverseProxyConfigs;
         } catch (Exception e) {
             log.error("Failed to load reverse proxy configurations from Nacos: {}", e.getMessage(), e);
