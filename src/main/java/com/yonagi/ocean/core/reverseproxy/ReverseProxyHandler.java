@@ -23,7 +23,6 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpTimeoutException;
 import java.time.Duration;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -41,11 +40,13 @@ public class ReverseProxyHandler implements RequestHandler {
             "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
             "te", "trailers", "transfer-encoding", "upgrade", "host", "content-length"
     );
+    private static final double WEIGHT_ADJUSTMENT_FACTOR = 0.1;
 
     private final ReverseProxyConfig proxyConfig;
     private final HttpClient httpClient;
     private final LoadBalancer loadBalancer;
     private final HealthChecker healthChecker;
+    private Upstream selectedUpstream;
 
     public ReverseProxyHandler(ReverseProxyConfig proxyConfig) {
         this.proxyConfig = proxyConfig;
@@ -55,7 +56,7 @@ public class ReverseProxyHandler implements RequestHandler {
                 .build();
         boolean enableLb = Boolean.parseBoolean(LocalConfigLoader.getProperty("server.load_balance.enabled", "false"));
         if (enableLb) {
-            this.loadBalancer = LoadBalancerFactory.createLoadBalancer(proxyConfig.getLbConfig());
+            this.loadBalancer = LoadBalancerFactory.createOrGetLoadBalancer(proxyConfig.getLbConfig());
         } else {
             this.loadBalancer = LoadBalancerFactory.createLoadBalancer(proxyConfig.getLbConfig(), Strategy.NONE);
         }
@@ -106,14 +107,14 @@ public class ReverseProxyHandler implements RequestHandler {
         }
 
         log.info("[{}] {} Forwarding {} request {} to upstream: {}", traceId, configId, request.getMethod(), request.getUri(), upstreamUri);
-        
+
         // 在设置请求体之前记录请求体状态
         byte[] bodyBeforeProxy = request.getBody();
         String contentLength = request.getHeaders().get("content-length");
         log.debug("[{}] Request body status before proxying: body={}, bodyLength={}, contentLength={}",
-                traceId, bodyBeforeProxy != null ? "exists" : "null", 
+                traceId, bodyBeforeProxy != null ? "exists" : "null",
                 bodyBeforeProxy != null ? bodyBeforeProxy.length : 0, contentLength);
-        
+
         try {
             java.net.http.HttpRequest.Builder requestBuilder = java.net.http.HttpRequest.newBuilder()
                     .uri(upstreamUri)
@@ -121,17 +122,17 @@ public class ReverseProxyHandler implements RequestHandler {
             copyRequestHeaders(request, requestBuilder, proxyConfig, traceId);
             setRequestBody(request, requestBuilder, traceId);
             java.net.http.HttpRequest upstreamRequest = requestBuilder.build();
-            
+
             // 验证构建的请求
             log.debug("[{}] Built upstream request: method={}, URI={}", traceId, upstreamRequest.method(), upstreamRequest.uri());
             upstreamRequest.headers().map().forEach((name, values) -> {
-                if (name.equalsIgnoreCase("content-length")) {
+                if ("content-length".equalsIgnoreCase(name)) {
                     log.warn("[{}] WARNING: Content-Length header found in upstream request: {} = {}", traceId, name, values);
                 } else {
                     log.debug("[{}] Upstream request header: {} = {}", traceId, name, values);
                 }
             });
-            
+
             // 记录 BodyPublisher 信息（用于调试）
             if (log.isDebugEnabled() && upstreamRequest.bodyPublisher().isPresent()) {
                 log.debug("[{}] BodyPublisher is present for upstream request", traceId);
@@ -143,10 +144,16 @@ public class ReverseProxyHandler implements RequestHandler {
 
             java.net.http.HttpResponse<byte[]> upstreamResponse;
             try {
+                long startTime = System.currentTimeMillis();
                 upstreamResponse = httpClient.send(
                         upstreamRequest,
                         java.net.http.HttpResponse.BodyHandlers.ofByteArray()
                 );
+                long duration = System.currentTimeMillis() - startTime;
+                if (duration > Long.parseLong(LocalConfigLoader.getProperty("server.load_balance.slow_response_max_latency", "1500"))) {
+                    log.warn("[{}] Slow response from upstream {}: {} ms", traceId, upstreamUri, duration);
+                    decreaseUpstreamWeight();
+                }
                 log.debug("[{}] Received response from upstream: status={}, headers={}",
                         traceId, upstreamResponse.statusCode(), upstreamResponse.headers().map().keySet());
             } catch (java.io.IOException ioException) {
@@ -159,12 +166,14 @@ public class ReverseProxyHandler implements RequestHandler {
                         log.error("[{}] Cause message: {}", traceId, cause.getMessage());
                         if (cause instanceof java.io.EOFException) {
                             log.error("[{}] EOFException detected - connection may have been closed unexpectedly", traceId);
+                            decreaseUpstreamWeight();
                         }
                     }
                 }
                 throw ioException;
             }
             forwardResponse(httpContext, upstreamResponse);
+            increaseUpstreamWeight();
         } catch (ConnectException e) {
             HttpResponse errorResponse = httpContext.getResponse().toBuilder()
                     .httpVersion(request.getHttpVersion())
@@ -173,7 +182,12 @@ public class ReverseProxyHandler implements RequestHandler {
                     .build();
             httpContext.setResponse(errorResponse);
             ErrorPageRender.render(httpContext);
-            log.error("[{}] {} Service Unavailable when proxying request to upstream {}: {}", traceId, configId, upstreamUri, e.getMessage(), e);
+            String message = e.getMessage();
+            log.error("[{}] {} Service Unavailable when proxying request to upstream {}: {}", traceId, configId, upstreamUri, message, e);
+            if (message.contains("Connection reset")) {
+                decreaseUpstreamWeight();
+                return;
+            }
             loadBalancer.reportFailure(upstreamUri.toString(), System.currentTimeMillis());
             log.debug("[{}] Request from {} reported failure to load balancer for upstream {}", traceId, request.getAttribute("clientIp"), upstreamUri);
         } catch (HttpTimeoutException e) {
@@ -185,8 +199,7 @@ public class ReverseProxyHandler implements RequestHandler {
             httpContext.setResponse(errorResponse);
             ErrorPageRender.render(httpContext);
             log.error("[{}] {} Gateway Timeout when proxying request to upstream {}: {}", traceId, configId, upstreamUri, e.getMessage(), e);
-            loadBalancer.reportFailure(upstreamUri.toString(), System.currentTimeMillis());
-            log.debug("[{}] Request from {} reported failure to load balancer for upstream {}", traceId, request.getAttribute("clientIp"), upstreamUri);
+            decreaseUpstreamWeight();
         } catch (Exception e) {
             HttpResponse errorResponse = httpContext.getResponse().toBuilder()
                     .httpVersion(request.getHttpVersion())
@@ -201,7 +214,7 @@ public class ReverseProxyHandler implements RequestHandler {
 
     private URI buildUpstreamUri(HttpRequest request, ReverseProxyConfig proxyConfig) throws ConnectException {
         String path = request.getUri();
-        Upstream selectedUpstream = loadBalancer.choose(request);
+        selectedUpstream = loadBalancer.choose(request);
         if (selectedUpstream == null) {
             log.error("No healthy upstreams available for reverse proxy");
             throw new ConnectException("No healthy upstreams available");
@@ -366,6 +379,9 @@ public class ReverseProxyHandler implements RequestHandler {
                     .build();
             httpContext.setResponse(errorResponse);
             ErrorPageRender.render(httpContext);
+            if (upstreamResponse.statusCode() >= 500) {
+                decreaseUpstreamWeight();
+            }
             return;
         }
         HttpResponse clientResponse = httpContext.getResponse();
@@ -383,6 +399,18 @@ public class ReverseProxyHandler implements RequestHandler {
             }
         });
         httpContext.setResponse(responseBuilder.build());
+    }
+
+    private void increaseUpstreamWeight() {
+        if (selectedUpstream != null) {
+            selectedUpstream.setEffectiveWeight(Math.min(selectedUpstream.getWeight(), selectedUpstream.getEffectiveWeight().get() + ReverseProxyHandler.WEIGHT_ADJUSTMENT_FACTOR));
+        }
+    }
+
+    private void decreaseUpstreamWeight() {
+        if (selectedUpstream != null) {
+            selectedUpstream.setEffectiveWeight(Math.max(0.0, selectedUpstream.getEffectiveWeight().get() - ReverseProxyHandler.WEIGHT_ADJUSTMENT_FACTOR));
+        }
     }
 
     public void shutdown() {

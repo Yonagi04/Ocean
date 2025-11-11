@@ -3,6 +3,8 @@ package com.yonagi.ocean.core.loadbalance;
 import com.yonagi.ocean.core.loadbalance.config.LoadBalancerConfig;
 import com.yonagi.ocean.core.loadbalance.config.Upstream;
 import com.yonagi.ocean.core.loadbalance.config.enums.HealthCheckMode;
+import com.yonagi.ocean.core.loadbalance.config.enums.Strategy;
+import com.yonagi.ocean.core.loadbalance.impl.WeightRandomLoadBalancer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

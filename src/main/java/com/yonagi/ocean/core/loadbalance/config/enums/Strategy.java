@@ -11,7 +11,9 @@ public enum Strategy {
     NONE,
     ROUND_ROBIN,
     IP_HASH,
-    RANDOM;
+    RANDOM,
+    WEIGHT_ROUND_ROBIN,
+    WEIGHT_RANDOM;
 
     public static Strategy getLbStrategy(String type) {
         try {

@@ -3,6 +3,8 @@ package com.yonagi.ocean.core.loadbalance;
 import com.yonagi.ocean.core.loadbalance.config.LoadBalancerConfig;
 import com.yonagi.ocean.core.loadbalance.config.Upstream;
 import com.yonagi.ocean.core.loadbalance.config.enums.HealthCheckMode;
+import com.yonagi.ocean.core.loadbalance.config.enums.Strategy;
+import com.yonagi.ocean.core.loadbalance.impl.WeightRandomLoadBalancer;
 import com.yonagi.ocean.utils.LocalConfigLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,10 +66,16 @@ public abstract class AbstractLoadBalancer implements LoadBalancer {
                             boolean ok = HttpClient.checkHealth(upstream);
                             if (ok) {
                                 upstream.setHealthy(true);
+                                upstream.getCurrentWeight().set(0.0d);
                                 log.info("PASSIVE CHECK: Upstream {} automatically recovered.", failedHost);
                             } else {
+                                upstream.getRecovering().set(false);
+                                upstream.getRetryCount().getAndIncrement();
+                                if (upstream.getRetryCount().get() == Integer.parseInt(LocalConfigLoader.getProperty("server.load_balance.failure_threshold", "3"))) {
+                                    log.warn("PASSIVE CHECK: Upstream {} reached max retry attempts, will not retry further until next failure.", failedHost);
+                                    return;
+                                }
                                 log.warn("PASSIVE CHECK: Upstream {} recovery failed, retrying...", failedHost);
-                                upstream.getRecovering().set(false); // 允许再次进入恢复
                                 reportFailure(url, failureTime);
                             }
                         } finally {

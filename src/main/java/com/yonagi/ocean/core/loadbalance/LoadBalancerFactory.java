@@ -2,10 +2,13 @@ package com.yonagi.ocean.core.loadbalance;
 
 import com.yonagi.ocean.core.loadbalance.config.LoadBalancerConfig;
 import com.yonagi.ocean.core.loadbalance.config.enums.Strategy;
-import com.yonagi.ocean.core.loadbalance.impl.IpHashLoadBalancer;
-import com.yonagi.ocean.core.loadbalance.impl.NoneLoadBalancer;
-import com.yonagi.ocean.core.loadbalance.impl.RandomLoadBalancer;
-import com.yonagi.ocean.core.loadbalance.impl.RoundRobinLoadBalancer;
+import com.yonagi.ocean.core.loadbalance.impl.*;
+
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @author Yonagi
@@ -16,14 +19,13 @@ import com.yonagi.ocean.core.loadbalance.impl.RoundRobinLoadBalancer;
  */
 public class LoadBalancerFactory {
 
-    public static LoadBalancer createLoadBalancer(LoadBalancerConfig config) {
+    private static final Map<String, LoadBalancer> LOAD_BALANCER_CACHE = new ConcurrentHashMap<>();
+    private static final ScheduledExecutorService SCHEDULER = Executors.newScheduledThreadPool(1);
+
+    public static LoadBalancer createOrGetLoadBalancer(LoadBalancerConfig config) {
         Strategy strategy = config.getStrategy();
-        return switch (strategy) {
-            case ROUND_ROBIN -> new RoundRobinLoadBalancer(config);
-            case IP_HASH -> new IpHashLoadBalancer(config);
-            case RANDOM -> new RandomLoadBalancer(config);
-            case NONE -> new NoneLoadBalancer(config);
-        };
+        String cacheKey = config.getCacheKey();
+        return LOAD_BALANCER_CACHE.putIfAbsent(cacheKey, createLoadBalancer(config, strategy));
     }
 
     public static LoadBalancer createLoadBalancer(LoadBalancerConfig config, Strategy strategy) {
@@ -32,6 +34,12 @@ public class LoadBalancerFactory {
             case IP_HASH -> new IpHashLoadBalancer(config);
             case RANDOM -> new RandomLoadBalancer(config);
             case NONE -> new NoneLoadBalancer(config);
+            case WEIGHT_ROUND_ROBIN -> new WeightRoundRobinLoadBalancer(config);
+            case WEIGHT_RANDOM -> new WeightRandomLoadBalancer(config);
         };
+    }
+
+    static {
+        SCHEDULER.schedule(LOAD_BALANCER_CACHE::clear, 1, TimeUnit.DAYS);
     }
 }

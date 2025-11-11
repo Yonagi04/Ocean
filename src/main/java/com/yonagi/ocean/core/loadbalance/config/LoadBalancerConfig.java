@@ -2,13 +2,12 @@ package com.yonagi.ocean.core.loadbalance.config;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 import com.yonagi.ocean.core.loadbalance.config.enums.HealthCheckMode;
 import com.yonagi.ocean.core.loadbalance.config.enums.Strategy;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * @author Yonagi
@@ -26,6 +25,11 @@ public final class LoadBalancerConfig {
     private final long checkIntervalMs;
 
     private final List<Upstream> upstreams;
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(strategy, healthCheckMode, checkIntervalMs, upstreams);
+    }
 
     @JsonCreator
     public LoadBalancerConfig(@JsonProperty("strategy") Strategy strategy,
@@ -52,5 +56,9 @@ public final class LoadBalancerConfig {
 
     public List<Upstream> getUpstreams() {
         return upstreams;
+    }
+
+    public String getCacheKey() {
+        return String.valueOf(this.hashCode());
     }
 }
