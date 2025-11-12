@@ -48,7 +48,7 @@ public class ApiHandler implements RequestHandler {
         if (contentType.contains("charset=")) {
             charset = contentType.split("charset=")[1].trim();
         }
-        Map<String, String> headers = (Map<String, String>) request.getAttribute("HstsHeaders");
+        Map<String, String> headers = request.getAttribute().getHstsHeaders();
 
         // 使用策略映射替代 if-else
         ContentProcessor processor = processors.get(mimeType);

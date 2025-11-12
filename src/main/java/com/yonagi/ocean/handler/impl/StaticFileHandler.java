@@ -47,7 +47,7 @@ public class StaticFileHandler implements RequestHandler {
         if (uri.startsWith(webRoot)) {
             uri = uri.substring(webRoot.length());
         }
-        Map<String, String> headers = (Map<String, String>) request.getAttribute("HstsHeaders");
+        Map<String, String> headers = request.getAttribute().getHstsHeaders();
 
         File file = new File(webRoot, uri);
         if (!file.exists() || file.isDirectory()) {

@@ -46,7 +46,7 @@ public class DownloadFileHandler implements RequestHandler {
         }
 
         try {
-            Map<String, String> headers = (Map<String, String>) request.getAttribute("HstsHeaders");
+            Map<String, String> headers = request.getAttribute().getHstsHeaders();
             headers.put("Content-Length", String.valueOf(file.length()));
             headers.put("Content-Disposition", "attachment; filename=\"" + file.getName() + "\"");
 
@@ -101,7 +101,7 @@ public class DownloadFileHandler implements RequestHandler {
     private void writeNotFound(HttpContext httpContext) {
         HttpRequest request = httpContext.getRequest();
 
-        Map<String, String> headers = (Map<String, String>) request.getAttribute("HstsHeaders");
+        Map<String, String> headers = request.getAttribute().getHstsHeaders();
         HttpResponse httpResponse = httpContext.getResponse().toBuilder()
                 .httpVersion(HttpVersion.HTTP_1_1)
                 .httpStatus(HttpStatus.NOT_FOUND)

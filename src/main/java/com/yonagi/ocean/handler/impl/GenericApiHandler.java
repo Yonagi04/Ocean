@@ -60,7 +60,7 @@ public class GenericApiHandler implements RequestHandler {
             default:
                 responseData.put("error", "Unsupported HTTP method");
         }
-        Map<String, String> headers = (Map<String, String>) request.getAttribute("HstsHeaders");
+        Map<String, String> headers = request.getAttribute().getHstsHeaders();
 
         String responseBody = objectMapper.writeValueAsString(responseData);
         HttpResponse response = httpContext.getResponse().toBuilder()

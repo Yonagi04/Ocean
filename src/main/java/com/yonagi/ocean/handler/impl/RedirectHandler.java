@@ -44,8 +44,8 @@ public class RedirectHandler implements RequestHandler {
     @Override
     public void handle(HttpContext httpContext) throws IOException {
         HttpRequest request = httpContext.getRequest();
-        String targetUrl = (String) request.getAttribute("targetUrl");
-        Integer statusCode = (Integer) request.getAttribute("statusCode");
+        String targetUrl = request.getAttribute().getTargetUrl();
+        Integer statusCode = request.getAttribute().getRedirectStatusCode();
         if (targetUrl == null) {
             log.error("[{}] Missing targetUrl attribute", httpContext.getTraceId());
             return;
@@ -56,7 +56,7 @@ public class RedirectHandler implements RequestHandler {
         }
 
         String protocol;
-        if ((Boolean) request.getAttribute("isSsl")) {
+        if (request.getAttribute().getSsl()) {
             protocol = "https";
         } else {
             protocol = "http";
@@ -116,8 +116,8 @@ public class RedirectHandler implements RequestHandler {
         HttpResponse.Builder builder = httpContext.getResponse().toBuilder()
                 .httpVersion(request.getHttpVersion())
                 .httpStatus(HttpStatus.fromCode(statusCode))
-                .contentType(request.getAttribute("contentType") != null ? ContentType.fromMime((String) request.getAttribute("contentType")) : ContentType.TEXT_HTML);
-        Map<String, String> responseHeaders = (Map<String, String>) request.getAttribute("HstsHeaders");
+                .contentType(request.getAttribute().getRedirectContentType() != null ? ContentType.fromMime(request.getAttribute().getRedirectContentType()) : ContentType.TEXT_HTML);
+        Map<String, String> responseHeaders = request.getAttribute().getHstsHeaders();
         responseHeaders.put("Location", finalLocation);
         builder.headers(responseHeaders);
 

@@ -36,7 +36,7 @@ public class IpExtractor {
                 }
             }
         }
-        String clientIp = (String) request.getAttribute("clientIp");
+        String clientIp = request.getAttribute().getClientIp();
         if (clientIp != null && !clientIp.isEmpty()) {
             return clientIp;
         }

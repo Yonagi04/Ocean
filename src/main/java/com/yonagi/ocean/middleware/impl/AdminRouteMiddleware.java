@@ -39,7 +39,7 @@ public class AdminRouteMiddleware implements Middleware {
         if (metricsUri.equalsIgnoreCase(request.getUri()) ||
                 healthUri.equalsIgnoreCase(request.getUri()) ||
                 adminUri.equalsIgnoreCase(request.getUri())) {
-            String clientIp = (String) request.getAttribute("clientIp");
+            String clientIp = request.getAttribute().getClientIp();
             if (!AdminUtil.isIpInWhiteList(clientIp)) {
                 HttpResponse errorResponse = httpContext.getResponse().toBuilder()
                         .httpVersion(request.getHttpVersion())

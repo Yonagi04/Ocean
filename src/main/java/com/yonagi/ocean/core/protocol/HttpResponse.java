@@ -94,7 +94,7 @@ public class HttpResponse {
      * 将响应以正确的 HTTP 报文格式写入输出流，支持Keep-Alive
      */
     public void write(HttpRequest request, OutputStream outputStream, boolean keepAlive) throws IOException {
-        Map<String, String> corsHeaders = (Map<String, String>) request.getAttribute("CorsResponseHeaders");
+        Map<String, String> corsHeaders = request.getAttribute().getCorsResponseHeaders();
         if (corsHeaders != null && !corsHeaders.isEmpty()) {
             if (this.headers == null) {
                 this.headers = new HashMap<>();
@@ -166,7 +166,7 @@ public class HttpResponse {
     }
 
     public void writeStreaming(HttpRequest request, OutputStream outputStream, boolean keepAlive, long contentLength) throws IOException {
-        Map<String, String> corsHeaders = (Map<String, String>) request.getAttribute("CorsResponseHeaders");
+        Map<String, String> corsHeaders = request.getAttribute().getCorsResponseHeaders();
         if (corsHeaders != null && !corsHeaders.isEmpty()) {
             if (this.headers == null) {
                 this.headers = new HashMap<>();

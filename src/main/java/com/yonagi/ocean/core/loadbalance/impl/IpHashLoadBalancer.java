@@ -31,7 +31,7 @@ public class IpHashLoadBalancer extends AbstractLoadBalancer {
             log.warn("No upstreams available");
             return null;
         }
-        String clientIp = (String) request.getAttribute("clientIp");
+        String clientIp = request.getAttribute().getClientIp();
         int listSize = upstreams.size();
         int hash = clientIp.hashCode();
         int startIndex = Math.abs(hash) % listSize;

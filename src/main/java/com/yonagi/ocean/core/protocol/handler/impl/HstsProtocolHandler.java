@@ -41,7 +41,7 @@ public class HstsProtocolHandler implements HttpProtocolHandler {
             }
             headers.put("Strict-Transport-Security", hstsValue.toString());
         }
-        request.setAttribute("HstsHeaders", headers);
+        request.getAttribute().setHstsHeaders(headers);
         return request;
     }
 }

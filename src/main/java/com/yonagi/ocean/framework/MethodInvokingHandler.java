@@ -186,7 +186,7 @@ public class MethodInvokingHandler implements RequestHandler {
         Object[] args = new Object[parameters.length];
 
         @SuppressWarnings("unchecked")
-        Map<String, String> pathVariables = (Map<String, String>) request.getAttribute("PathVariableAttributes");
+        Map<String, String> pathVariables = request.getAttribute().getPathVariableAttributes();
         Map<String, String> queryParameters = request.getQueryParams();
 
         for (int i = 0; i < parameters.length; i++) {

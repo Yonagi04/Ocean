@@ -109,8 +109,8 @@ public class ClientHandler implements Runnable {
                 if (currentRequest == null) {
                     break;
                 }
-                currentRequest.setAttribute("clientIp", client.getInetAddress().getHostAddress());
-                currentRequest.setAttribute("isSsl", connectionContext.isSsl());
+                currentRequest.getAttribute().setClientIp(client.getInetAddress().getHostAddress());
+                currentRequest.getAttribute().setSsl(connectionContext.isSsl());
 
                 boolean shouldKeepAlive = shouldKeepAlive(currentRequest);
                 if (!shouldKeepAlive) {

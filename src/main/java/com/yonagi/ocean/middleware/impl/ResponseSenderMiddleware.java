@@ -28,7 +28,7 @@ public class ResponseSenderMiddleware implements Middleware {
                 HttpResponse response = httpContext.getResponse();
                 String traceId = httpContext.getTraceId();
                 String sessionId = httpContext.getSessionId();
-                boolean isSetCookie = Boolean.TRUE.equals(httpContext.getRequest().getAttribute("isSetCookie"));
+                boolean isSetCookie = Boolean.TRUE.equals(httpContext.getRequest().getAttribute().getSetCookie());
 
                 Map<String, String> headers = response.getHeaders() != null
                         ? new HashMap<>(response.getHeaders())

@@ -48,7 +48,7 @@ public class UploadFileHandler implements RequestHandler {
     @Override
     public void handle(HttpContext httpContext) throws IOException {
         HttpRequest request = httpContext.getRequest();
-        Map<String, String> headers = (Map<String, String>) request.getAttribute("HstsHeaders");
+        Map<String, String> headers = request.getAttribute().getHstsHeaders();
 
         if (request.getMethod() != HttpMethod.POST) {
             HttpResponse response = httpContext.getResponse().toBuilder()

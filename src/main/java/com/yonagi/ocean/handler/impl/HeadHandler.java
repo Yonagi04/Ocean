@@ -34,7 +34,7 @@ public class HeadHandler implements RequestHandler {
     @Override
     public void handle(HttpContext httpContext) throws IOException {
         HttpRequest request = httpContext.getRequest();
-        Map<String, String> headers = (Map<String, String>) request.getAttribute("HstsHeaders");
+        Map<String, String> headers = request.getAttribute().getHstsHeaders();
 
         String uri = request.getUri();
         if ("/".equals(uri)) {
@@ -62,8 +62,8 @@ public class HeadHandler implements RequestHandler {
         httpContext.setResponse(response);
     }
     
-    private void writeNotFound(HttpContext httpContext) throws IOException {
-        Map<String, String> headers = (Map<String, String>) httpContext.getRequest().getAttribute("HstsHeaders");
+    private void writeNotFound(HttpContext httpContext) {
+        Map<String, String> headers = httpContext.getRequest().getAttribute().getHstsHeaders();
         HttpResponse response = httpContext.getResponse().toBuilder()
                 .httpVersion(HttpVersion.HTTP_1_1)
                 .httpStatus(HttpStatus.NOT_FOUND)

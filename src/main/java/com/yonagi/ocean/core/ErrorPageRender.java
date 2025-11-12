@@ -25,12 +25,12 @@ public class ErrorPageRender {
         HttpRequest request = httpContext.getRequest();
         HttpResponse response = httpContext.getResponse();
 
-        String clientIp = (String) request.getAttributeOrDefault("clientIp", "");
+        String clientIp = request.getAttribute().getClientIp() == null ? "" : request.getAttribute().getClientIp();
         String userAgent = request.getHeaders().getOrDefault("user-agent", "Unknown");
         String method = request.getMethod() != null ? request.getMethod().name() : "UNKNOWN";
         String uri = request.getUri();
         String timestamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
-        String traceId = (String) request.getAttributeOrDefault("traceId", "");
+        String traceId = httpContext.getTraceId();
 
         Map<String, Object> data = Map.ofEntries(
                 Map.entry("traceId", traceId),

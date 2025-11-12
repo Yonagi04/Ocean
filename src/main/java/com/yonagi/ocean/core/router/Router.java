@@ -344,7 +344,7 @@ public class Router {
             }
 
             if (match) {
-                request.setAttribute("PathVariableAttributes", pathVariables);
+                request.getAttribute().setPathVariableAttributes(pathVariables);
                 log.debug("Found Controller path match for: {} {} (Pattern: {})", method, requestPath, entry.config.getPath());
                 return entry;
             }
@@ -429,9 +429,9 @@ public class Router {
             log.debug("Handling request with dynamic router: {} -> {}", request.getUri(), handlerClassName);
             if (routeType == RouteType.REDIRECT) {
                 // 对于重定向，传递目标URL和状态码
-                request.setAttribute("targetUrl", routeConfig.getTargetUrl());
-                request.setAttribute("statusCode", routeConfig.getStatusCode() == null ? 302 : routeConfig.getStatusCode());
-                request.setAttribute("contentType", routeConfig.getContentType());
+                request.getAttribute().setTargetUrl(routeConfig.getTargetUrl());
+                request.getAttribute().setRedirectStatusCode(routeConfig.getStatusCode() == null ? 302 : routeConfig.getStatusCode());
+                request.getAttribute().setRedirectContentType(routeConfig.getContentType());
                 httpContext.setRequest(request);
             }
             handler.handle(httpContext);

@@ -185,7 +185,7 @@ public class ReverseProxyHandler implements RequestHandler {
                 return;
             }
             loadBalancer.reportFailure(upstreamUri.toString(), System.currentTimeMillis());
-            log.debug("[{}] Request from {} reported failure to load balancer for upstream {}", traceId, request.getAttribute("clientIp"), upstreamUri);
+            log.debug("[{}] Request from {} reported failure to load balancer for upstream {}", traceId, request.getAttribute().getClientIp(), upstreamUri);
         } catch (HttpTimeoutException e) {
             HttpResponse errorResponse = httpContext.getResponse().toBuilder()
                     .httpVersion(request.getHttpVersion())
@@ -267,7 +267,7 @@ public class ReverseProxyHandler implements RequestHandler {
         });
         
         // 添加 X-Forwarded-For 头部
-        String clientIp = (String) request.getAttribute("clientIp");
+        String clientIp = request.getAttribute().getClientIp();
         if (clientIp != null) {
             requestBuilder.header("X-Forwarded-For", clientIp);
         }

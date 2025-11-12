@@ -59,7 +59,7 @@ public class CorsPreflightProtocolHandler implements HttpProtocolHandler {
         boolean isPreflightTerminated = headers != null && "true".equals(headers.get("__IS_PREFLIGHT__"));
         if (isPreflightTerminated) {
             log.info("CORS preflight request (OPTIONS) handled and terminated");
-            Map<String, String> hstsHeaders = (Map<String, String>) request.getAttribute("HstsHeaders");
+            Map<String, String> hstsHeaders = request.getAttribute().getHstsHeaders();
             if (hstsHeaders != null && !hstsHeaders.isEmpty()) {
                 headers.putAll(hstsHeaders);
             }
@@ -77,7 +77,7 @@ public class CorsPreflightProtocolHandler implements HttpProtocolHandler {
 
         if (headers != null && !headers.isEmpty()) {
             headers.remove("__IS_PREFLIGHT__");
-            request.setAttribute("CorsResponseHeaders", headers);
+            request.getAttribute().setCorsResponseHeaders(headers);
         }
         return request;
     }

@@ -35,7 +35,7 @@ public class UserIdMiddleware implements Middleware {
         }
         httpContext.setSessionId(sessionId);
         if (isSetCookie) {
-            request.setAttribute("isSetCookie", true);
+            request.getAttribute().setSetCookie(true);
         }
         executor.proceed(httpContext);
     }
