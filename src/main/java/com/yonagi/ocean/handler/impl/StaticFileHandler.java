@@ -115,6 +115,7 @@ public class StaticFileHandler implements RequestHandler {
                     .httpVersion(request.getHttpVersion())
                     .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
                     .contentType(ContentType.TEXT_HTML)
+                    .headers(headers)
                     .build();
             httpContext.setResponse(errorResponse);
             ErrorPageRender.render(httpContext);

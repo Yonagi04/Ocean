@@ -23,6 +23,7 @@ public class HttpContext {
     private final ConnectionContext connectionContext;
     private final AtomicBoolean commited = new AtomicBoolean(false);
     private String traceId;
+    private String sessionId;
 
     public HttpContext(HttpRequest request, HttpResponse response, OutputStream output,
                        boolean keepalive, ConnectionContext connectionContext) {
@@ -79,5 +80,13 @@ public class HttpContext {
 
     public String getTraceId() {
         return traceId;
+    }
+
+    public void setSessionId(String sessionId) {
+        this.sessionId = sessionId;
+    }
+
+    public String getSessionId() {
+        return sessionId;
     }
 }

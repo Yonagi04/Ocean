@@ -20,12 +20,7 @@ public class TraceMiddleware implements Middleware {
     @Override
     public void handle(HttpContext httpContext, ChainExecutor executor) throws Exception {
         String traceId = UUIDUtil.getUUID();
-        HttpRequest request = httpContext.getRequest();
-        if (request.getAttribute("traceId") == null || ((String) request.getAttribute("traceId")).isEmpty()) {
-            request.setAttribute("traceId", traceId);
-        }
         httpContext.setTraceId(traceId);
-        httpContext.setRequest(request);
 
         executor.proceed(httpContext);
     }
