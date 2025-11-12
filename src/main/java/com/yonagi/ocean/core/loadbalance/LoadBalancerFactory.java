@@ -9,6 +9,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * @author Yonagi
@@ -21,8 +23,10 @@ public class LoadBalancerFactory {
 
     private static final Map<String, LoadBalancer> LOAD_BALANCER_CACHE = new ConcurrentHashMap<>();
     private static final ScheduledExecutorService SCHEDULER = Executors.newScheduledThreadPool(1);
+    private static final AtomicBoolean enableScheduler = new AtomicBoolean(false);
 
     public static LoadBalancer createOrGetLoadBalancer(LoadBalancerConfig config) {
+        startCacheClearScheduler();
         Strategy strategy = config.getStrategy();
         String cacheKey = config.getCacheKey();
         return LOAD_BALANCER_CACHE.putIfAbsent(cacheKey, createLoadBalancer(config, strategy));
@@ -39,7 +43,9 @@ public class LoadBalancerFactory {
         };
     }
 
-    static {
-        SCHEDULER.schedule(LOAD_BALANCER_CACHE::clear, 1, TimeUnit.DAYS);
+    private static void startCacheClearScheduler() {
+        if (enableScheduler.compareAndSet(false, true)) {
+            SCHEDULER.scheduleAtFixedRate(LOAD_BALANCER_CACHE::clear, 1, 1, TimeUnit.DAYS);
+        }
     }
 }
