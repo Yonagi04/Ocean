@@ -1,6 +1,7 @@
 package com.yonagi.ocean.core.reverseproxy;
 
 import com.alibaba.nacos.api.config.ConfigService;
+import com.yonagi.ocean.core.loadbalance.config.Upstream;
 import com.yonagi.ocean.core.reverseproxy.config.ReverseProxyConfig;
 import com.yonagi.ocean.core.reverseproxy.config.source.ConfigSource;
 import com.yonagi.ocean.core.reverseproxy.config.source.MutableConfigSource;
@@ -9,8 +10,10 @@ import com.yonagi.ocean.spi.ConfigRecoveryAction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -75,6 +78,18 @@ public class ReverseProxyManager {
                     config.getLbConfig().setVersion(newVersion);
                 }
             });
+
+            Set<String> oldUpstreams = extractUpstreams(this.reverseProxyConfigs);
+            Set<String> newUpstreams = extractUpstreams(newConfigs);
+            oldUpstreams.removeAll(newUpstreams);
+            for (String removedUrl : oldUpstreams) {
+                HttpClientManager.removeClient(removedUrl);
+            }
+
+            for (String addedUrl : newUpstreams) {
+                HttpClientManager.getClient(URI.create(addedUrl));
+            }
+
             this.reverseProxyConfigs = newConfigs;
             this.handlerCache.clear();
             log.info("Reverse Proxy rules refreshed - Total rules: {}", reverseProxyConfigs.size());
@@ -96,6 +111,17 @@ public class ReverseProxyManager {
     public ReverseProxyHandler getOrCreateHandler(ReverseProxyConfig config) {
         String key = config.getId();
         return handlerCache.computeIfAbsent(key, k -> new ReverseProxyHandler(config));
+    }
+
+    private Set<String> extractUpstreams(List<ReverseProxyConfig> configs) {
+        if (configs == null) {
+            return Set.of();
+        }
+        return configs.stream()
+                .filter(c -> c.getLbConfig() != null)
+                .flatMap(c -> c.getLbConfig().getUpstreams().stream())
+                .map(Upstream::getUrl)
+                .collect(java.util.stream.Collectors.toSet());
     }
 
     public void shutdownAll() {

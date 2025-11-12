@@ -43,17 +43,12 @@ public class ReverseProxyHandler implements RequestHandler {
     private static final double WEIGHT_ADJUSTMENT_FACTOR = 0.1;
 
     private final ReverseProxyConfig proxyConfig;
-    private final HttpClient httpClient;
     private final LoadBalancer loadBalancer;
     private final HealthChecker healthChecker;
     private Upstream selectedUpstream;
 
     public ReverseProxyHandler(ReverseProxyConfig proxyConfig) {
         this.proxyConfig = proxyConfig;
-        this.httpClient = HttpClient.newBuilder()
-                .followRedirects(HttpClient.Redirect.NEVER)
-                .connectTimeout(Duration.ofSeconds(5))
-                .build();
         boolean enableLb = Boolean.parseBoolean(LocalConfigLoader.getProperty("server.load_balance.enabled", "false"));
         if (enableLb) {
             this.loadBalancer = LoadBalancerFactory.createOrGetLoadBalancer(proxyConfig.getLbConfig());
@@ -145,6 +140,7 @@ public class ReverseProxyHandler implements RequestHandler {
             java.net.http.HttpResponse<byte[]> upstreamResponse;
             try {
                 long startTime = System.currentTimeMillis();
+                HttpClient httpClient = HttpClientManager.getClient(upstreamUri);
                 upstreamResponse = httpClient.send(
                         upstreamRequest,
                         java.net.http.HttpResponse.BodyHandlers.ofByteArray()
