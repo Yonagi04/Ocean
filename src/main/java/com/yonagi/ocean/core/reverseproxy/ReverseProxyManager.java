@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * @author Yonagi
@@ -51,6 +52,8 @@ public class ReverseProxyManager {
 
     private final Map<String, ReverseProxyHandler> handlerCache = new ConcurrentHashMap<>();
 
+    private final AtomicLong versionCenter = new AtomicLong(0);
+
     public ReverseProxyManager() {
 
     }
@@ -65,7 +68,14 @@ public class ReverseProxyManager {
 
     public void refreshReverseProxyConfigs(ConfigSource source) {
         try {
-            this.reverseProxyConfigs = source.load();
+            List<ReverseProxyConfig> newConfigs = source.load();
+            long newVersion = this.versionCenter.incrementAndGet();
+            newConfigs.forEach(config -> {
+                if (config.getLbConfig() != null) {
+                    config.getLbConfig().setVersion(newVersion);
+                }
+            });
+            this.reverseProxyConfigs = newConfigs;
             this.handlerCache.clear();
             log.info("Reverse Proxy rules refreshed - Total rules: {}", reverseProxyConfigs.size());
         } catch (Exception e) {

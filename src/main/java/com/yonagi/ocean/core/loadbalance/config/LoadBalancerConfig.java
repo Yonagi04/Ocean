@@ -8,6 +8,7 @@ import com.yonagi.ocean.core.loadbalance.config.enums.Strategy;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * @author Yonagi
@@ -25,6 +26,9 @@ public final class LoadBalancerConfig {
     private final long checkIntervalMs;
 
     private final List<Upstream> upstreams;
+
+    // 运行时状态：LB配置的版本号
+    private final AtomicLong version = new AtomicLong(0);
 
     @Override
     public int hashCode() {
@@ -60,5 +64,13 @@ public final class LoadBalancerConfig {
 
     public String getCacheKey() {
         return String.valueOf(this.hashCode());
+    }
+
+    public long getVersion() {
+        return version.get();
+    }
+
+    public void setVersion(long version) {
+        this.version.set(version);
     }
 }

@@ -14,7 +14,7 @@ import java.util.List;
  * @description
  * @date 2025/11/08 19:11
  */
-public class    ReverseProxyChecker {
+public class ReverseProxyChecker {
 
     private final ReverseProxyManager manager;
 

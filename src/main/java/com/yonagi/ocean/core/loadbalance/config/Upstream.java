@@ -4,10 +4,12 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.common.util.concurrent.AtomicDouble;
+import org.checkerframework.checker.guieffect.qual.UI;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 
 /**
  * @author Yonagi
@@ -40,7 +42,8 @@ public class Upstream {
     // 运行时状态： 节点的有效权重，用于加权轮询
     private final AtomicDouble effectiveWeight;
 
-    private final AtomicLong version = new AtomicLong(0);
+    // 运行时状态：节点状态变更回调
+    private transient Consumer<Upstream> onStageChange;
 
     @JsonCreator
     public Upstream(@JsonProperty("url") String url,
@@ -64,17 +67,17 @@ public class Upstream {
     }
 
     public void setHealthy(boolean healthy) {
-        isHealthy.set(healthy);
-        version.incrementAndGet();
-        lastCheckedTime = System.currentTimeMillis();
+        if (this.isHealthy.get() != healthy) {
+            isHealthy.set(healthy);
+            lastCheckedTime = System.currentTimeMillis();
+            if (onStageChange != null) {
+                onStageChange.accept(this);
+            }
+        }
     }
 
     public long getLastCheckedTime() {
         return lastCheckedTime;
-    }
-
-    public AtomicLong getVersion() {
-        return version;
     }
 
     public AtomicInteger getRetryCount() {
@@ -94,8 +97,16 @@ public class Upstream {
     }
 
     public void setEffectiveWeight(double effectiveWeight) {
-        this.effectiveWeight.set(effectiveWeight);
-        version.incrementAndGet();
+        if (effectiveWeight != this.effectiveWeight.get()) {
+            this.effectiveWeight.set(effectiveWeight);
+            if (onStageChange != null) {
+                onStageChange.accept(this);
+            }
+        }
+    }
+
+    public void setOnStageChange(Consumer<Upstream> listener) {
+        this.onStageChange = listener;
     }
 
     @Override
