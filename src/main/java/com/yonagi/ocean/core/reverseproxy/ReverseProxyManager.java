@@ -72,6 +72,9 @@ public class ReverseProxyManager {
     public void refreshReverseProxyConfigs(ConfigSource source) {
         try {
             List<ReverseProxyConfig> newConfigs = source.load();
+            List<ReverseProxyConfig> oldConfigs = reverseProxyConfigs;
+            this.reverseProxyConfigs = newConfigs;
+
             long newVersion = this.versionCenter.incrementAndGet();
             newConfigs.forEach(config -> {
                 if (config.getLbConfig() != null) {
@@ -79,9 +82,11 @@ public class ReverseProxyManager {
                 }
             });
 
-            Set<String> oldUpstreams = extractUpstreams(this.reverseProxyConfigs);
+            Set<String> oldUpstreams = extractUpstreams(oldConfigs);
             Set<String> newUpstreams = extractUpstreams(newConfigs);
-            oldUpstreams.removeAll(newUpstreams);
+            if (!oldUpstreams.isEmpty()) {
+                oldUpstreams.removeAll(newUpstreams);
+            }
             for (String removedUrl : oldUpstreams) {
                 HttpClientManager.removeClient(removedUrl);
             }
@@ -90,7 +95,6 @@ public class ReverseProxyManager {
                 HttpClientManager.getClient(URI.create(addedUrl));
             }
 
-            this.reverseProxyConfigs = newConfigs;
             this.handlerCache.clear();
             log.info("Reverse Proxy rules refreshed - Total rules: {}", reverseProxyConfigs.size());
         } catch (Exception e) {
