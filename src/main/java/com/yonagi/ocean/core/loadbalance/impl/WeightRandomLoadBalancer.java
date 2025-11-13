@@ -3,6 +3,7 @@ package com.yonagi.ocean.core.loadbalance.impl;
 import com.yonagi.ocean.core.loadbalance.AbstractLoadBalancer;
 import com.yonagi.ocean.core.loadbalance.config.LoadBalancerConfig;
 import com.yonagi.ocean.core.loadbalance.config.Upstream;
+import com.yonagi.ocean.core.loadbalance.utils.GrayReleaseUtils;
 import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.core.reverseproxy.HttpClientManager;
 import com.yonagi.ocean.utils.LocalConfigLoader;
@@ -42,14 +43,19 @@ public class WeightRandomLoadBalancer extends AbstractLoadBalancer {
     });
     private final AtomicBoolean rebuildPending = new AtomicBoolean(false);
 
-    private volatile double[] prefixSumWeights;
     private volatile long latestLbConfigVersion = -1L;
 
-    private List<Upstream> healthyUpstreams;
+    private List<Upstream> normalHealthyUpstreams;
+    private volatile double[] normalPrefixSumWeights;
+    private List<Upstream> canaryHealthyUpstreams;
+    private volatile double[] canaryPrefixSumWeights;
 
     public WeightRandomLoadBalancer(LoadBalancerConfig config) {
         super(config);
         for (Upstream upstream : config.getUpstreams()) {
+            upstream.setOnStageChange(this::onUpstreamChanged);
+        }
+        for (Upstream upstream : config.getCanaryUpstreams()) {
             upstream.setOnStageChange(this::onUpstreamChanged);
         }
         rebuildCache();
@@ -57,6 +63,7 @@ public class WeightRandomLoadBalancer extends AbstractLoadBalancer {
 
     @Override
     public Upstream choose(HttpRequest request) {
+        boolean useCanary = GrayReleaseUtils.isGrayRelease(request, config.getCanaryPercent());
         readLock.lock();
         try {
             long currentLbConfigVersion = config.getVersion();
@@ -66,7 +73,8 @@ public class WeightRandomLoadBalancer extends AbstractLoadBalancer {
                 readLock.lock();
             }
 
-            double[] prefix = prefixSumWeights;
+            List<Upstream> targetUpstreams = useCanary ? canaryHealthyUpstreams : normalHealthyUpstreams;
+            double[] prefix = useCanary ? canaryPrefixSumWeights : normalPrefixSumWeights;
             if (prefix == null || prefix.length == 0) {
                 return null;
             }
@@ -76,7 +84,7 @@ public class WeightRandomLoadBalancer extends AbstractLoadBalancer {
             if (idx < 0) {
                 idx = -idx - 1;
             }
-            return healthyUpstreams.get(idx);
+            return targetUpstreams.get(idx);
         } finally {
             readLock.unlock();
         }
@@ -86,17 +94,24 @@ public class WeightRandomLoadBalancer extends AbstractLoadBalancer {
         writeLock.lock();
         try {
             this.latestLbConfigVersion = config.getVersion();
-            healthyUpstreams = getHealthyUpstreams();
-            double[] prefix = new double[healthyUpstreams.size()];
-            double sum = 0.0d;
-            for (int i = 0; i < healthyUpstreams.size(); i++) {
-                sum += healthyUpstreams.get(i).getEffectiveWeight().get();
-                prefix[i] = sum;
-            }
-            this.prefixSumWeights = prefix;
+
+            this.normalHealthyUpstreams = selectHealthyUpstreams(config.getUpstreams());
+            this.normalPrefixSumWeights = buildPrefixSum(normalHealthyUpstreams);
+            this.canaryHealthyUpstreams = selectHealthyUpstreams(config.getCanaryUpstreams());
+            this.canaryPrefixSumWeights = buildPrefixSum(canaryHealthyUpstreams);
         } finally {
             writeLock.unlock();
         }
+    }
+
+    private double[] buildPrefixSum(List<Upstream> upstreams) {
+        double[] prefix = new double[upstreams.size()];
+        double sum = 0.0d;
+        for (int i = 0; i < upstreams.size(); i++) {
+            sum += upstreams.get(i).getEffectiveWeight().get();
+            prefix[i] = sum;
+        }
+        return prefix;
     }
 
     private void onUpstreamChanged(Upstream upstream) {

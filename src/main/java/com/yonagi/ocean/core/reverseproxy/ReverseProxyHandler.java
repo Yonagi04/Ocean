@@ -180,7 +180,7 @@ public class ReverseProxyHandler implements RequestHandler {
             ErrorPageRender.render(httpContext);
             String message = e.getMessage();
             log.error("[{}] {} Service Unavailable when proxying request to upstream {}: {}", traceId, configId, upstreamUri, message, e);
-            if (message.contains("Connection reset")) {
+            if (message != null && message.contains("Connection reset")) {
                 decreaseUpstreamWeight();
                 return;
             }

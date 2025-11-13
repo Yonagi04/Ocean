@@ -22,7 +22,7 @@ public class NoneLoadBalancer extends AbstractLoadBalancer {
 
     @Override
     public Upstream choose(HttpRequest request) {
-        List<Upstream> healthyUpstreams = getHealthyUpstreams();
+        List<Upstream> healthyUpstreams = selectHealthyUpstreams(this.config.getUpstreams());
         if (healthyUpstreams.isEmpty()) {
             return null;
         }

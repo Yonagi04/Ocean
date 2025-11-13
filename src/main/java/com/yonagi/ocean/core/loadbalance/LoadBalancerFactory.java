@@ -28,7 +28,7 @@ public class LoadBalancerFactory {
         startCacheClearScheduler();
         Strategy strategy = config.getStrategy();
         String cacheKey = config.getCacheKey();
-        return LOAD_BALANCER_CACHE.putIfAbsent(cacheKey, createLoadBalancer(config, strategy));
+        return LOAD_BALANCER_CACHE.computeIfAbsent(cacheKey, k -> createLoadBalancer(config, strategy));
     }
 
     public static LoadBalancer createLoadBalancer(LoadBalancerConfig config, Strategy strategy) {

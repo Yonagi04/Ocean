@@ -25,8 +25,6 @@ import java.util.stream.Collectors;
  */
 public class RoundRobinLoadBalancer extends AbstractLoadBalancer {
 
-    private static final Logger log = LoggerFactory.getLogger(RoundRobinLoadBalancer.class);
-
     private final AtomicInteger counter = new AtomicInteger(0);
 
     public RoundRobinLoadBalancer(LoadBalancerConfig config) {
@@ -35,7 +33,7 @@ public class RoundRobinLoadBalancer extends AbstractLoadBalancer {
 
     @Override
     public Upstream choose(HttpRequest request) {
-        List<Upstream> healthyUpstreams = getHealthyUpstreams();
+        List<Upstream> healthyUpstreams = selectHealthyUpstreams(getTargetUpstreams(request));
         if (healthyUpstreams.isEmpty()) {
             return null;
         }

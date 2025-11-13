@@ -23,9 +23,13 @@ public final class LoadBalancerConfig {
 
     private final HealthCheckMode healthCheckMode;
 
-    private final long checkIntervalMs;
+    private final Long checkIntervalMs;
 
     private final List<Upstream> upstreams;
+
+    private final List<Upstream> canaryUpstreams;
+
+    private final Integer canaryPercent;
 
     // 运行时状态：LB配置的版本号
     private final AtomicLong version = new AtomicLong(0);
@@ -38,12 +42,16 @@ public final class LoadBalancerConfig {
     @JsonCreator
     public LoadBalancerConfig(@JsonProperty("strategy") Strategy strategy,
                               @JsonProperty("healthCheckMode") HealthCheckMode healthCheckMode,
-                              @JsonProperty("checkIntervalMs") long checkIntervalMs,
-                              @JsonProperty("upstreams") List<Upstream> upstreams) {
+                              @JsonProperty("checkIntervalMs") Long checkIntervalMs,
+                              @JsonProperty("upstreams") List<Upstream> upstreams,
+                              @JsonProperty("canaryUpstreams") List<Upstream> canaryUpstreams,
+                              @JsonProperty("canaryPercent") Integer canaryPercent) {
         this.strategy = strategy;
         this.healthCheckMode = healthCheckMode;
         this.checkIntervalMs = checkIntervalMs;
         this.upstreams = new ArrayList<>(upstreams);
+        this.canaryUpstreams = new ArrayList<>(canaryUpstreams);
+        this.canaryPercent = canaryPercent;
     }
 
     public Strategy getStrategy() {
@@ -54,12 +62,20 @@ public final class LoadBalancerConfig {
         return healthCheckMode;
     }
 
-    public long getCheckIntervalMs() {
+    public Long getCheckIntervalMs() {
         return checkIntervalMs;
     }
 
     public List<Upstream> getUpstreams() {
         return upstreams;
+    }
+
+    public List<Upstream> getCanaryUpstreams() {
+        return canaryUpstreams;
+    }
+
+    public Integer getCanaryPercent() {
+        return canaryPercent;
     }
 
     public String getCacheKey() {

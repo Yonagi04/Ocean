@@ -22,7 +22,7 @@ public class WeightRoundRobinLoadBalancer extends AbstractLoadBalancer {
     public Upstream choose(HttpRequest request) {
         double total = 0.0d;
         Upstream selected = null;
-        for (Upstream upstream : getHealthyUpstreams()) {
+        for (Upstream upstream : selectHealthyUpstreams(getTargetUpstreams(request))) {
             upstream.getCurrentWeight().addAndGet(upstream.getEffectiveWeight().get());
             total += upstream.getEffectiveWeight().get();
             if (selected == null || upstream.getCurrentWeight().get() > selected.getCurrentWeight().get()) {

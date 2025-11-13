@@ -26,9 +26,8 @@ public class IpHashLoadBalancer extends AbstractLoadBalancer {
 
     @Override
     public Upstream choose(HttpRequest request) {
-        List<Upstream> upstreams = config.getUpstreams();
+        List<Upstream> upstreams = selectHealthyUpstreams(getTargetUpstreams(request));
         if (upstreams.isEmpty()) {
-            log.warn("No upstreams available");
             return null;
         }
         String clientIp = request.getAttribute().getClientIp();

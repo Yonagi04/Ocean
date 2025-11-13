@@ -5,6 +5,8 @@ import com.yonagi.ocean.core.loadbalance.config.Upstream;
 import com.yonagi.ocean.core.loadbalance.config.enums.HealthCheckMode;
 import com.yonagi.ocean.core.loadbalance.config.enums.Strategy;
 import com.yonagi.ocean.core.loadbalance.impl.WeightRandomLoadBalancer;
+import com.yonagi.ocean.core.loadbalance.utils.GrayReleaseUtils;
+import com.yonagi.ocean.core.protocol.HttpRequest;
 import com.yonagi.ocean.utils.LocalConfigLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,6 +41,25 @@ public abstract class AbstractLoadBalancer implements LoadBalancer {
         return config.getUpstreams().stream()
                 .filter(Upstream::isHealthy)
                 .collect(Collectors.toList());
+    }
+
+    protected List<Upstream> selectHealthyUpstreams(List<Upstream> upstreams) {
+        return upstreams.stream()
+                .filter(Upstream::isHealthy)
+                .collect(Collectors.toList());
+    }
+
+    protected List<Upstream> getTargetUpstreams(HttpRequest request) {
+        LoadBalancerConfig lbConfig = config;
+        boolean useCanary = false;
+        String sessionId = request.getAttribute().getSessionId();
+        if (sessionId != null && lbConfig.getCanaryUpstreams() != null) {
+            useCanary = GrayReleaseUtils.isGrayRelease(request, config.getCanaryPercent());
+            if (useCanary) {
+                log.debug("Using canary upstreams for session ID: {}", sessionId);
+            }
+        }
+        return useCanary ? lbConfig.getCanaryUpstreams() : lbConfig.getUpstreams();
     }
 
     @Override
