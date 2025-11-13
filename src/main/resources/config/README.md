@@ -82,7 +82,7 @@ This file defines the reverse proxy configuration for the Ocean. Each entry spec
     "stripPrefix": false,
     "timeout": 3000,
     "lbConfig": {
-      "strategy": "NONE",
+      "strategy": "WEIGHT_ROUND_ROBIN",
       "healthCheckMode": "DISABLED",
       "checkIntervalMs": 3000,
       "upstreams": [
@@ -90,7 +90,14 @@ This file defines the reverse proxy configuration for the Ocean. Each entry spec
           "url": "http://localhost:8088",
           "weight": 1.0
         }
-      ]
+      ],
+      "canaryUpstreams": [
+        {
+          "url": "http://localhost:8089",
+          "weight": 1.0
+        }
+      ],
+      "canaryPercent": 30
     },
     "addHeaders": {
       "testHeader": "token"
@@ -110,6 +117,8 @@ This file defines the reverse proxy configuration for the Ocean. Each entry spec
   - `upstreams`: A list of upstream backend servers.
     - `url`: The URL of the upstream server.
     - `weight`: The weight of the upstream server for load balancing, between 0 and 1.
+    - `canaryUpstreams`: A list of canary upstream backend servers for canary deployments.
+    - `canaryPercent`: The percentage of traffic to route to canary upstreams (0-100).
 - `addHeaders`: A map of additional headers to add to requests forwarded to the backend.
 
 If you set `healthChechMode` to **ACTIVE_CHECK** or **PASSIVE_CHECK**, Ocean will set up a simple client to periodically check the health status of each upstream server.

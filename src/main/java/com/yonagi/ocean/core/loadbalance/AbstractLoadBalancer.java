@@ -13,10 +13,12 @@ import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * @author Yonagi
@@ -35,12 +37,6 @@ public abstract class AbstractLoadBalancer implements LoadBalancer {
 
     public AbstractLoadBalancer(LoadBalancerConfig config) {
         this.config = config;
-    }
-
-    protected List<Upstream> getHealthyUpstreams() {
-        return config.getUpstreams().stream()
-                .filter(Upstream::isHealthy)
-                .collect(Collectors.toList());
     }
 
     protected List<Upstream> selectHealthyUpstreams(List<Upstream> upstreams) {
@@ -70,40 +66,45 @@ public abstract class AbstractLoadBalancer implements LoadBalancer {
         URI uri = URI.create(url);
         String failedHost = uri.getScheme() + "://" + uri.getAuthority();
 
-        config.getUpstreams().stream()
-                .filter(u -> u.getUrl().equals(failedHost))
-                .findFirst()
-                .ifPresent(upstream -> {
-                    if (!upstream.getRecovering().compareAndSet(false, true)) {
-                        return;
-                    }
+        findUpstreamByHost(failedHost).ifPresent(upstream -> {
+            if (!upstream.getRecovering().compareAndSet(false, true)) {
+                return;
+            }
 
-                    upstream.setHealthy(false);
-                    log.error("PASSIVE CHECK: Upstream {} marked UNHEALTHY due to request failure.", url);
+            upstream.setHealthy(false);
+            log.error("PASSIVE CHECK: Upstream {} marked UNHEALTHY due to request failure.", url);
 
-                    long recoveryIntervalMillis = Long.parseLong(LocalConfigLoader.getProperty("server.load_balance.recovery_interval_millis", "30000L"));
-                    scheduler.schedule(() -> {
-                        try {
-                            boolean ok = HttpClient.checkHealth(upstream);
-                            if (ok) {
-                                upstream.setHealthy(true);
-                                upstream.getCurrentWeight().set(0.0d);
-                                log.info("PASSIVE CHECK: Upstream {} automatically recovered.", failedHost);
-                            } else {
-                                upstream.getRecovering().set(false);
-                                upstream.getRetryCount().getAndIncrement();
-                                if (upstream.getRetryCount().get() == Integer.parseInt(LocalConfigLoader.getProperty("server.load_balance.failure_threshold", "3"))) {
-                                    log.warn("PASSIVE CHECK: Upstream {} reached max retry attempts, will not retry further until next failure.", failedHost);
-                                    return;
-                                }
-                                log.warn("PASSIVE CHECK: Upstream {} recovery failed, retrying...", failedHost);
-                                reportFailure(url, failureTime);
-                            }
-                        } finally {
-                            upstream.getRecovering().set(false);
+            long recoveryIntervalMillis = Long.parseLong(LocalConfigLoader.getProperty("server.load_balance.recovery_interval_millis", "30000L"));
+            scheduler.schedule(() -> {
+                try {
+                    boolean ok = HttpClient.checkHealth(upstream);
+                    if (ok) {
+                        upstream.setHealthy(true);
+                        upstream.getCurrentWeight().set(0.0d);
+                        log.info("PASSIVE CHECK: Upstream {} automatically recovered.", failedHost);
+                    } else {
+                        upstream.getRecovering().set(false);
+                        upstream.getRetryCount().getAndIncrement();
+                        if (upstream.getRetryCount().get() == Integer.parseInt(LocalConfigLoader.getProperty("server.load_balance.failure_threshold", "3"))) {
+                            log.warn("PASSIVE CHECK: Upstream {} reached max retry attempts, will not retry further until next failure.", failedHost);
+                            return;
                         }
+                        log.warn("PASSIVE CHECK: Upstream {} recovery failed, retrying...", failedHost);
+                        reportFailure(url, failureTime);
+                    }
+                } finally {
+                    upstream.getRecovering().set(false);
+                }
 
-                    }, recoveryIntervalMillis, TimeUnit.MILLISECONDS);
-                });
+            }, recoveryIntervalMillis, TimeUnit.MILLISECONDS);
+        });
+    }
+
+    private Optional<Upstream> findUpstreamByHost(String host) {
+        Stream<Upstream> allUpstreams = Stream.concat(
+                config.getUpstreams().stream(),
+                config.getCanaryUpstreams().stream()
+        );
+        return allUpstreams.filter(u -> u.getUrl().equals(host)).findFirst();
     }
 }

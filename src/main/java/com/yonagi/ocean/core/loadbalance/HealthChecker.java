@@ -48,6 +48,10 @@ public class HealthChecker {
             boolean isHealthy = HttpClient.checkHealth(upstream);
             upstream.setHealthy(isHealthy);
         }
+        for (Upstream upstream : config.getCanaryUpstreams()) {
+            boolean isHealthy = HttpClient.checkHealth(upstream);
+            upstream.setHealthy(isHealthy);
+        }
     }
 
     public void stop() {
