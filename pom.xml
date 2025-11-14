@@ -26,6 +26,7 @@
         <reflections.version>0.9.11</reflections.version>
         <pebble.version>3.2.2</pebble.version>
         <micrometer.version>1.15.4</micrometer.version>
+        <apollo.version>1.7.0</apollo.version>
     </properties>
 
     <dependencies>
@@ -123,6 +124,13 @@
             <artifactId>micrometer-registry-prometheus</artifactId>
             <version>${micrometer.version}</version>
         </dependency>
+
+        <dependency>
+            <groupId>com.ctrip.framework.apollo</groupId>
+            <artifactId>apollo-client</artifactId>
+            <version>${apollo.version}</version>
+        </dependency>
+
     </dependencies>
 
     <build>
