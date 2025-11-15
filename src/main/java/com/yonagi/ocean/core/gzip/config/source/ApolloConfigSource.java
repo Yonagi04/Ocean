@@ -2,6 +2,7 @@ package com.yonagi.ocean.core.gzip.config.source;
 
 import com.ctrip.framework.apollo.Config;
 import com.ctrip.framework.apollo.ConfigService;
+import com.yonagi.ocean.backup.BackupScheduler;
 import com.yonagi.ocean.core.gzip.config.GzipConfig;
 import com.yonagi.ocean.utils.LocalConfigLoader;
 import org.slf4j.Logger;
@@ -74,6 +75,6 @@ public class ApolloConfigSource implements ConfigSource {
         }
         int syncIntervalSeconds = Integer.parseInt(LocalConfigLoader.getProperty("server.gzip.apollo.sync_interval_seconds", "7200"));
         String syncLocalPath = LocalConfigLoader.getProperty("server.gzip.apollo.sync_local_path");
-        // todo: 实现 Apollo 配置同步到本地文件的逻辑
+        BackupScheduler.startApolloTask(namespace, syncLocalPath, syncIntervalSeconds);
     }
 }

@@ -5,6 +5,7 @@ import com.ctrip.framework.apollo.ConfigService;
 import com.ctrip.framework.apollo.core.enums.ConfigFileFormat;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yonagi.ocean.backup.BackupScheduler;
 import com.yonagi.ocean.core.reverseproxy.config.ReverseProxyConfig;
 import com.yonagi.ocean.utils.LocalConfigLoader;
 import org.slf4j.Logger;
@@ -74,6 +75,6 @@ public class ApolloConfigSource implements ConfigSource {
         }
         int syncIntervalSeconds = Integer.parseInt(LocalConfigLoader.getProperty("server.reverse_proxy.apollo.sync_interval_seconds", "7200"));
         String syncLocalPath = LocalConfigLoader.getProperty("server.reverse_proxy.apollo.sync_local_path");
-        // todo: 实现 Apollo 配置同步到本地文件的逻辑
+        BackupScheduler.startApolloTask(namespace, syncLocalPath, syncIntervalSeconds);
     }
 }

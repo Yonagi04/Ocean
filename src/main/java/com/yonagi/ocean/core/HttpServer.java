@@ -6,6 +6,7 @@ import com.yonagi.ocean.admin.health.HealthIndicator;
 import com.yonagi.ocean.admin.health.impl.NacosHealthIndicator;
 import com.yonagi.ocean.admin.health.impl.ThreadPoolHealthIndicator;
 import com.yonagi.ocean.admin.health.impl.VirtualThreadHealthIndicator;
+import com.yonagi.ocean.backup.BackupScheduler;
 import com.yonagi.ocean.cache.StaticFileCacheFactory;
 import com.yonagi.ocean.core.config.KeepAliveConfig;
 import com.yonagi.ocean.core.context.ConnectionContext;
@@ -270,6 +271,7 @@ public class HttpServer {
         if (reverseProxyManager != null) {
             reverseProxyManager.shutdownAll();
         }
+        BackupScheduler.shutdownAll();
 
         log.info("Ocean stopped.");
         shutdownLatch.countDown();

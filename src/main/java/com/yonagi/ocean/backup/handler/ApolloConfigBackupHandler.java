@@ -7,12 +7,12 @@ import java.io.IOException;
  * @version 1.0
  * @program Ocean
  * @description
- * @date 2025/10/09 10:06
+ * @date 2025/11/14 20:24
  */
-public interface ConfigBackupHandler {
+public interface ApolloConfigBackupHandler {
     boolean supports(String type);
 
-    Object load(String dataId, String group, long timeoutMs);
+    Object load(String namespace);
 
     void save(Object config, String backupPath) throws IOException;
 }
