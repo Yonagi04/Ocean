@@ -38,6 +38,8 @@ public class ConfigManager implements ConfigSource {
 
     private Runnable changeCallback;
 
+    private volatile boolean nacosInitialFailure = false;
+
     public ConfigManager(ConfigService nacosConfigService) {
         String priorityStr = LocalConfigLoader.getProperty("server.cors.remote_sources.priority", "nacos,apollo");
         this.prioritySources = Arrays.stream(priorityStr.split(","))
@@ -62,13 +64,17 @@ public class ConfigManager implements ConfigSource {
         this.localSource = new LocalConfigSource();
         this.activeSource.set(localSource);
         if (prioritySources.contains(RemoteSource.NACOS)) {
-            NacosConfigLoader.registerRecoveryAction(configService -> startFailbackCheck(RemoteSource.NACOS.getName(), new NacosConfigSource(configService)));
+            NacosConfigLoader.registerRecoveryAction(configService -> {
+                if (nacosInitialFailure) {
+                    startFailbackCheck(RemoteSource.NACOS.getName(), new NacosConfigSource(configService));
+                }
+            });
         }
-        this.load();
     }
 
     @Override
     public CorsConfig load() {
+        boolean nacosLoadSuccess = true;
         for (RemoteSource sourceKey : prioritySources) {
             ConfigSource current = remoteSources.get(sourceKey);
             if (current == null) {
@@ -79,11 +85,21 @@ public class ConfigManager implements ConfigSource {
             if (config != null) {
                 activeSource.set(current);
                 log.info("Successfully loaded configuration from source: {}", sourceKey);
+                if (sourceKey == RemoteSource.NACOS) {
+                    nacosInitialFailure = false;
+                }
                 return config;
+            }
+            if (sourceKey == RemoteSource.NACOS) {
+                nacosLoadSuccess = false;
             }
         }
         log.warn("All remote configuration sources failed. Falling back to local configuration.");
         activeSource.set(localSource);
+        if (prioritySources.contains(RemoteSource.NACOS) && !nacosLoadSuccess) {
+            this.nacosInitialFailure = true;
+        }
+
         CorsConfig localConfig = localSource.load();
         return localConfig != null
                 ? localConfig

@@ -38,6 +38,8 @@ public class ConfigManager implements ConfigSource {
 
     private Runnable callback;
 
+    private volatile boolean nacosInitialFailure = false;
+
     public ConfigManager(ConfigService nacosConfigService) {
         String priorityStr = LocalConfigLoader.getProperty("server.router.remote_sources.priority", "nacos,apollo");
         this.prioritySources = List.of(priorityStr.split(",")).stream()
@@ -62,10 +64,13 @@ public class ConfigManager implements ConfigSource {
         this.localSource = new LocalConfigSource();
         this.activeSource.set(localSource);
         if (prioritySources.contains(RemoteSource.NACOS)) {
-            NacosConfigLoader.registerRecoveryAction(configService ->
-                    startFailbackCheck(RemoteSource.NACOS.name(), new NacosConfigSource(nacosConfigService)));
+            NacosConfigLoader.registerRecoveryAction(configService -> {
+                if (nacosInitialFailure) {
+                    startFailbackCheck(RemoteSource.NACOS.name(), new NacosConfigSource(nacosConfigService));
+                }
+            });
         }
-        this.load();
+//        this.load();
     }
 
     @Override
@@ -78,6 +83,7 @@ public class ConfigManager implements ConfigSource {
 
     @Override
     public List<RouteConfig> load() {
+        boolean nacosLoadSuccess = true;
         for (RemoteSource remoteSource : prioritySources) {
             ConfigSource configSource = remoteSources.get(remoteSource);
             if (configSource == null) {
@@ -88,11 +94,21 @@ public class ConfigManager implements ConfigSource {
             if (config != null) {
                 activeSource.set(configSource);
                 log.info("Configuration successfully loaded from primary source: {}", remoteSource);
+                if (remoteSource == RemoteSource.NACOS) {
+                    nacosInitialFailure = false;
+                }
                 return config;
+            }
+            if (remoteSource == RemoteSource.NACOS) {
+                nacosLoadSuccess = false;
             }
         }
         log.warn("All remote configuration sources failed. Falling back to Local configuration.");
         activeSource.set(localSource);
+        if (prioritySources.contains(RemoteSource.NACOS) && !nacosLoadSuccess) {
+            this.nacosInitialFailure = true;
+        }
+
         List<RouteConfig> localConfig = localSource.load();
         return localConfig != null
                 ? localConfig

@@ -39,6 +39,8 @@ public class ConfigManager implements ConfigSource {
 
     private Runnable changeCallback;
 
+    private volatile boolean nacosInitialFailure = false;
+
     public ConfigManager(ConfigService nacosConfigService) {
         String priorityStr = LocalConfigLoader.getProperty("server.gzip.remote_sources.priority", "nacos,apollo");
         this.prioritySources = Arrays.stream(priorityStr.split(","))
@@ -63,9 +65,12 @@ public class ConfigManager implements ConfigSource {
         this.localSource = new LocalConfigSource();
         this.activeSource.set(localSource);
         if (prioritySources.contains(RemoteSource.NACOS)) {
-            NacosConfigLoader.registerRecoveryAction(configService -> startFailbackCheck(RemoteSource.NACOS.name(), new NacosConfigSource(configService)));
+            NacosConfigLoader.registerRecoveryAction(configService -> {
+                if (nacosInitialFailure) {
+                    startFailbackCheck(RemoteSource.NACOS.name(), new NacosConfigSource(configService));
+                }
+            });
         }
-        this.load();
     }
 
     @Override
@@ -78,6 +83,7 @@ public class ConfigManager implements ConfigSource {
 
     @Override
     public GzipConfig load() {
+        boolean nacosLoadSuccess = true;
         for (RemoteSource sourceKey : prioritySources) {
             ConfigSource current = remoteSources.get(sourceKey);
             if (current == null) {
@@ -89,11 +95,21 @@ public class ConfigManager implements ConfigSource {
             if (config != null) {
                 activeSource.set(current);
                 log.info("Configuration successfully loaded from primary source: {}", sourceKey);
+                if (sourceKey == RemoteSource.NACOS) {
+                    nacosInitialFailure = false;
+                }
                 return config;
+            }
+            if (sourceKey == RemoteSource.NACOS) {
+                nacosLoadSuccess = false;
             }
         }
         log.warn("All remote configuration sources failed. Falling back to Local configuration.");
         activeSource.set(localSource);
+        if (prioritySources.contains(RemoteSource.NACOS) && !nacosLoadSuccess) {
+            this.nacosInitialFailure = true;
+        }
+
         GzipConfig localConfig = localSource.load();
         return localConfig != null
                 ? localConfig
