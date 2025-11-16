@@ -15,7 +15,6 @@ import com.yonagi.ocean.core.cors.CorsManager;
 import com.yonagi.ocean.core.ratelimiter.config.source.ConfigManager;
 import com.yonagi.ocean.core.reverseproxy.ReverseProxyChecker;
 import com.yonagi.ocean.core.reverseproxy.ReverseProxyManager;
-import com.yonagi.ocean.framework.ControllerRegistry;
 import com.yonagi.ocean.core.gzip.GzipEncoderManager;
 import com.yonagi.ocean.core.ratelimiter.RateLimiterChecker;
 import com.yonagi.ocean.core.ratelimiter.RateLimiterManager;
@@ -294,20 +293,6 @@ public class HttpServer {
 
         // Initialize router
         this.router = new Router(webRoot);
-
-        // Scan Controller and register to Static Router
-        final String DEFAULT_BASE_PACKAGE = "";
-        String basePackageToScan = LocalConfigLoader.getProperty("server.controller.base_package", DEFAULT_BASE_PACKAGE);
-        if (basePackageToScan.equals(DEFAULT_BASE_PACKAGE)) {
-            log.info("Starting Controller scanning using IMPLICIT global classpath search. To optimize startup time, set 'server.controller.base_package'.");
-        } else {
-            log.info("Starting Controller scanning in EXPLICIT base package: {}", basePackageToScan);
-        }
-
-        ControllerRegistry controllerRegistry = new ControllerRegistry(this.router, basePackageToScan);
-        controllerRegistry.scanAndRegister();
-
-        log.info("Controller scanning and static route registration completed.");
 
         // Initialize router config manager and initial router config
         this.routeManager = new RouteManager(router);
