@@ -40,6 +40,8 @@ public class ConfigManager implements ConfigSource {
 
     private volatile boolean nacosInitialFailure = false;
 
+    private final AtomicReference<CacheConfig> currentConfigSnapshot = new AtomicReference<>();
+
     public ConfigManager(ConfigService nacosConfigService) {
         String priorityStr = LocalConfigLoader.getProperty("server.cache.remote_sources.priority", "nacos,apollo");
         this.prioritySources = Arrays.stream(priorityStr.split(","))
@@ -114,6 +116,10 @@ public class ConfigManager implements ConfigSource {
         for (ConfigSource source : remoteSources.values()) {
             source.onChange(changeCallback);
         }
+    }
+
+    public AtomicReference<CacheConfig> getCurrentConfigSnapshot() {
+        return currentConfigSnapshot;
     }
 
     private void startFailbackCheck(String sourceId, ConfigSource recoveredSource) {

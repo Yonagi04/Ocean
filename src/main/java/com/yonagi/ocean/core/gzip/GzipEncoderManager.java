@@ -52,9 +52,14 @@ public class GzipEncoderManager {
     }
 
     private static void refresh() {
-        final GzipConfig loaded = configManager.load();
-        final GzipConfig config = loaded != null
-                ? loaded :
+        final GzipConfig newConfig = configManager.load();
+        final GzipConfig oldConfig = configManager.getCurrentConfigSnapshot().get();
+        if (oldConfig != null && newConfig.equals(oldConfig)) {
+            log.debug("Configuration source changed, but final merged configuration remains the same.");
+            return;
+        }
+        final GzipConfig config = newConfig != null
+                ? newConfig :
                 new GzipConfig(false, 1024, 6);
         GzipEncoder encoder = new GzipEncoder(config);
         ENCODER_REF.set(encoder);

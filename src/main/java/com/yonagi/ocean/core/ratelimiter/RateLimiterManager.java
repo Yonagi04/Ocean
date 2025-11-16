@@ -93,7 +93,14 @@ public class RateLimiterManager {
 
     public void refreshRateLimiter(ConfigManager configManager) {
         try {
-            this.rateLimitConfigs = configManager.load();
+            List<RateLimitConfig> newConfigs = configManager.load();
+            List<RateLimitConfig> oldConfigs = configManager.getCurrentConfigSnapshot().get();
+            if (oldConfigs != null && newConfigs.equals(oldConfigs)) {
+                log.debug("Configuration source changed, but final merged configuration remains the same.");
+                return;
+            }
+            configManager.getCurrentConfigSnapshot().set(newConfigs);
+            this.rateLimitConfigs = newConfigs;
             log.info("Rate limiting rules refreshed - Total rules: {}", rateLimitConfigs.size());
         } catch (Exception e) {
             log.error("Failed to refresh rate limiting rules: {}", e.getMessage(), e);

@@ -41,6 +41,8 @@ public class ConfigManager implements ConfigSource {
 
     private volatile boolean nacosInitialFailure = false;
 
+    private final AtomicReference<GzipConfig> currentConfigSnapshot = new AtomicReference<>();
+
     public ConfigManager(ConfigService nacosConfigService) {
         String priorityStr = LocalConfigLoader.getProperty("server.gzip.remote_sources.priority", "nacos,apollo");
         this.prioritySources = Arrays.stream(priorityStr.split(","))
@@ -114,6 +116,10 @@ public class ConfigManager implements ConfigSource {
         return localConfig != null
                 ? localConfig
                 : new GzipConfig(false, 1024, 6);
+    }
+
+    public AtomicReference<GzipConfig> getCurrentConfigSnapshot() {
+        return currentConfigSnapshot;
     }
 
     private void startFailbackCheck(String sourceId, ConfigSource recoveredSource) {

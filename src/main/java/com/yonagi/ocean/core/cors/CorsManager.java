@@ -54,9 +54,15 @@ public class CorsManager {
     }
 
     private static void refresh() {
-        final CorsConfig loaded = configManager.load();
-        final CorsConfig config = loaded != null
-                ? loaded :
+        final CorsConfig newConfig = configManager.load();
+        final CorsConfig oldConfig = configManager.getCurrentConfigSnapshot().get();
+        if (oldConfig != null && newConfig.equals(oldConfig)) {
+            log.debug("Configuration source changed, but final merged configuration remains the same.");
+            return;
+        }
+        configManager.getCurrentConfigSnapshot().set(newConfig);
+        final CorsConfig config = newConfig != null
+                ? newConfig :
                 new CorsConfig.Builder()
                         .enabled(false)
                         .allowOrigin("*")

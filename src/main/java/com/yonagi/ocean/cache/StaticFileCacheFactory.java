@@ -49,9 +49,15 @@ public class StaticFileCacheFactory {
     }
 
     private static void refresh() {
-        final CacheConfig loaded = configManager.load();
-        final CacheConfig cfg = loaded != null
-                ? loaded
+        final CacheConfig newConfig  = configManager.load();
+        final CacheConfig oldConfig = configManager.getCurrentConfigSnapshot().get();
+        if (oldConfig != null && newConfig.equals(oldConfig)) {
+            log.debug("Configuration source changed, but final merged configuration remains the same. Skipping cache refresh.");
+            return;
+        }
+        configManager.getCurrentConfigSnapshot().set(newConfig);
+        final CacheConfig cfg = newConfig != null
+                ? newConfig
                 : CacheConfig.builder().enabled(false).type(CacheConfig.Type.NONE).build();
         StaticFileCache created;
         if (!cfg.isEnabled()) {

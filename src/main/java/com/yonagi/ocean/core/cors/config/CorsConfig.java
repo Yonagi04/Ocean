@@ -2,6 +2,8 @@ package com.yonagi.ocean.core.cors.config;
 
 import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 
+import java.util.Objects;
+
 /**
  * @author Yonagi
  * @version 1.0
@@ -34,6 +36,30 @@ public final class CorsConfig {
         this.exposeHeaders = builder.exposeHeaders;
         this.allowCredentials = builder.allowCredentials;
         this.maxAge = builder.maxAge;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(enabled, allowOrigin, allowMethods, allowHeaders, exposeHeaders,
+                allowCredentials, maxAge);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
+        CorsConfig that = (CorsConfig) obj;
+        return enabled == that.enabled &&
+                Objects.equals(allowOrigin, that.allowOrigin) &&
+                Objects.equals(allowMethods, that.allowMethods) &&
+                Objects.equals(allowHeaders, that.allowHeaders) &&
+                Objects.equals(exposeHeaders, that.exposeHeaders) &&
+                allowCredentials == that.allowCredentials &&
+                maxAge == that.maxAge;
     }
 
     public boolean isEnabled() {

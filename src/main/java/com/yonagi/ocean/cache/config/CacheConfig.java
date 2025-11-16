@@ -1,5 +1,7 @@
 package com.yonagi.ocean.cache.config;
 
+import java.util.Objects;
+
 /**
  * 缓存配置的不可变值对象
  */
@@ -43,6 +45,40 @@ public final class CacheConfig {
         this.caffeineMaxMemoryMb = b.caffeineMaxMemoryMb;
         this.caffeineMaxEntries = b.caffeineMaxEntries;
         this.caffeineSoftValues = b.caffeineSoftValues;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(
+                enabled, type, cleanerIntervalMs, lruMaxEntries, lruTtlMs,
+                lruPolicy, lruMaxMemoryMb, lruDynamicAdjustment, lruAdjustIntervalMs, caffeineExpireType,
+                caffeineTtlMs, caffeinePolicy, caffeineMaxMemoryMb, caffeineMaxEntries, caffeineSoftValues);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
+        CacheConfig that = (CacheConfig) obj;
+        return Objects.equals(enabled, that.enabled) &&
+                Objects.equals(type, that.type) &&
+                Objects.equals(cleanerIntervalMs, that.cleanerIntervalMs) &&
+                Objects.equals(lruMaxEntries, that.lruMaxEntries) &&
+                Objects.equals(lruTtlMs, that.lruTtlMs) &&
+                Objects.equals(lruPolicy, that.lruPolicy) &&
+                Objects.equals(lruMaxMemoryMb, that.lruMaxMemoryMb) &&
+                Objects.equals(lruDynamicAdjustment, that.lruDynamicAdjustment) &&
+                Objects.equals(lruAdjustIntervalMs, that.lruAdjustIntervalMs) &&
+                Objects.equals(caffeineExpireType, that.caffeineExpireType) &&
+                Objects.equals(caffeineTtlMs, that.caffeineTtlMs) &&
+                Objects.equals(caffeinePolicy, that.caffeinePolicy) &&
+                Objects.equals(caffeineMaxMemoryMb, that.caffeineMaxMemoryMb) &&
+                Objects.equals(caffeineMaxEntries, that.caffeineMaxEntries) &&
+                Objects.equals(caffeineSoftValues, that.caffeineSoftValues);
     }
 
     public boolean isEnabled() { return enabled; }

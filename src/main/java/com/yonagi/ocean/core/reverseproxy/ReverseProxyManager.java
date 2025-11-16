@@ -47,7 +47,13 @@ public class ReverseProxyManager {
     public void refreshReverseProxyConfigs(ConfigManager configManager) {
         try {
             List<ReverseProxyConfig> newConfigs = configManager.load();
-            List<ReverseProxyConfig> oldConfigs = reverseProxyConfigs;
+            List<ReverseProxyConfig> oldConfigs = configManager.getCurrentConfigSnapshot().get();
+            if (oldConfigs != null && newConfigs.equals(oldConfigs)) {
+                log.debug("Configuration source changed, but final merged configuration remains the same.");
+                return;
+            }
+            configManager.getCurrentConfigSnapshot().set(newConfigs);
+            oldConfigs = reverseProxyConfigs;
             this.reverseProxyConfigs = newConfigs;
 
             long newVersion = this.versionCenter.incrementAndGet();

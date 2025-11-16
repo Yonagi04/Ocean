@@ -39,6 +39,8 @@ public class ConfigManager implements ConfigSource {
 
     private volatile boolean nacosInitialFailure = false;
 
+    private final AtomicReference<List<ReverseProxyConfig>> currentConfigSnapshot = new AtomicReference<>();
+
     public ConfigManager(ConfigService nacosConfigService) {
         String priorityStr = LocalConfigLoader.getProperty("server.reverse_proxy.remote_sources.priority", "nacos,apollo");
         this.prioritySources = List.of(priorityStr.split(",")).stream()
@@ -69,7 +71,6 @@ public class ConfigManager implements ConfigSource {
                 }
             });
         }
-//        this.load();
     }
 
     @Override
@@ -112,6 +113,10 @@ public class ConfigManager implements ConfigSource {
         return localConfig != null
                 ? localConfig
                 : new ArrayList<>();
+    }
+
+    public AtomicReference<List<ReverseProxyConfig>> getCurrentConfigSnapshot() {
+        return currentConfigSnapshot;
     }
 
     private void startFailbackCheck(String sourceId, ConfigSource recoveredSource) {

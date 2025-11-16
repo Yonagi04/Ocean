@@ -36,7 +36,24 @@ public final class LoadBalancerConfig {
 
     @Override
     public int hashCode() {
-        return Objects.hash(strategy, healthCheckMode, checkIntervalMs, upstreams);
+        return Objects.hash(strategy, healthCheckMode, checkIntervalMs, upstreams, canaryUpstreams, canaryPercent);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == this) {
+            return true;
+        }
+        if (obj == null || obj.getClass() != getClass()) {
+            return false;
+        }
+        LoadBalancerConfig that = (LoadBalancerConfig) obj;
+        return Objects.equals(strategy, that.strategy) &&
+                Objects.equals(healthCheckMode, that.healthCheckMode) &&
+                Objects.equals(checkIntervalMs, that.checkIntervalMs) &&
+                Objects.equals(upstreams, that.upstreams) &&
+                Objects.equals(canaryUpstreams, that.canaryUpstreams) &&
+                Objects.equals(canaryPercent, that.canaryPercent);
     }
 
     @JsonCreator

@@ -1,5 +1,7 @@
 package com.yonagi.ocean.core.gzip.config;
 
+import java.util.Objects;
+
 /**
  * @author Yonagi
  * @version 1.0
@@ -17,6 +19,25 @@ public final class GzipConfig {
         this.enabled = enabled;
         this.compressionLevel = compressionLevel;
         this.minContentLength = minContentLength;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(enabled, minContentLength, compressionLevel);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == this) {
+            return true;
+        }
+        if (obj == null || obj.getClass() != this.getClass()) {
+            return false;
+        }
+        GzipConfig that = (GzipConfig) obj;
+        return enabled == that.enabled &&
+                minContentLength == that.minContentLength &&
+                compressionLevel == that.compressionLevel;
     }
 
     public boolean isEnabled() {

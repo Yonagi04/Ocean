@@ -44,11 +44,17 @@ public class RouteManager {
 
     public void refreshRoutes(ConfigManager configManager) {
         try {
-            List<RouteConfig> routeConfigs = configManager.load();
-            if (routeConfigs == null) {
+            List<RouteConfig> newConfigs = configManager.load();
+            List<RouteConfig> oldConfigs = configManager.getCurrentConfigSnapshot().get();
+            if (oldConfigs != null && newConfigs.equals(oldConfigs)) {
+                log.debug("Configuration source changed, but final merged configuration remains the same.");
                 return;
             }
-            List<RouteConfig> filteredConfigs = routeConfigs.stream()
+            if (newConfigs == null) {
+                return;
+            }
+            configManager.getCurrentConfigSnapshot().set(newConfigs);
+            List<RouteConfig> filteredConfigs = newConfigs.stream()
                     .filter(c -> c.getRouteType() != RouteType.CONTROLLER)
                     .collect(Collectors.toList());
 
