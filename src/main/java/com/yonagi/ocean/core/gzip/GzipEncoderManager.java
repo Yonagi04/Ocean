@@ -20,34 +20,13 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 public class GzipEncoderManager {
 
-    public static class GzipConfigRecoveryAction implements ConfigRecoveryAction {
-        private final MutableConfigSource proxy;
-        private final GzipEncoderManager globalGzipEncoderManager;
-
-        public GzipConfigRecoveryAction(MutableConfigSource proxy, GzipEncoderManager globalGzipEncoderManager) {
-            this.proxy = proxy;
-            this.globalGzipEncoderManager = globalGzipEncoderManager;
-        }
-
-        @Override
-        public void recover(ConfigService configService) {
-            GzipEncoderManager.log.info("Nacos reconnected. Executing recovery action for Gzip Configuration");
-            NacosConfigSource liveSource = new NacosConfigSource(configService);
-            proxy.updateSource(liveSource);
-            liveSource.onChange(GzipEncoderManager::refresh);
-
-            globalGzipEncoderManager.refresh();
-            GzipEncoderManager.log.info("Gzip Configuration successfully switched to Nacos primary source");
-        }
-    }
     private static final Logger log = LoggerFactory.getLogger(GzipEncoderManager.class);
 
     private static volatile GzipEncoderManager INSTANCE;
     private static ReentrantLock lock = new ReentrantLock();
 
     private static final AtomicReference<GzipEncoder> ENCODER_REF = new AtomicReference<>();
-    private static ConfigSource configSource;
-    private static MutableConfigSource nacosConfigSourceProxy;
+    private static ConfigManager configManager;
 
     private GzipEncoderManager() {}
 
@@ -67,17 +46,13 @@ public class GzipEncoderManager {
             return;
         }
 
-        NacosConfigSource initialNacosSource = new NacosConfigSource(NacosConfigLoader.getConfigService());
-        nacosConfigSourceProxy = new MutableConfigSource(initialNacosSource);
-        configSource = new FallbackConfigSource(nacosConfigSourceProxy, new LocalConfigSource());
-
-        NacosConfigLoader.registerRecoveryAction(new GzipConfigRecoveryAction(nacosConfigSourceProxy, INSTANCE));
+        configManager = new ConfigManager(NacosConfigLoader.getConfigService());
         refresh();
-        configSource.onChange(GzipEncoderManager::refresh);
+        configManager.onChange(GzipEncoderManager::refresh);
     }
 
     private static void refresh() {
-        final GzipConfig loaded = configSource.load();
+        final GzipConfig loaded = configManager.load();
         final GzipConfig config = loaded != null
                 ? loaded :
                 new GzipConfig(false, 1024, 6);

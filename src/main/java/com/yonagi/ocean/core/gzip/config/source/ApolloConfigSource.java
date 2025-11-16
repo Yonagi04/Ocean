@@ -30,16 +30,13 @@ public class ApolloConfigSource implements ConfigSource {
     public ApolloConfigSource() {
         this.namespace = LocalConfigLoader.getProperty("server.gzip.apollo.namespace", "application");
         this.enabled = Boolean.parseBoolean(LocalConfigLoader.getProperty("apollo.enabled", "false"));
+        this.config = ConfigService.getConfig(namespace);
         startPeriodicSync();
     }
 
     @Override
     public GzipConfig load() {
-        if (!enabled) {
-            return null;
-        }
-        config = ConfigService.getConfig(namespace);
-        if (config == null) {
+        if (!enabled || config == null) {
             return null;
         }
 

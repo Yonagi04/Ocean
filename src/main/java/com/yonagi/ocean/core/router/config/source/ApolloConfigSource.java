@@ -34,15 +34,15 @@ public class ApolloConfigSource implements ConfigSource {
     public ApolloConfigSource() {
         this.namespace = LocalConfigLoader.getProperty("server.apollo.namespace", "application");
         this.enabled = Boolean.parseBoolean(LocalConfigLoader.getProperty("apollo.enabled", "false"));
+        this.configFile = ConfigService.getConfigFile(namespace, ConfigFileFormat.JSON);
         startPeriodicSync();
     }
 
     @Override
     public List<RouteConfig> load() {
-        if (!enabled) {
+        if (!enabled || configFile == null) {
             return null;
         }
-        configFile = ConfigService.getConfigFile(namespace, ConfigFileFormat.JSON);
         String content = configFile.getContent();
         if (content == null || content.isEmpty()) {
             return null;

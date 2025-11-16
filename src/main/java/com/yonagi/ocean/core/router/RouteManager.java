@@ -2,6 +2,7 @@ package com.yonagi.ocean.core.router;
 
 import com.alibaba.nacos.api.config.ConfigService;
 import com.yonagi.ocean.core.router.config.RouteConfig;
+import com.yonagi.ocean.core.router.config.source.ConfigManager;
 import com.yonagi.ocean.core.router.config.source.ConfigSource;
 import com.yonagi.ocean.core.router.config.source.MutableConfigSource;
 import com.yonagi.ocean.core.router.config.source.NacosConfigSource;
@@ -23,27 +24,6 @@ import java.util.stream.Collectors;
  * @date 2025/10/08 17:03
  */
 public class RouteManager {
-
-    public static class RouteConfigRecoveryAction implements ConfigRecoveryAction {
-        private final MutableConfigSource proxy;
-        private final RouteManager globalRouteManager;
-
-        public RouteConfigRecoveryAction(MutableConfigSource proxy, RouteManager globalRouteManager) {
-            this.proxy = proxy;
-            this.globalRouteManager = globalRouteManager;
-        }
-
-        @Override
-        public void recover(ConfigService configService) {
-            log.info("Nacos reconnected. Executing recovery action for Route Configuration");
-            NacosConfigSource liveSource = new NacosConfigSource(configService);
-            proxy.updateSource(liveSource);
-            liveSource.onChange(() -> globalRouteManager.refreshRoutes(proxy));
-
-            globalRouteManager.refreshRoutes(proxy);
-            log.info("Route Configuration successfully switched to Nacos primary source");
-        }
-    }
 
     private static volatile RouteManager INSTANCE;
     private final Router router;
@@ -67,9 +47,9 @@ public class RouteManager {
         return routeConfig.getMethod().name() + ":" + routeConfig.getPath();
     }
 
-    public void refreshRoutes(ConfigSource configSource) {
+    public void refreshRoutes(ConfigManager configManager) {
         try {
-            List<RouteConfig> routeConfigs = configSource.load();
+            List<RouteConfig> routeConfigs = configManager.load();
             if (routeConfigs == null) {
                 return;
             }
@@ -116,9 +96,9 @@ public class RouteManager {
         }
     }
 
-    public void initializeRoutes(ConfigSource configSource) {
+    public void initializeRoutes(ConfigManager configManager) {
         try {
-            List<RouteConfig> routeConfigs = configSource.load();
+            List<RouteConfig> routeConfigs = configManager.load();
             if (routeConfigs == null || routeConfigs.isEmpty()) {
                 return;
             }

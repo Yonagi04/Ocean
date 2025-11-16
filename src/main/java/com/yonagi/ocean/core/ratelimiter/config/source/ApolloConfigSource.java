@@ -1,6 +1,5 @@
 package com.yonagi.ocean.core.ratelimiter.config.source;
 
-import com.ctrip.framework.apollo.Config;
 import com.ctrip.framework.apollo.ConfigFile;
 import com.ctrip.framework.apollo.ConfigService;
 import com.ctrip.framework.apollo.core.enums.ConfigFileFormat;
@@ -35,15 +34,15 @@ public class ApolloConfigSource implements ConfigSource {
     public ApolloConfigSource() {
         this.namespace = LocalConfigLoader.getProperty("server.rate_limit.apollo.namespace", "application");
         this.enabled = Boolean.parseBoolean(LocalConfigLoader.getProperty("apollo.enabled", "false"));
+        this.configFile = ConfigService.getConfigFile(namespace, ConfigFileFormat.JSON);
         startPeriodicSync();
     }
 
     @Override
     public List<RateLimitConfig> load() {
-        if (!enabled) {
+        if (!enabled || configFile == null) {
             return null;
         }
-        configFile = ConfigService.getConfigFile(namespace, ConfigFileFormat.JSON);
         String content = configFile.getContent();
         if (content == null || content.isEmpty()) {
             return null;

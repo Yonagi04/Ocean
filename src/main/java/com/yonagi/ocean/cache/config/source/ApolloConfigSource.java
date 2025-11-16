@@ -2,7 +2,6 @@ package com.yonagi.ocean.cache.config.source;
 
 import com.ctrip.framework.apollo.Config;
 import com.ctrip.framework.apollo.ConfigService;
-import com.ctrip.framework.apollo.core.enums.ConfigFileFormat;
 import com.yonagi.ocean.backup.BackupScheduler;
 import com.yonagi.ocean.cache.config.CacheConfig;
 import com.yonagi.ocean.utils.LocalConfigLoader;
@@ -25,16 +24,13 @@ public class ApolloConfigSource implements ConfigSource {
     public ApolloConfigSource() {
         this.namespace = LocalConfigLoader.getProperty("server.cache.apollo.namespace", "application");
         this.enabled = Boolean.parseBoolean(LocalConfigLoader.getProperty("apollo.enabled", "false"));
+        this.config = ConfigService.getConfig(this.namespace);
         startPeriodicSync();
     }
 
     @Override
     public CacheConfig load() {
-        if (!enabled) {
-            return null;
-        }
-        config = ConfigService.getConfig(this.namespace);
-        if (config == null) {
+        if (!enabled || config == null) {
             return null;
         }
         CacheConfig.Builder b = CacheConfig.builder();
