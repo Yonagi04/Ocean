@@ -10,7 +10,7 @@ import com.yonagi.ocean.core.router.RouteType;
 import com.yonagi.ocean.handler.impl.RedirectHandler;
 import com.yonagi.ocean.handler.impl.StaticFileHandler;
 import com.yonagi.ocean.utils.LocalConfigLoader;
-import com.yonagi.ocean.backup.NacosBackupScheduler;
+import com.yonagi.ocean.backup.BackupScheduler;
 import com.yonagi.ocean.utils.NacosConfigLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -103,6 +103,6 @@ public class NacosConfigSource implements ConfigSource {
         }
         int syncIntervalSeconds = Integer.parseInt(LocalConfigLoader.getProperty("server.router.nacos.sync_interval_seconds", "7200"));
         String syncLocalPath = LocalConfigLoader.getProperty("server.router.nacos.sync_local_path");
-        NacosBackupScheduler.start(dataId, group, syncLocalPath, syncIntervalSeconds, timeoutMs);
+        BackupScheduler.startNacosTask(dataId, group, syncLocalPath, syncIntervalSeconds, timeoutMs);
     }
 }

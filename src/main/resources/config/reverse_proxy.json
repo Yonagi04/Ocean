@@ -1,20 +1,27 @@
 [
   {
     "enabled": true,
-    "id": "echo",
+    "id": "echo1",
     "path": "echo",
     "stripPrefix": false,
     "timeout": 3000,
     "lbConfig": {
-      "strategy": "NONE",
-      "healthCheckMode": "DISABLED",
+      "strategy": "WEIGHT_RANDOM",
+      "healthCheckMode": "PASSIVE_CHECK",
       "checkIntervalMs": 3000,
       "upstreams": [
         {
           "url": "http://localhost:8088",
           "weight": 1.0
         }
-      ]
+      ],
+      "canaryUpstreams": [
+        {
+          "url": "http://localhost:8089",
+          "weight": 1.0
+        }
+      ],
+      "canaryPercent": 0
     },
     "addHeaders": {
       "testHeader": "token"
@@ -37,10 +44,17 @@
           "weight": 0.5
         },
         {
-          "url": "http://localhost:8089",
+          "url": "http://localhost:8090",
           "weight": 0.5
         }
-      ]
+      ],
+      "canaryUpstreams": [
+        {
+          "url": "http://localhost:8089",
+          "weight": 1.0
+        }
+      ],
+      "canaryPercent": 80
     }
   },
   {
@@ -50,15 +64,22 @@
     "stripPrefix": false,
     "timeout": 3000,
     "lbConfig": {
-        "strategy": "IP_HASH",
-        "healthCheckMode": "PASSIVE_CHECK",
-        "checkIntervalMs": 5000,
-        "upstreams": [
-            {
-            "url": "http://localhost:9999",
-            "weight": 1.0
-            }
-        ]
+      "strategy": "IP_HASH",
+      "healthCheckMode": "PASSIVE_CHECK",
+      "checkIntervalMs": 5000,
+      "upstreams": [
+        {
+          "url": "http://localhost:9999",
+          "weight": 1.0
+        }
+      ],
+      "canaryUpstreams": [
+        {
+          "url": "http://localhost:8089",
+          "weight": 1.0
+        }
+      ],
+      "canaryPercent": 80
     },
     "addHeaders": {}
   }

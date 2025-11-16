@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.google.common.util.concurrent.AtomicDouble;
 import org.checkerframework.checker.guieffect.qual.UI;
 
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -52,6 +53,23 @@ public class Upstream {
         this.weight = Math.max(1, weight);
         this.currentWeight = new AtomicDouble(0.0d);
         this.effectiveWeight = new AtomicDouble(weight);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(url, weight);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == this) {
+            return true;
+        }
+        if (obj == null || obj.getClass() != this.getClass()) {
+            return false;
+        }
+        Upstream that = (Upstream) obj;
+        return Objects.equals(url, that.url) && weight == that.weight;
     }
 
     public String getUrl() {

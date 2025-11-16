@@ -24,34 +24,13 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 public class CorsManager {
 
-    public static class CorsConfigRecoveryAction implements ConfigRecoveryAction {
-        private final MutableConfigSource proxy;
-        private final CorsManager globalManager;
-
-        public CorsConfigRecoveryAction(MutableConfigSource proxy, CorsManager globalManager) {
-            this.proxy = proxy;
-            this.globalManager = globalManager;
-        }
-
-        @Override
-        public void recover(ConfigService configService) {
-            CorsManager.log.info("Nacos reconnected. Executing recovery action for Cors Configuration");
-            NacosConfigSource liveSource = new NacosConfigSource(configService);
-            proxy.updateSource(liveSource);
-            liveSource.onChange(CorsManager::refresh);
-            globalManager.refresh();
-            CorsManager.log.info("Cors Configuration successfully switched to Nacos primary source");
-        }
-    }
-
     private static final Logger log = LoggerFactory.getLogger(CorsManager.class);
 
     private static volatile CorsManager INSTANCE;
     private static ReentrantLock lock = new ReentrantLock();
 
     private static final AtomicReference<CorsConfig> REF = new AtomicReference<>();
-    private static ConfigSource configSource;
-    private static MutableConfigSource nacosConfigSourceProxy;
+    private static ConfigManager configManager;
 
     private CorsManager() {}
 
@@ -69,19 +48,21 @@ public class CorsManager {
         if (REF.get() != null) {
             return;
         }
-        NacosConfigSource initialNacosSource = new NacosConfigSource(NacosConfigLoader.getConfigService());
-        nacosConfigSourceProxy = new MutableConfigSource(initialNacosSource);
-        configSource = new FallbackConfigSource(nacosConfigSourceProxy, new LocalConfigSource());
-
-        NacosConfigLoader.registerRecoveryAction(new CorsConfigRecoveryAction(nacosConfigSourceProxy, INSTANCE));
+        configManager = new ConfigManager(NacosConfigLoader.getConfigService());
         refresh();
-        configSource.onChange(CorsManager::refresh);
+        configManager.onChange(CorsManager::refresh);
     }
 
     private static void refresh() {
-        final CorsConfig loaded = configSource.load();
-        final CorsConfig config = loaded != null
-                ? loaded :
+        final CorsConfig newConfig = configManager.load();
+        final CorsConfig oldConfig = configManager.getCurrentConfigSnapshot().get();
+        if (oldConfig != null && newConfig.equals(oldConfig)) {
+            log.debug("Configuration source changed, but final merged configuration remains the same.");
+            return;
+        }
+        configManager.getCurrentConfigSnapshot().set(newConfig);
+        final CorsConfig config = newConfig != null
+                ? newConfig :
                 new CorsConfig.Builder()
                         .enabled(false)
                         .allowOrigin("*")

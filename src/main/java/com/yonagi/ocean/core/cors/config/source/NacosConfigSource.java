@@ -4,7 +4,7 @@ import com.alibaba.nacos.api.config.ConfigService;
 import com.alibaba.nacos.api.config.listener.Listener;
 import com.yonagi.ocean.core.cors.config.CorsConfig;
 import com.yonagi.ocean.utils.LocalConfigLoader;
-import com.yonagi.ocean.backup.NacosBackupScheduler;
+import com.yonagi.ocean.backup.BackupScheduler;
 import com.yonagi.ocean.utils.NacosConfigLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,6 +94,6 @@ public class NacosConfigSource implements ConfigSource {
         }
         int syncIntervalSeconds = Integer.parseInt(LocalConfigLoader.getProperty("server.cors.nacos.sync_interval_seconds", "7200"));
         String syncLocalPath = LocalConfigLoader.getProperty("server.cors.nacos.sync_local_path");
-        NacosBackupScheduler.start(dataId, group, syncLocalPath, syncIntervalSeconds, timeoutMs);
+        BackupScheduler.startNacosTask(dataId, group, syncLocalPath, syncIntervalSeconds, timeoutMs);
     }
 }

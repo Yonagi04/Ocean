@@ -76,7 +76,6 @@ public class NacosConfigLoader {
         String serverAddr = LocalConfigLoader.getProperty("nacos.server_addr");
 
         if (!nacosEnabled) {
-            log.warn("Nacos disabled in config, using local config only.");
             initialized.set(true);
             return;
         }

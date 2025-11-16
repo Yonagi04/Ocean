@@ -1,12 +1,8 @@
 package com.yonagi.ocean.core.reverseproxy;
 
-import com.alibaba.nacos.api.config.ConfigService;
 import com.yonagi.ocean.core.loadbalance.config.Upstream;
 import com.yonagi.ocean.core.reverseproxy.config.ReverseProxyConfig;
-import com.yonagi.ocean.core.reverseproxy.config.source.ConfigSource;
-import com.yonagi.ocean.core.reverseproxy.config.source.MutableConfigSource;
-import com.yonagi.ocean.core.reverseproxy.config.source.NacosConfigSource;
-import com.yonagi.ocean.spi.ConfigRecoveryAction;
+import com.yonagi.ocean.core.reverseproxy.config.source.ConfigManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,27 +21,6 @@ import java.util.concurrent.atomic.AtomicLong;
  * @date 2025/11/08 18:30
  */
 public class ReverseProxyManager {
-
-    public static class ReverseProxyConfigRecoveryAction implements ConfigRecoveryAction {
-        private final MutableConfigSource proxy;
-        private final ReverseProxyManager globalReverseProxyManager;
-
-        public ReverseProxyConfigRecoveryAction(MutableConfigSource proxy, ReverseProxyManager globalReverseProxyManager) {
-            this.proxy = proxy;
-            this.globalReverseProxyManager = globalReverseProxyManager;
-        }
-
-        @Override
-        public void recover(ConfigService configService) {
-            log.info("Nacos reconnected. Executing recovery action for Reverse Proxy Configuration");
-            NacosConfigSource liveSource = new NacosConfigSource(configService);
-            proxy.updateSource(liveSource);
-            liveSource.onChange(() -> globalReverseProxyManager.refreshReverseProxyConfigs(proxy));
-
-            globalReverseProxyManager.refreshReverseProxyConfigs(proxy);
-            log.info("Reverse Proxy Configuration successfully switched to Nacos primary source");
-        }
-    }
 
     private static final Logger log = LoggerFactory.getLogger(ReverseProxyManager.class);
 
@@ -69,10 +44,16 @@ public class ReverseProxyManager {
         INSTANCE = instance;
     }
 
-    public void refreshReverseProxyConfigs(ConfigSource source) {
+    public void refreshReverseProxyConfigs(ConfigManager configManager) {
         try {
-            List<ReverseProxyConfig> newConfigs = source.load();
-            List<ReverseProxyConfig> oldConfigs = reverseProxyConfigs;
+            List<ReverseProxyConfig> newConfigs = configManager.load();
+            List<ReverseProxyConfig> oldConfigs = configManager.getCurrentConfigSnapshot().get();
+            if (oldConfigs != null && newConfigs.equals(oldConfigs)) {
+                log.debug("Configuration source changed, but final merged configuration remains the same.");
+                return;
+            }
+            configManager.getCurrentConfigSnapshot().set(newConfigs);
+            oldConfigs = reverseProxyConfigs;
             this.reverseProxyConfigs = newConfigs;
 
             long newVersion = this.versionCenter.incrementAndGet();

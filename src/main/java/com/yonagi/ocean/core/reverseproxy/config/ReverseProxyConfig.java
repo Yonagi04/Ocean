@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 import com.yonagi.ocean.core.loadbalance.config.LoadBalancerConfig;
 
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * @author Yonagi
@@ -38,6 +39,29 @@ public final class ReverseProxyConfig {
         this.lbConfig = builder.lbConfig;
         this.timeout = builder.timeout;
         this.addHeaders = builder.addHeaders;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(enabled, id, path, stripPrefix, timeout, lbConfig, addHeaders);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == this) {
+            return true;
+        }
+        if (obj == null || obj.getClass() != getClass()) {
+            return false;
+        }
+        ReverseProxyConfig that = (ReverseProxyConfig) obj;
+        return Objects.equals(enabled, that.enabled) &&
+                Objects.equals(id, that.id) &&
+                Objects.equals(path, that.path) &&
+                Objects.equals(stripPrefix, that.stripPrefix) &&
+                Objects.equals(timeout, that.timeout) &&
+                Objects.equals(lbConfig, that.lbConfig) &&
+                Objects.equals(addHeaders, that.addHeaders);
     }
 
     public Boolean isEnabled() {

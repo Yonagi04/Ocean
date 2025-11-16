@@ -6,6 +6,7 @@ import com.yonagi.ocean.core.ratelimiter.config.enums.RateLimitType;
 import com.yonagi.ocean.core.protocol.enums.HttpMethod;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * @author Yonagi
@@ -30,6 +31,26 @@ public final class RateLimitConfig {
         this.method = builder.method;
         this.path = builder.path;
         this.scopes = builder.scopes;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(enabled, method, path, scopes);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == this) {
+            return true;
+        }
+        if (obj == null || obj.getClass() != this.getClass()) {
+            return false;
+        }
+        RateLimitConfig that = (RateLimitConfig) obj;
+        return enabled == that.enabled &&
+                Objects.equals(method, that.method) &&
+                Objects.equals(path, that.path) &&
+                Objects.equals(scopes, that.scopes);
     }
 
     public boolean isEnabled() {

@@ -1,9 +1,9 @@
-package com.yonagi.ocean.backup.handler.impl;
+package com.yonagi.ocean.backup.handler.impl.nacos;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.yonagi.ocean.backup.NacosBackupWriter;
+import com.yonagi.ocean.backup.BackupWriter;
 import com.yonagi.ocean.utils.NacosConfigLoader;
-import com.yonagi.ocean.backup.handler.ConfigBackupHandler;
+import com.yonagi.ocean.backup.handler.NacosConfigBackupHandler;
 
 import java.io.IOException;
 
@@ -14,7 +14,7 @@ import java.io.IOException;
  * @description
  * @date 2025/10/09 10:07
  */
-public class JsonConfigBackupHandler implements ConfigBackupHandler {
+public class JsonConfigBackupHandler implements NacosConfigBackupHandler {
 
     @Override
     public boolean supports(String type) {
@@ -28,6 +28,6 @@ public class JsonConfigBackupHandler implements ConfigBackupHandler {
 
     @Override
     public void save(Object config, String backupPath) throws IOException {
-        NacosBackupWriter.writeBackup((ArrayNode) config, backupPath);
+        BackupWriter.writeBackup((ArrayNode) config, backupPath);
     }
 }

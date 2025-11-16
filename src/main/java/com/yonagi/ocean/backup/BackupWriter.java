@@ -17,7 +17,7 @@ import java.util.Properties;
  * @description
  * @date 2025/10/09 10:20
  */
-public class NacosBackupWriter {
+public class BackupWriter {
     private static final ObjectMapper mapper = new ObjectMapper();
 
     public static void writeBackup(Object config, String contentType, String backupPath) throws IOException {

@@ -25,33 +25,11 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public class StaticFileCacheFactory {
 
-    private static class CacheConfigRecoveryAction implements ConfigRecoveryAction {
-        private final MutableConfigSource proxy;
-
-        public CacheConfigRecoveryAction(MutableConfigSource proxy) {
-            this.proxy = proxy;
-        }
-
-        @Override
-        public void recover(ConfigService configService) {
-            log.info("Nacos reconnected. Executing recovery action for Cache Configuration");
-
-            NacosConfigSource liveSource = new NacosConfigSource(configService);
-            proxy.updateSource(liveSource);
-            liveSource.onChange(StaticFileCacheFactory::refresh);
-
-            StaticFileCacheFactory.refresh();
-
-            log.info("Cache Configuration successfully switched to Nacos primary source");
-        }
-    }
-
     private static final Logger log = LoggerFactory.getLogger(StaticFileCacheFactory.class);
 
     private static final AtomicReference<StaticFileCache> REF = new AtomicReference<>();
     private static List<CacheProvider> providers;
-    private static ConfigSource configSource;
-    private static MutableConfigSource nacosConfigSourceProxy;
+    private static ConfigManager configManager;
 
     private StaticFileCacheFactory() {}
 
@@ -64,19 +42,22 @@ public class StaticFileCacheFactory {
                 return;
             }
             providers = Arrays.asList(new LRUCacheProvider(), new CaffeineCacheProvider(), new NoCacheProvider());
-            NacosConfigSource initialNacosSource = new NacosConfigSource(NacosConfigLoader.getConfigService());
-            nacosConfigSourceProxy = new MutableConfigSource(initialNacosSource);
-            configSource = new FallbackConfigSource(nacosConfigSourceProxy, new LocalConfigSource());
-            NacosConfigLoader.registerRecoveryAction(new CacheConfigRecoveryAction(nacosConfigSourceProxy));
+            configManager = new ConfigManager(NacosConfigLoader.getConfigService());
             refresh();
-            configSource.onChange(StaticFileCacheFactory::refresh);
+            configManager.onChange(StaticFileCacheFactory::refresh);
         }
     }
 
     private static void refresh() {
-        final CacheConfig loaded = configSource.load();
-        final CacheConfig cfg = loaded != null
-                ? loaded
+        final CacheConfig newConfig  = configManager.load();
+        final CacheConfig oldConfig = configManager.getCurrentConfigSnapshot().get();
+        if (oldConfig != null && newConfig.equals(oldConfig)) {
+            log.debug("Configuration source changed, but final merged configuration remains the same. Skipping cache refresh.");
+            return;
+        }
+        configManager.getCurrentConfigSnapshot().set(newConfig);
+        final CacheConfig cfg = newConfig != null
+                ? newConfig
                 : CacheConfig.builder().enabled(false).type(CacheConfig.Type.NONE).build();
         StaticFileCache created;
         if (!cfg.isEnabled()) {
@@ -107,6 +88,4 @@ public class StaticFileCacheFactory {
         }
         return REF.get();
     }
-
-    // 监听已由 ConfigSource 内部负责
 }

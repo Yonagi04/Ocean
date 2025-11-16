@@ -26,6 +26,9 @@
         <reflections.version>0.9.11</reflections.version>
         <pebble.version>3.2.2</pebble.version>
         <micrometer.version>1.15.4</micrometer.version>
+        <apollo-client.version>2.3.0</apollo-client.version>
+        <apollo-core.version>2.3.0</apollo-core.version>
+        <apollo-openapi.version>2.3.0</apollo-openapi.version>
     </properties>
 
     <dependencies>
@@ -123,6 +126,25 @@
             <artifactId>micrometer-registry-prometheus</artifactId>
             <version>${micrometer.version}</version>
         </dependency>
+
+        <dependency>
+            <groupId>com.ctrip.framework.apollo</groupId>
+            <artifactId>apollo-client</artifactId>
+            <version>${apollo-client.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.ctrip.framework.apollo</groupId>
+            <artifactId>apollo-core</artifactId>
+            <version>${apollo-core.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.ctrip.framework.apollo</groupId>
+            <artifactId>apollo-openapi</artifactId>
+            <version>${apollo-openapi.version}</version>
+        </dependency>
+
     </dependencies>
 
     <build>

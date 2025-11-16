@@ -1,15 +1,12 @@
 package com.yonagi.ocean.core.ratelimiter;
 
-import com.alibaba.nacos.api.config.ConfigService;
 import com.yonagi.ocean.core.ratelimiter.config.RateLimitConfig;
 import com.yonagi.ocean.core.ratelimiter.config.enums.RateLimitType;
+import com.yonagi.ocean.core.ratelimiter.config.source.ConfigManager;
 import com.yonagi.ocean.core.ratelimiter.config.source.ConfigSource;
-import com.yonagi.ocean.core.ratelimiter.config.source.MutableConfigSource;
-import com.yonagi.ocean.core.ratelimiter.config.source.NacosConfigSource;
 import com.yonagi.ocean.core.ratelimiter.algorithm.AllwaysAllowRateLimiter;
 import com.yonagi.ocean.core.ratelimiter.algorithm.RateLimiter;
 import com.yonagi.ocean.core.ratelimiter.algorithm.TokenBucket;
-import com.yonagi.ocean.spi.ConfigRecoveryAction;
 import com.yonagi.ocean.utils.LocalConfigLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,27 +24,6 @@ import java.util.concurrent.ConcurrentHashMap;
  * @date 2025/10/10 10:02
  */
 public class RateLimiterManager {
-
-    public static class RateLimiterConfigRecoveryAction implements ConfigRecoveryAction {
-        private final MutableConfigSource proxy;
-        private final RateLimiterManager globalRateLimiterManager;
-
-        public RateLimiterConfigRecoveryAction(MutableConfigSource proxy, RateLimiterManager globalRateLimiterManager) {
-            this.proxy = proxy;
-            this.globalRateLimiterManager = globalRateLimiterManager;
-        }
-
-        @Override
-        public void recover(ConfigService configService) {
-            log.info("Nacos reconnected. Executing recovery action for Rate-limiting Configuration");
-            NacosConfigSource liveSource = new NacosConfigSource(configService);
-            proxy.updateSource(liveSource);
-            liveSource.onChange(() -> globalRateLimiterManager.refreshRateLimiter(proxy));
-
-            globalRateLimiterManager.refreshRateLimiter(proxy);
-            log.info("Rate-limiting Configuration successfully switched to Nacos primary source");
-        }
-    }
 
     private static volatile RateLimiterManager INSTANCE;
 
@@ -115,9 +91,16 @@ public class RateLimiterManager {
         return map;
     }
 
-    public void refreshRateLimiter(ConfigSource configSource) {
+    public void refreshRateLimiter(ConfigManager configManager) {
         try {
-            this.rateLimitConfigs = configSource.load();
+            List<RateLimitConfig> newConfigs = configManager.load();
+            List<RateLimitConfig> oldConfigs = configManager.getCurrentConfigSnapshot().get();
+            if (oldConfigs != null && newConfigs.equals(oldConfigs)) {
+                log.debug("Configuration source changed, but final merged configuration remains the same.");
+                return;
+            }
+            configManager.getCurrentConfigSnapshot().set(newConfigs);
+            this.rateLimitConfigs = newConfigs;
             log.info("Rate limiting rules refreshed - Total rules: {}", rateLimitConfigs.size());
         } catch (Exception e) {
             log.error("Failed to refresh rate limiting rules: {}", e.getMessage(), e);

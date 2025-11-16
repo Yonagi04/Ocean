@@ -5,7 +5,7 @@ import com.alibaba.nacos.api.config.listener.Listener;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.yonagi.ocean.backup.NacosBackupScheduler;
+import com.yonagi.ocean.backup.BackupScheduler;
 import com.yonagi.ocean.core.reverseproxy.config.ReverseProxyConfig;
 import com.yonagi.ocean.utils.LocalConfigLoader;
 import com.yonagi.ocean.utils.NacosConfigLoader;
@@ -84,6 +84,6 @@ public class NacosConfigSource implements ConfigSource {
         }
         int syncIntervalSeconds = Integer.parseInt(LocalConfigLoader.getProperty("server.reverse_proxy.nacos.sync_interval_seconds", "7200"));
         String syncLocalPath = LocalConfigLoader.getProperty("server.reverse_proxy.nacos.sync_local_path");
-        NacosBackupScheduler.start(dataId, group, syncLocalPath, syncIntervalSeconds, timeoutMs);
+        BackupScheduler.startNacosTask(dataId, group, syncLocalPath, syncIntervalSeconds, timeoutMs);
     }
 }
