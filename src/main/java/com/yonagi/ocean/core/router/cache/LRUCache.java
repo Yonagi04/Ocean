@@ -1,4 +1,4 @@
-package com.yonagi.ocean.core.router;
+package com.yonagi.ocean.core.router.cache;
 
 import com.yonagi.ocean.handler.RequestHandler;
 

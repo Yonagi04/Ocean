@@ -1,6 +1,7 @@
 package com.yonagi.ocean.core.router;
 
 import com.yonagi.ocean.core.ErrorPageRender;
+import com.yonagi.ocean.core.router.cache.LRUCache;
 import com.yonagi.ocean.core.router.config.RouteConfig;
 import com.yonagi.ocean.core.context.HttpContext;
 import com.yonagi.ocean.core.protocol.HttpResponse;
@@ -16,7 +17,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -92,13 +92,13 @@ public class Router {
     }
 
     // 稳定层路由
-    private final Map<HttpMethod, List<RouteEntry>> staticRoutes = new ConcurrentHashMap<>();
+    private final Map<HttpMethod, RouteTrie> staticRoutes = new ConcurrentHashMap<>();
 
     // 动态层路由
     private volatile Map<HttpMethod, Map<String, RouteEntry>> dynamicRoutes = new ConcurrentHashMap<>();
 
     // 动态层路径变量路由
-    private final Map<HttpMethod, List<RouteEntry>> dynamicPathVariableRoutes = new ConcurrentHashMap<>();
+    private final Map<HttpMethod, RouteTrie> dynamicPathVariableRoutes = new ConcurrentHashMap<>();
 
     // 处理器实例缓存: class name -> handler instance (使用LRU+TTL缓存)
     private final LRUCache<String, RequestHandler> handlerCache;
@@ -173,18 +173,6 @@ public class Router {
         defaultHandlers.put(HttpMethod.POST, new ApiHandler());
         defaultHandlers.put(HttpMethod.HEAD, new HeadHandler(webRoot));
     }
-    
-    /**
-     * 注册路由配置
-     */
-    public void registerRoutes(List<RouteConfig> routeConfigs) {
-        for (RouteConfig config : routeConfigs) {
-            if (config.isEnabled()) {
-                registerRoute(config);
-            }
-        }
-        log.info("Router initialized with {} custom routes", routeConfigs.size());
-    }
 
     /**
      * 注册稳定路由（Controller注入专用）
@@ -196,8 +184,7 @@ public class Router {
         }
         HttpMethod method = config.getMethod();
 
-        staticRoutes.computeIfAbsent(method, k -> Collections.synchronizedList(new java.util.ArrayList<>()))
-                .add(new RouteEntry(config, handler));
+        staticRoutes.computeIfAbsent(method, k -> new RouteTrie()).insert(new RouteEntry(config, handler));
         log.debug("Registered static controller: {} {}", method, config.getPath());
     }
 
@@ -217,8 +204,7 @@ public class Router {
         RouteEntry entry = new RouteEntry(config);
 
         if (path.contains("{") && path.contains("}")) {
-            dynamicPathVariableRoutes.computeIfAbsent(method, k -> Collections.synchronizedList(new java.util.ArrayList<>()))
-                    .add(entry);
+            dynamicPathVariableRoutes.computeIfAbsent(method, k -> new RouteTrie()).insert(entry);
             log.debug("Registered dynamic path variable router: {} {} (Type: {})", method, path, config.getRouteType().name());
         } else {
             dynamicRoutes.computeIfAbsent(method, k -> new ConcurrentHashMap<>())
@@ -236,11 +222,10 @@ public class Router {
         String path = config.getPath();
 
         if (path.contains("{") && path.contains("}")) {
-            List<RouteEntry> methodRoutes = dynamicPathVariableRoutes.get(method);
-            if (methodRoutes != null) {
-                if (methodRoutes.removeIf(e -> e.config.equals(config))) {
-                    log.debug("Unregistered dynamic path variable router: {} {}", method, path);
-                }
+            RouteTrie trie = dynamicPathVariableRoutes.get(method);
+            if (trie != null) {
+                trie.remove(new RouteEntry(config));
+                log.debug("Unregistered dynamic path variable router: {} {}", method, path);
             }
         } else {
             Map<String, RouteEntry> methodRoutes = dynamicRoutes.get(method);
@@ -268,20 +253,41 @@ public class Router {
         HttpMethod method = httpContext.getRequest().getMethod();
         String path = httpContext.getRequest().getUri();
         HttpRequest request = httpContext.getRequest();
-        OutputStream output = httpContext.getOutput();
-        boolean keepAlive = httpContext.isKeepalive();
 
         RouteEntry entry = null;
 
-        // 查找稳定路由（Controller），支持通配符
-        entry = findPathMatchInControllerRoutes(staticRoutes, method, path, request);
-
-        // 查找动态路由，支持路径变量
-        if (entry == null) {
-            entry = findPathMatchInControllerRoutes(dynamicPathVariableRoutes, method, path, request);
+//        // 查找稳定路由（Controller），支持通配符
+//        entry = findPathMatchInControllerRoutes(staticRoutes, method, path, request);
+//
+//        // 查找动态路由，支持路径变量
+//        if (entry == null) {
+//            entry = findPathMatchInControllerRoutes(dynamicPathVariableRoutes, method, path, request);
+//        }
+//
+//        // 查找简单动态路由
+//        if (entry == null) {
+//            entry = findRouteEntry(dynamicRoutes, method, path);
+//        }
+        RouteTrie staticTrie = staticRoutes.get(method);
+        if (staticTrie != null) {
+            RouteTrie.TrieMatch staticMatch = staticTrie.search(path);
+            if (staticMatch != null) {
+                entry = staticMatch.entry;
+                request.getAttribute().setPathVariableAttributes(staticMatch.pathVariables);
+            }
         }
 
-        // 查找简单动态路由
+        if (entry == null) {
+            RouteTrie dynamicTrie = dynamicPathVariableRoutes.get(method);
+            if (dynamicTrie != null) {
+                RouteTrie.TrieMatch dynamicMatch = dynamicTrie.search(path);
+                if (dynamicMatch != null) {
+                    entry = dynamicMatch.entry;
+                    request.getAttribute().setPathVariableAttributes(dynamicMatch.pathVariables);
+                }
+            }
+        }
+
         if (entry == null) {
             entry = findRouteEntry(dynamicRoutes, method, path);
         }
@@ -487,9 +493,9 @@ public class Router {
     public Map<String, Object> getRouteStats() {
         Map<String, Object> stats = new HashMap<>();
 
-        int staticControllerCount = staticRoutes.values().stream().mapToInt(List::size).sum();
+        int staticControllerCount = staticRoutes.values().stream().mapToInt(RouteTrie::count).sum();
         int dynamicSimpleCount = dynamicRoutes.values().stream().mapToInt(Map::size).sum();
-        int dynamicPathVariableCount = dynamicPathVariableRoutes.values().stream().mapToInt(List::size).sum();
+        int dynamicPathVariableCount = dynamicPathVariableRoutes.values().stream().mapToInt(RouteTrie::count).sum();
         int totalDynamic = dynamicSimpleCount + dynamicPathVariableCount;
 
         stats.put("totalRoutes", staticControllerCount + totalDynamic);
